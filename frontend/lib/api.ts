@@ -208,7 +208,10 @@ export const api = {
 
   intelligence: () => fetchApi<Intelligence>('/api/intelligence'),
 
-  simulate: () => fetchApi<{ status: string }>('/api/simulate', { method: 'POST' }),
+  simulate: (scenario?: string) => fetchApi<{ status: string }>('/api/simulate', {
+    method: 'POST',
+    body: JSON.stringify({ scenario: scenario ?? null }),
+  }),
 
   restrictUser: (id: string) =>
     fetchApi<{ status: string; user_id: string }>(`/api/users/${id}/restrict`, { method: 'POST' }),

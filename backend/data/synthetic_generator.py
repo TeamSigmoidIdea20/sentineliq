@@ -187,3 +187,9 @@ class SyntheticGenerator:
 
     def generate_one(self) -> dict:
         return self.generate_batch(1)[0]
+
+    def generate_forced_fraud(self, pattern: str) -> dict:
+        spec = random.choice(list(self._specs.values()))
+        ts = datetime.utcnow()
+        ev = self._fraud_event(spec, ts, pattern)
+        return ev

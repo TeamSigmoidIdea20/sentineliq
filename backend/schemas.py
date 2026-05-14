@@ -184,6 +184,10 @@ class NoteRequest(BaseModel):
     text: str
 
 
+class SimulateRequest(BaseModel):
+    scenario: Optional[str] = None
+
+
 class RetrainResponse(BaseModel):
     status: str
     message: str

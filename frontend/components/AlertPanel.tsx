@@ -29,6 +29,20 @@ const EVENT_DOT: Record<string, string> = {
   system_query: '#8B49C4',
 }
 
+function formatTs(iso: string): string {
+  const normalised = /Z$|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : iso + 'Z'
+  const d = new Date(normalised)
+  const diff = Date.now() - d.getTime()
+  const s = Math.floor(diff / 1000)
+  if (s < 60) return `${s}s ago`
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' +
+    d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })
+}
+
 function generateExplanation(alert: Alert): string {
   const topPositive = [...alert.shap_values]
     .filter((v) => v.contribution > 0)
@@ -318,7 +332,7 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
                             {ev.description}
                           </p>
                           <p style={{ margin: '2px 0 0', fontSize: 10, color: C.textMuted }}>
-                            {ev.event_type.replace(/_/g, ' ')} · {timeAgo(ev.timestamp)}
+                            {ev.event_type.replace(/_/g, ' ')} · {formatTs(ev.timestamp)}
                           </p>
                         </div>
                       </div>

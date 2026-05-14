@@ -55,45 +55,45 @@ export default function SHAPChart({ values }: Props) {
               </span>
             </div>
 
-            {/* Centered waterfall bar */}
-            <div style={{ display: 'flex', alignItems: 'center', height: 6 }}>
-              {/* Left half — negative bars grow rightward (toward center) */}
-              <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', height: '100%', alignItems: 'center' }}>
-                {!isPositive && (
-                  <div
-                    style={{
-                      width: `${pct}%`,
-                      height: 6,
-                      background: C.negative,
-                      borderRadius: '2px 0 0 2px',
-                      transition: 'width 0.4s ease',
-                    }}
-                  />
-                )}
+            {/* Centered waterfall bar + inline val */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', height: 6 }}>
+                {/* Left half — negative bars grow rightward (toward center) */}
+                <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', height: '100%', alignItems: 'center' }}>
+                  {!isPositive && (
+                    <div
+                      style={{
+                        width: `${pct}%`,
+                        height: 6,
+                        background: C.negative,
+                        borderRadius: '2px 0 0 2px',
+                        transition: 'width 0.4s ease',
+                      }}
+                    />
+                  )}
+                </div>
+
+                {/* Center line */}
+                <div style={{ width: 1, height: 10, background: C.divider, flexShrink: 0 }} />
+
+                {/* Right half — positive bars grow leftward (away from center) */}
+                <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-start', height: '100%', alignItems: 'center' }}>
+                  {isPositive && (
+                    <div
+                      style={{
+                        width: `${pct}%`,
+                        height: 6,
+                        background: C.positive,
+                        borderRadius: '0 2px 2px 0',
+                        transition: 'width 0.4s ease',
+                      }}
+                    />
+                  )}
+                </div>
               </div>
-
-              {/* Center line */}
-              <div style={{ width: 1, height: 10, background: C.divider, flexShrink: 0 }} />
-
-              {/* Right half — positive bars grow leftward (away from center) */}
-              <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-start', height: '100%', alignItems: 'center' }}>
-                {isPositive && (
-                  <div
-                    style={{
-                      width: `${pct}%`,
-                      height: 6,
-                      background: C.positive,
-                      borderRadius: '0 2px 2px 0',
-                      transition: 'width 0.4s ease',
-                    }}
-                  />
-                )}
-              </div>
-            </div>
-
-            {/* Feature value */}
-            <div style={{ marginTop: 3 }}>
-              <span style={{ fontSize: 9, color: C.textMuted }}>val: {sv.value.toFixed(3)}</span>
+              <span style={{ fontSize: 9, color: C.textMuted, flexShrink: 0, width: 46, textAlign: 'right' }}>
+                val: {sv.value.toFixed(3)}
+              </span>
             </div>
           </div>
         )

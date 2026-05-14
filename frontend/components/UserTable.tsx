@@ -69,7 +69,7 @@ export default function UserTable({ users, loading, onSelectUser, watchlist, onT
             {onToggleWatchlist && (
               <th style={{ width: 36, padding: '10px 14px' }} />
             )}
-            {['User', 'Role', 'Department', 'Risk Score', '7d Trend', 'Last Active', ''].map((h) => (
+            {['User', 'Role', 'Department', 'Risk Score', 'Last Active', ''].map((h) => (
               <th key={h} style={{ padding: '10px 14px', textAlign: 'left', color: C.textMuted, fontWeight: 600, fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                 {h}
               </th>
@@ -164,9 +164,6 @@ export default function UserTable({ users, loading, onSelectUser, watchlist, onT
                     <TrendArrow trend={user.risk_trend} />
                     <RiskBadge level={level} size="sm" />
                   </div>
-                </td>
-                <td style={{ padding: '10px 14px' }}>
-                  <MiniSparkline score={user.risk_score} userId={user.id} trend={user.risk_trend} />
                 </td>
                 <td style={{ padding: '10px 14px', color: C.textMuted }}>
                   {timeAgo(user.last_seen)}

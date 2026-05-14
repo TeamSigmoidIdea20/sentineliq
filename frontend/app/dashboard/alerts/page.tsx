@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Sidebar from '@/components/Sidebar'
 import AlertTable from '@/components/AlertTable'
 import AlertPanel from '@/components/AlertPanel'
@@ -96,6 +96,19 @@ export default function AlertsPage() {
   const [page, setPage] = useState(1)
   const [threshold, setThreshold] = useState(50)
   const [simulateToast, setSimulateToast] = useState('')
+  const [simulateOpen, setSimulateOpen] = useState(false)
+  const simulateRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!simulateOpen) return
+    const handler = (e: MouseEvent) => {
+      if (simulateRef.current && !simulateRef.current.contains(e.target as Node)) {
+        setSimulateOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [simulateOpen])
   const PAGE_SIZE = 20
 
   const fetch = useCallback(async () => {
@@ -234,23 +247,52 @@ export default function AlertsPage() {
               >
                 {retraining ? 'RETRAINING' : 'RETRAIN XGB'}
               </button>
-              <button
-                onClick={async () => {
-                  await api.simulate().catch(() => null)
-                  setSimulateToast('Attack scenario injected')
-                  setTimeout(() => {
-                    setSimulateToast('')
-                    fetch()
-                  }, 3000)
-                }}
-                style={{
-                  padding: '7px 14px', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
-                  background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted,
-                  borderRadius: 3, cursor: 'pointer',
-                }}
-              >
-                SIMULATE EVENT
-              </button>
+              <div ref={simulateRef} style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setSimulateOpen((o) => !o)}
+                  style={{
+                    padding: '7px 14px', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
+                    background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted,
+                    borderRadius: 3, cursor: 'pointer',
+                  }}
+                >
+                  SIMULATE ▾
+                </button>
+                {simulateOpen && (
+                  <div style={{
+                    position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 20,
+                    background: C.card, border: `1px solid ${C.border}`, borderRadius: 4,
+                    minWidth: 220, boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                  }}>
+                    {[
+                      { label: 'Bulk Data Exfiltration', scenario: 'bulk_exfiltration' },
+                      { label: 'Privilege Escalation Sequence', scenario: 'privilege_escalation' },
+                      { label: 'Off-Hours Treasury Access', scenario: 'off_hours_treasury' },
+                    ].map(({ label, scenario }, idx, arr) => (
+                      <button
+                        key={scenario}
+                        onClick={async () => {
+                          setSimulateOpen(false)
+                          await api.simulate(scenario).catch(() => null)
+                          setSimulateToast(`${label} injected`)
+                          setTimeout(() => { setSimulateToast(''); fetch() }, 3000)
+                        }}
+                        style={{
+                          display: 'block', width: '100%', textAlign: 'left',
+                          padding: '10px 14px', fontSize: 12, color: C.textPrimary,
+                          background: 'transparent', border: 'none',
+                          borderBottom: idx < arr.length - 1 ? `1px solid ${C.border}` : 'none',
+                          cursor: 'pointer', fontFamily: 'inherit',
+                        }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = C.hover }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

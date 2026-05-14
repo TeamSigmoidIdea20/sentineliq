@@ -110,7 +110,12 @@ export default function CasesPage() {
       <Sidebar />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         <div style={{ height: 48, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', borderBottom: `1px solid ${C.border}`, background: C.card, flexShrink: 0 }}>
-          <h1 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: C.textPrimary }}>Kill Chain Cases</h1>
+          <div>
+            <h1 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: C.textPrimary }}>Kill Chain Cases</h1>
+            <p style={{ margin: '2px 0 0', fontSize: 11, color: C.textMuted }}>
+              Related alerts from the same user grouped into attack sequences — see the full pattern, not isolated events.
+            </p>
+          </div>
           <span style={{ fontSize: 11, color: C.textMuted }}>{cases.length} active patterns</span>
         </div>
 

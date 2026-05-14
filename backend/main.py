@@ -39,6 +39,7 @@ from schemas import (
     FPTrendPoint,
     RiskPoint,
     SHAPValue,
+    SimulateRequest,
     StatsResponse,
     UserDetailResponse,
     UserEventResponse,
@@ -935,11 +936,20 @@ async def get_intelligence(db: AsyncSession = Depends(get_db)):
 # Simulate / retrain
 # ---------------------------------------------------------------------------
 
+_SCENARIO_PATTERNS: dict = {
+    "bulk_exfiltration": "bulk_download",
+    "privilege_escalation": "privilege_escalation",
+    "off_hours_treasury": "off_hours_login",
+}
+
 @app.post("/api/simulate")
-async def simulate():
-    ev = generator.generate_one()
+async def simulate(body: SimulateRequest = None):
+    if body is None:
+        body = SimulateRequest()
+    pattern = _SCENARIO_PATTERNS.get(body.scenario or "") if body.scenario else None
+    ev = generator.generate_forced_fraud(pattern) if pattern else generator.generate_one()
     asyncio.create_task(_process_event(ev))
-    return {"status": "ok", "event_id": ev["id"]}
+    return {"status": "ok", "event_id": ev["id"], "scenario": body.scenario}
 
 
 @app.post("/api/retrain", response_model=RetrainResponse)
