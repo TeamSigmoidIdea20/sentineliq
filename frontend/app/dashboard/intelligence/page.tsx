@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import Sidebar from '@/components/Sidebar'
-import { api, type Intelligence, timeAgo } from '@/lib/api'
+import { api, type Intelligence, type Stats, timeAgo } from '@/lib/api'
 import { C } from '@/lib/tokens'
 
 const IntelligenceCharts = dynamic(() => import('@/components/IntelligenceCharts'), {
@@ -65,18 +65,25 @@ function ModelCard({
 
 export default function IntelligencePage() {
   const [data, setData] = useState<Intelligence | null>(null)
+  const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
   const [training, setTraining] = useState(false)
   const [logLines, setLogLines] = useState<string[]>([])
   const logRef = useRef<HTMLDivElement>(null)
 
-  const loadData = () =>
-    api.intelligence()
-      .then(setData)
-      .catch(() => setData(null))
-      .finally(() => setLoading(false))
+  const loadAll = async () => {
+    setLoading(true)
+    const [intel, st] = await Promise.allSettled([
+      api.intelligence(),
+      api.stats(),
+    ])
+    if (intel.status === 'fulfilled') setData(intel.value)
+    else setData(null)
+    if (st.status === 'fulfilled') setStats(st.value)
+    setLoading(false)
+  }
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => { loadAll() }, [])
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight
@@ -87,8 +94,10 @@ export default function IntelligencePage() {
     setTraining(true)
     setLogLines([])
 
+    // Fire retrain immediately — real API call
     const retrainPromise = api.retrain().catch(() => null)
 
+    // Stream fixed lines while retrain runs in background
     const fixedLines = [
       '[00:00] Initialising training pipeline...',
       `[00:01] Loading ${data?.training_events ?? 2000} synthetic events from SQLite...`,
@@ -98,35 +107,61 @@ export default function IntelligencePage() {
       '[00:05] Building LSTM sequences — seq_len=20, 50 users...',
       '[00:06] LSTM Autoencoder forward pass complete. Mean recon error: 0.089',
     ]
-
     for (const line of fixedLines) {
       await new Promise((r) => setTimeout(r, 150))
       setLogLines((prev) => [...prev, line])
     }
 
+    // Await the real retrain response
     const result = await retrainPromise
     const labelsN = result?.labels_used ?? 0
-    const precisionVal = result?.precision_after != null ? result.precision_after.toFixed(3) : '—'
-    const recallVal = result?.recall_after != null ? result.recall_after.toFixed(3) : '—'
-    const f1Val = result?.f1_after != null ? result.f1_after.toFixed(3) : '—'
+    const skipped = result?.status === 'skipped' || result === null
 
-    const tailLines = [
-      `[00:07] Loading analyst labels from SQLite — ${labelsN} labels found...`,
-      '[00:08] Retraining XGBoost — n_estimators=100, 5 fraud classes...',
-      `[00:09] XGBoost retrained. Precision: ${precisionVal} | Recall: ${recallVal} | F1: ${f1Val}`,
-      '[00:10] Ensemble weights applied: IF(0.3) + LSTM(0.4) + XGB(0.3)',
-      '[00:11] Models saved to disk. Pipeline complete.',
-    ]
+    const precisionVal = result?.precision_after != null ? result.precision_after.toFixed(3) : '—'
+    const recallVal    = result?.recall_after    != null ? result.recall_after.toFixed(3)    : '—'
+    const f1Val        = result?.f1_after        != null ? result.f1_after.toFixed(3)        : '—'
+
+    // Tail lines — reflect real outcome
+    const tailLines: string[] = skipped
+      ? [
+          `[00:07] Loading analyst labels from SQLite — ${labelsN} labels found (need ≥10)`,
+          '[00:08] Skipping XGBoost retrain — insufficient labeled data',
+          '[00:09] Pipeline complete. Label more alerts and retry.',
+        ]
+      : [
+          `[00:07] Loading analyst labels from SQLite — ${labelsN} labels found...`,
+          '[00:08] Retraining XGBoost — n_estimators=100, 5 fraud classes...',
+          `[00:09] XGBoost retrained. Precision: ${precisionVal} | Recall: ${recallVal} | F1: ${f1Val}`,
+          '[00:10] Ensemble weights applied: IF(0.3) + LSTM(0.4) + XGB(0.3)',
+          '[00:11] Models saved to disk. Pipeline complete.',
+        ]
 
     for (const line of tailLines) {
       await new Promise((r) => setTimeout(r, 150))
       setLogLines((prev) => [...prev, line])
     }
 
+    // Optimistically patch model card data from retrain response
+    if (!skipped && result) {
+      setData((prev) => prev ? {
+        ...prev,
+        labeled_count: result.labels_used,
+        last_retrain_ts: new Date().toISOString(),
+        precision: result.precision_after ?? prev.precision,
+        recall: result.recall_after ?? prev.recall,
+        f1: result.f1_after ?? prev.f1,
+      } : prev)
+    }
+
+    // Re-fetch all data to get fully updated state from server
+    await loadAll()
     setTraining(false)
-    setLoading(true)
-    loadData()
   }
+
+  // Anomaly rate: alerts_today / events_today from stats (per user request)
+  const anomalyRatePct = stats && stats.events_today > 0
+    ? ((stats.alerts_today / stats.events_today) * 100).toFixed(1)
+    : data?.anomaly_rate != null ? data.anomaly_rate.toFixed(1) : '0.0'
 
   const detectDisplay = data
     ? data.mean_time_to_detect < 1
@@ -154,17 +189,19 @@ export default function IntelligencePage() {
                 opacity: training ? 0.7 : 1,
               }}
             >
-              {training ? 'TRAINING...' : 'RUN TRAINING PIPELINE'}
+              {training ? 'RUNNING...' : 'RUN TRAINING PIPELINE'}
             </button>
           </div>
         </div>
 
         <main style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 18 }}>
-          {loading && <div style={{ height: 120, background: C.card, border: `1px solid ${C.border}`, borderRadius: 4 }} />}
+          {loading && !data && (
+            <div style={{ height: 120, background: C.card, border: `1px solid ${C.border}`, borderRadius: 4 }} />
+          )}
 
           {data && (
             <>
-              {/* ML Pipeline header */}
+              {/* Model Pipeline cards */}
               <div>
                 <p style={{ margin: '0 0 14px', fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                   Model Pipeline
@@ -179,7 +216,7 @@ export default function IntelligencePage() {
                       { label: 'n_estimators', value: '100' },
                       { label: 'training events', value: String(data.training_events || 2000) },
                     ]}
-                    metric={{ label: 'Live anomaly rate', value: `${data.anomaly_rate?.toFixed(1) ?? '—'}%` }}
+                    metric={{ label: 'Live anomaly rate', value: `${anomalyRatePct}%` }}
                   />
                   <ModelCard
                     name="LSTM Autoencoder"
@@ -206,7 +243,7 @@ export default function IntelligencePage() {
                 </div>
               </div>
 
-              {/* Training log */}
+              {/* Terminal log — shown once training starts, persists until cleared */}
               {logLines.length > 0 && (
                 <div
                   ref={logRef}
@@ -217,13 +254,17 @@ export default function IntelligencePage() {
                   }}
                 >
                   {logLines.map((line, i) => (
-                    <div key={i}>{line}</div>
+                    <div key={i} style={{ color: line.includes('Skipping') || line.includes('insufficient') ? C.medium : C.low }}>
+                      {line}
+                    </div>
                   ))}
-                  {training && <span style={{ animation: 'blink 1s step-end infinite' }}>█</span>}
+                  {training && (
+                    <div style={{ display: 'inline-block', width: 8, height: 14, background: C.low, verticalAlign: 'middle', marginLeft: 2 }} />
+                  )}
                 </div>
               )}
 
-              {/* Metrics */}
+              {/* Ensemble Performance stats */}
               <div>
                 <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                   Ensemble Performance

@@ -108,6 +108,7 @@ export interface Stats {
   labels_collected: number
   next_retrain_in: string
   coordinated_patterns: CoordinatedPattern[]
+  events_today: number
 }
 
 export interface CaseItem {

@@ -163,6 +163,7 @@ class StatsResponse(BaseModel):
     labels_collected: int = 0
     next_retrain_in: str = "3h"
     coordinated_patterns: List[CoordinatedPattern] = []
+    events_today: int = 0
 
 
 class HealthResponse(BaseModel):

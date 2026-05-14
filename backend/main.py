@@ -359,6 +359,10 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
         if len(uids) >= 3
     ]
 
+    events_today = await db.scalar(
+        select(func.count()).select_from(EventModel).where(EventModel.timestamp >= today_start)
+    ) or 0
+
     return StatsResponse(
         users_monitored=users_monitored,
         alerts_today=alerts_today,
@@ -369,6 +373,7 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
         labels_collected=labels_collected,
         next_retrain_in="3h",
         coordinated_patterns=coordinated,
+        events_today=events_today,
     )
 
 

@@ -5,7 +5,6 @@ import { C as TOKENS } from '@/lib/tokens'
 
 const C = {
   border: TOKENS.border,
-  textPrimary: TOKENS.textPrimary,
   textMuted: TOKENS.textMuted,
   positive: TOKENS.critical,
   negative: TOKENS.low,
@@ -29,72 +28,89 @@ interface Props {
 
 export default function SHAPChart({ values }: Props) {
   if (!values || values.length === 0) {
-    return (
-      <div style={{ color: C.textMuted, fontSize: 12, padding: '12px 0' }}>No SHAP data available.</div>
-    )
+    return <div style={{ color: C.textMuted, fontSize: 12, padding: '12px 0' }}>No SHAP data available.</div>
   }
 
   const maxAbs = Math.max(...values.map((v) => Math.abs(v.contribution)), 0.001)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {values.map((sv) => {
-        const pct = (Math.abs(sv.contribution) / maxAbs) * 100
+        // Bar width: proportional to absolute value, max 48% of bar area per side
+        const pct = Math.min(48, (Math.abs(sv.contribution) / maxAbs) * 48)
         const isPositive = sv.direction === 'positive'
         const color = isPositive ? C.positive : C.negative
 
         return (
-          <div key={sv.feature}>
-            {/* Label row: feature name left, SHAP value right */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-              <span style={{ fontSize: 11, color: C.textMuted, fontWeight: 500 }}>
-                {LABELS[sv.feature] || sv.feature}
-              </span>
-              <span style={{ fontSize: 11, fontWeight: 700, color, letterSpacing: '-0.01em' }}>
-                {sv.contribution >= 0 ? '+' : ''}{sv.contribution.toFixed(3)}
-              </span>
-            </div>
+          <div key={sv.feature} style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+            {/* Feature name — fixed 140px, left-aligned */}
+            <span style={{
+              width: 140, flexShrink: 0,
+              fontSize: 11, color: C.textMuted, fontWeight: 500,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {LABELS[sv.feature] || sv.feature}
+            </span>
 
-            {/* Bar row: [left half 50%] [center 1px] [right half 50%] [val fixed] */}
-            <div style={{ display: 'flex', alignItems: 'center', height: 8 }}>
-              {/* Left 50%: negative bars extend left from center */}
-              <div style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-                {!isPositive && (
-                  <div style={{
-                    width: `${pct}%`, height: 6,
-                    background: C.negative,
-                    borderRadius: '2px 0 0 2px',
-                    transition: 'width 0.4s ease',
-                  }} />
-                )}
-              </div>
-
+            {/* Bar area — flex-1, position relative so bars can be absolutely placed */}
+            <div style={{ flex: 1, position: 'relative', height: 10 }}>
               {/* Center axis */}
-              <div style={{ width: 1, height: 10, background: C.divider, flexShrink: 0 }} />
+              <div style={{
+                position: 'absolute', left: '50%', top: 0, bottom: 0,
+                width: 1, background: C.divider,
+              }} />
 
-              {/* Right 50%: positive bars extend right from center */}
-              <div style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
-                {isPositive && (
-                  <div style={{
-                    width: `${pct}%`, height: 6,
-                    background: C.positive,
-                    borderRadius: '0 2px 2px 0',
-                    transition: 'width 0.4s ease',
-                  }} />
-                )}
-              </div>
+              {/* Positive bar: starts at center, extends RIGHT */}
+              {isPositive && (
+                <div style={{
+                  position: 'absolute',
+                  left: '50%',
+                  top: 2, bottom: 2,
+                  width: `${pct}%`,
+                  background: C.positive,
+                  borderRadius: '0 2px 2px 0',
+                  transition: 'width 0.4s ease',
+                }} />
+              )}
 
-              {/* Inline val — fixed width, right of bar area */}
-              <span style={{ fontSize: 9, color: C.textMuted, width: 52, flexShrink: 0, textAlign: 'right', paddingLeft: 6 }}>
-                {sv.value.toFixed(3)}
-              </span>
+              {/* Negative bar: ends at center, extends LEFT */}
+              {!isPositive && (
+                <div style={{
+                  position: 'absolute',
+                  right: '50%',
+                  top: 2, bottom: 2,
+                  width: `${pct}%`,
+                  background: C.negative,
+                  borderRadius: '2px 0 0 2px',
+                  transition: 'width 0.4s ease',
+                }} />
+              )}
             </div>
+
+            {/* SHAP contribution — fixed 60px, colored red/green, right-aligned */}
+            <span style={{
+              width: 60, flexShrink: 0,
+              fontSize: 11, fontWeight: 700, color,
+              textAlign: 'right', letterSpacing: '-0.01em',
+              paddingLeft: 8,
+            }}>
+              {sv.contribution >= 0 ? '+' : ''}{sv.contribution.toFixed(3)}
+            </span>
+
+            {/* Feature value — fixed 50px, muted, right-aligned */}
+            <span style={{
+              width: 50, flexShrink: 0,
+              fontSize: 9, color: C.textMuted,
+              textAlign: 'right', paddingLeft: 4,
+            }}>
+              {sv.value.toFixed(3)}
+            </span>
           </div>
         )
       })}
 
       {/* Legend */}
-      <div style={{ marginTop: 4, paddingTop: 10, borderTop: `1px solid ${C.border}`, display: 'flex', gap: 20 }}>
+      <div style={{ marginTop: 6, paddingTop: 10, borderTop: `1px solid ${C.border}`, display: 'flex', gap: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <div style={{ width: 16, height: 6, background: C.negative, borderRadius: 1 }} />
           <span style={{ fontSize: 10, color: C.textMuted }}>← Decreases risk</span>
