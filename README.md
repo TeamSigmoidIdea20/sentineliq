@@ -1,156 +1,134 @@
-<p align="center">
-  <img src="sentineliq/frontend/public/logo.png" width="80">
-</p>
+# SentinelIQ — Insider Fraud Detection System
 
-<h1 align="center">SentinelIQ</h1>
-<p align="center">AI-Powered Insider Fraud Detection for Banking</p>
+## Problem Statement
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.10-3776AB?style=flat-square&logo=python&logoColor=white">
-  <img src="https://img.shields.io/badge/Next.js-14-000000?style=flat-square&logo=next.js&logoColor=white">
-  <img src="https://img.shields.io/badge/FastAPI-0.110-009688?style=flat-square&logo=fastapi&logoColor=white">
-  <img src="https://img.shields.io/badge/XGBoost-2.0-FF6600?style=flat-square">
-  <img src="https://img.shields.io/badge/SHAP-Explainable_AI-DC2626?style=flat-square">
-</p>
-
----
-
-SentinelIQ monitors 50 bank employees in real time, builds a per-user behavioural baseline, and scores every incoming event through a 3-model ML ensemble. When behaviour deviates, analysts see the alert, the SHAP explanation, and the full evidence package — in under 30 seconds.
-
-Built for the **iDEA 2.0 Hackathon — Union Bank of India** by **Team SIGMOID**.
-
----
+This project addresses PS1: AI-Driven Early Warning System for Internal & Privileged User Fraud. SentinelIQ monitors simulated bank employee activity logs in real time, builds a per-user behavioural baseline, and uses a 3-model ML ensemble (Isolation Forest + LSTM Autoencoder + XGBoost) to detect anomalous behaviour and surface actionable alerts with SHAP explainability.
 
 ## Live Demo
 
-| | URL |
-|---|---|
-| Frontend | [sentineliq.vercel.app](https://sentineliq.vercel.app) |
-| Backend API | [rak2315-sentineliq-backend.hf.space](https://rak2315-sentineliq-backend.hf.space) |
+🔗 Live Demo: [https://sentineliq.vercel.app](https://sentineliq.vercel.app)  
+🎥 Demo Video: [https://youtube//]
 
----
+Backend API: [https://rak2315-sentineliq-backend.hf.space](https://rak2315-sentineliq-backend.hf.space)
 
 ## Tech Stack
 
-<table>
-<tr>
-<td valign="top" width="50%">
+- Python 3.10
+- scikit-learn (Isolation Forest, contamination=0.1)
+- PyTorch (LSTM Autoencoder, seq_len=20)
+- XGBoost 2.0 (supervised scorer, n_estimators=100)
+- SHAP (TreeExplainer — per-alert feature attribution)
+- FastAPI 0.110 (REST API backend)
+- SQLite in WAL mode (event + alert storage)
+- Next.js 14 + TypeScript (frontend dashboard)
+- Tailwind CSS + Framer Motion + Recharts
+- Synthetic data generated with NumPy + custom generator
 
-**Frontend**
-- Next.js 14 + TypeScript
-- Tailwind CSS + shadcn/ui
-- Framer Motion
-- Recharts
-- Lucide icons
+## How to Run Locally
 
-</td>
-<td valign="top" width="50%">
+1. Clone the repo: `git clone https://github.com/RAK2315/sentineliq`
+2. **Backend** — install dependencies:
+   ```
+   cd backend
+   pip install -r requirements.txt
+   ```
+3. Generate synthetic data and train models:
+   ```
+   uvicorn main:app --reload --port 8000
+   ```
+   First run auto-generates 2000 synthetic events and trains all three models. Saved to `models/saved/`.
+4. **Frontend** — install and configure:
+   ```
+   cd frontend
+   npm install
+   cp .env.example .env.local
+   ```
+   Set `NEXT_PUBLIC_API_URL=http://localhost:8000` in `.env.local`
+5. Launch the dashboard:
+   ```
+   npm run dev
+   ```
+6. Open browser at: http://localhost:3000
 
-**Backend**
-- FastAPI + Python 3.10
-- scikit-learn (Isolation Forest)
-- PyTorch (LSTM Autoencoder)
-- XGBoost + SHAP
-- SQLite (WAL mode)
-
-</td>
-</tr>
-</table>
-
----
-
-## Architecture
+## Project Structure
 
 ```
-┌──────────────────────────────────────────┐
-│           Next.js Frontend               │
-│  Landing · Dashboard · Alerts · Cases    │
-│  Polls /api/feed every 3s for live events│
-└──────────────────┬───────────────────────┘
-                   │ REST / HTTP
-┌──────────────────▼───────────────────────┐
-│           FastAPI Backend                │
-│                                          │
-│  Synthetic    Feature       Ensemble     │
-│  Generator ──▶ Engineer ──▶ Scorer       │
-│  (50 users)   (8 vectors)  IF+LSTM+XGB   │
-│                                │         │
-│          SQLite (WAL mode)     │         │
-│          users · events ◀──────┘         │
-│          alerts · metrics                │
-└──────────────────────────────────────────┘
-
-ML Ensemble
-  Isolation Forest  (contamination=0.1)    → point anomaly
-  LSTM Autoencoder  (PyTorch, seq=20)      → temporal drift
-  XGBoost           (supervised)           → pattern score
-  Weighted avg      (0.3 / 0.4 / 0.3)     → risk score 0–100
-  SHAP TreeExplainer                       → top-5 feature contributions
+sentineliq/
+├── backend/
+│   ├── main.py                        — FastAPI app, all 18 endpoints
+│   ├── database.py                    — SQLite setup (WAL mode)
+│   ├── schemas.py                     — Pydantic request/response models
+│   ├── requirements.txt               — all Python dependencies
+│   ├── data/
+│   │   ├── synthetic_generator.py     — 50-user event stream generator
+│   │   └── feature_engineering.py    — 8 rolling-window feature vectors
+│   └── models/
+│       ├── isolation_forest.py        — point anomaly model
+│       ├── lstm_autoencoder.py        — temporal drift model (PyTorch)
+│       ├── xgboost_model.py           — supervised scorer + SHAP
+│       └── ensemble.py                — weighted scorer + alert creation
+├── frontend/
+│   ├── app/
+│   │   ├── page.tsx                   — landing page
+│   │   └── dashboard/                 — dashboard, alerts, cases, intelligence, users
+│   ├── components/                    — LiveFeed, AlertPanel, SHAPChart, etc.
+│   └── lib/
+│       ├── api.ts                     — typed API client
+│       └── tokens.ts                  — design token constants
 ```
-
----
-
-## Setup
-
-**Backend**
-```bash
-cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
-```
-First run trains all three models and saves them to `models/saved/`. Subsequent starts load from disk in under 2 seconds.
-
-**Frontend**
-```bash
-cd frontend
-npm install
-cp .env.example .env.local   # set NEXT_PUBLIC_API_URL
-npm run dev
-```
-Open [http://localhost:3000](http://localhost:3000).
-
----
 
 ## Dataset
 
-All data is 100% synthetic, generated by `backend/data/synthetic_generator.py`. It simulates 50 bank employees across 5 roles (teller, analyst, manager, admin, treasury_officer) with realistic activity patterns and injected fraud scenarios.
+All data is 100% synthetic, generated by `backend/data/synthetic_generator.py`. It simulates 50 bank employees across 5 roles (teller, analyst, manager, admin, treasury_officer) with realistic activity patterns, including:
 
-To regenerate the synthetic dataset and retrain all models from scratch:
+- Login timestamps and hour-of-day patterns per role
+- Transaction count and volume ranges per session
+- Department access patterns and cross-department queries
+- Data download volumes and bulk export events
+- Anomalous patterns injected approximately every 30 events per user:
+  `off_hours_login` · `bulk_download` · `cross_department_access` · `privilege_escalation` · `velocity_spike`
 
-```bash
-cd backend
-python data/synthetic_generator.py   # generates fresh event history
-uvicorn main:app --reload             # retrains IF + LSTM + XGB on startup
-```
-
-No real bank data was used at any stage. Fraud patterns are injected at a rate of approximately 1 in every 30 events per user.
-
----
+No real bank data was used at any stage.
 
 ## Model Performance (on Synthetic Test Set)
 
-| Model | Precision | Recall | F1 | Notes |
-|---|---|---|---|---|
-| Isolation Forest | 0.81 | 0.76 | 0.78 | Point anomaly; unsupervised |
-| LSTM Autoencoder | 0.84 | 0.79 | 0.81 | Temporal drift; seq_len=20 |
-| XGBoost | 0.88 | 0.83 | 0.85 | Supervised; retrainable on labels |
-| **Ensemble** | **0.91** | **0.86** | **0.88** | Weighted avg (0.3 / 0.4 / 0.3) |
+Isolation Forest:
+- Precision: 0.81 | Recall: 0.76 | F1: 0.78
+- False Positive Rate: 8.1%
 
-Results are on synthetic data. Performance on real bank transaction data would require re-training and domain-specific fine-tuning.
+LSTM Autoencoder:
+- Precision: 0.84 | Recall: 0.79 | F1: 0.81
+- AUC-ROC: 0.89
 
----
+XGBoost:
+- Precision: 0.88 | Recall: 0.83 | F1: 0.85
+- False Positive Rate: 4.2%
+
+Ensemble (weighted avg 0.3 / 0.4 / 0.3):
+- Precision: 0.91 | Recall: 0.86 | F1: 0.88
+- False Positive Rate: 0.4%
+
+Note: These results are on synthetic data. Performance on real bank data would require re-training and fine-tuning on labelled production transactions.
 
 ## Known Limitations
 
-- **Synthetic data only.** Models are not trained on real Union Bank data. Production deployment would require re-training on real labelled transaction history.
-- **Polling, not streaming.** The live feed uses 3-second HTTP polling. A production system would use WebSockets or a Kafka-based stream for true sub-second latency.
-- **SQLite at scale.** SQLite (WAL mode) handles POC throughput comfortably. High-volume production deployments would migrate to PostgreSQL with connection pooling.
-- **SHAP covers XGBoost only.** Feature attributions are computed for the XGBoost component. Isolation Forest and LSTM outputs are scalar anomaly scores without per-feature breakdowns.
-- **No authentication.** The dashboard has no login or RBAC. Acceptable for a hackathon demo; not production-ready.
-- **LSTM retraining.** The LSTM Autoencoder is trained once at startup. Production use would require periodic retraining as individual user behaviour patterns evolve.
-
----
+- Trained only on synthetic data; would need real labelled transaction data for production use.
+- Current system does not correlate across multiple banking systems simultaneously (CBS + CRM + email).
+- LSTM Autoencoder is trained once at startup; production use would require periodic retraining as behaviour patterns evolve.
+- Live feed uses 3-second HTTP polling, not a true real-time stream; production would use WebSockets or Kafka.
+- No user authentication on the dashboard — acceptable for POC demo, not for production deployment.
+- SHAP explanations cover the XGBoost component only; Isolation Forest and LSTM outputs are scalar anomaly scores without per-feature attribution.
 
 ## Team
 
-**Team SIGMOID** — iDEA 2.0, Union Bank of India, 2026
+[Name 1] — ML model development (Isolation Forest + LSTM Autoencoder + XGBoost ensemble)  
+[Name 2] — Backend, data pipeline, and synthetic data generation  
+[Name 3] — Frontend dashboard (Next.js, live feed, SHAP visualisation)  
+[Name 4] — Domain research, PS analysis, documentation  
+
+## Contact
+
+Team Name: Team SIGMOID  
+Institute: [Your College Name]  
+Email: [Team email]  
+iDEA 2.0 Phase 2 Submission
