@@ -6,8 +6,8 @@ This project addresses PS1: AI-Driven Early Warning System for Internal & Privil
 
 ## Live Demo
 
-🔗 Live Demo: [https://sentineliq.vercel.app](https://sentineliq.vercel.app)  
-🎥 Demo Video: [https://youtube//]
+Live Demo: [https://sentineliq-gold.vercel.app/](https://sentineliq-gold.vercel.app/)  
+Demo Video: [https://youtube//]
 
 Backend API: [https://rak2315-sentineliq-backend.hf.space](https://rak2315-sentineliq-backend.hf.space)
 
@@ -121,10 +121,10 @@ Note: These results are on synthetic data. Performance on real bank data would r
 
 ## Team
 
-[Rehaan Ahmad khan] — ML model development (Isolation Forest + LSTM Autoencoder + XGBoost ensemble)  
-[Shantanu Singh] — Backend, data pipeline, and synthetic data generation  
-[Vishnu Tripathi] — Frontend dashboard (Next.js, live feed, SHAP visualisation)  
-[Krishna Agarwal] — Domain research, PS analysis, documentation  
+Rehaan Ahmad Khan — ML model development (Isolation Forest + LSTM Autoencoder + XGBoost ensemble)  
+Shantanu Singh — Backend, data pipeline, and synthetic data generation  
+Vishnu Tripathi — Frontend dashboard (Next.js, live feed, SHAP visualisation)  
+Krishna Agarwal — Domain research, PS analysis, documentation  
 
 ## Contact
 

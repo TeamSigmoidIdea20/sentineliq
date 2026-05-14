@@ -49,6 +49,8 @@ class UserResponse(BaseModel):
     last_seen: datetime
     location: str
     risk_trend: str = "stable"
+    restricted: bool = False
+    escalated: bool = False
 
 
 class RiskPoint(BaseModel):
@@ -139,6 +141,10 @@ class IntelligenceResponse(BaseModel):
     anomaly_type_breakdown: List[BreakdownItem]
     model_agreement_rate: float
     false_positive_rate_trend: List[FPTrendPoint]
+    labeled_count: int = 0
+    last_retrain_ts: Optional[str] = None
+    training_events: int = 0
+    anomaly_rate: float = 0.0
 
 
 class CoordinatedPattern(BaseModel):

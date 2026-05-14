@@ -27,6 +27,8 @@ class UserModel(Base):
     risk_score: Mapped[float] = mapped_column(Float, default=0.0)
     last_seen: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
     location: Mapped[str] = mapped_column(String)
+    restricted: Mapped[int] = mapped_column(Integer, default=0)
+    escalated: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class EventModel(Base):
@@ -90,6 +92,8 @@ async def init_db():
             "ALTER TABLE events ADD COLUMN download_mb REAL DEFAULT 0.0",
             "ALTER TABLE events ADD COLUMN tx_count INTEGER DEFAULT 0",
             "ALTER TABLE alerts ADD COLUMN label_updated_at DATETIME",
+            "ALTER TABLE users ADD COLUMN restricted INTEGER DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN escalated INTEGER DEFAULT 0",
         ]:
             try:
                 await conn.execute(text(stmt))

@@ -662,9 +662,31 @@ async def get_users(db: AsyncSession = Depends(get_db)):
             id=r.id, name=r.name, role=r.role, department=r.department,
             risk_score=r.risk_score, last_seen=r.last_seen, location=r.location,
             risk_trend=_trend(r.id),
+            restricted=bool(getattr(r, 'restricted', 0)),
+            escalated=bool(getattr(r, 'escalated', 0)),
         )
         for r in rows
     ]
+
+
+@app.post("/api/users/{user_id}/restrict")
+async def restrict_user(user_id: str, db: AsyncSession = Depends(get_db)):
+    row = await db.get(UserModel, user_id)
+    if not row:
+        raise HTTPException(404, "User not found")
+    row.restricted = 1
+    await db.commit()
+    return {"status": "restricted", "user_id": user_id}
+
+
+@app.post("/api/users/{user_id}/escalate")
+async def escalate_user(user_id: str, db: AsyncSession = Depends(get_db)):
+    row = await db.get(UserModel, user_id)
+    if not row:
+        raise HTTPException(404, "User not found")
+    row.escalated = 1
+    await db.commit()
+    return {"status": "escalated", "user_id": user_id}
 
 
 @app.get("/api/cases", response_model=List[CaseResponse])
@@ -876,6 +898,23 @@ async def get_intelligence(db: AsyncSession = Depends(get_db)):
     ]
     agreement_rate = round((agreement_count / max(1, len(alert_rows))) * 100, 1)
 
+    labeled_count = await db.scalar(
+        select(func.count()).select_from(AlertModel).where(AlertModel.label.in_(["TP", "FP"]))
+    ) or 0
+
+    last_metric = (
+        await db.execute(
+            select(ModelMetricModel).order_by(desc(ModelMetricModel.created_at)).limit(1)
+        )
+    ).scalars().first()
+    last_retrain_ts = last_metric.created_at.isoformat() if last_metric else None
+
+    total_events = await db.scalar(select(func.count()).select_from(EventModel)) or 0
+    fraud_events = await db.scalar(
+        select(func.count()).select_from(EventModel).where(EventModel.is_fraud == 1)
+    ) or 0
+    anomaly_rate = round((fraud_events / max(1, total_events)) * 100, 1)
+
     return IntelligenceResponse(
         precision=precision,
         recall=recall,
@@ -885,6 +924,10 @@ async def get_intelligence(db: AsyncSession = Depends(get_db)):
         anomaly_type_breakdown=breakdown,
         model_agreement_rate=agreement_rate,
         false_positive_rate_trend=fp_trend,
+        labeled_count=labeled_count,
+        last_retrain_ts=last_retrain_ts,
+        training_events=total_events,
+        anomaly_rate=anomaly_rate,
     )
 
 

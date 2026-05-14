@@ -7,6 +7,14 @@ import AlertPanel from '@/components/AlertPanel'
 import { api, type CaseItem, formatFraudType, timeAgo } from '@/lib/api'
 import { C } from '@/lib/tokens'
 
+const CASE_EXPLANATIONS: Record<string, string> = {
+  'Coordinated Insider Threat': 'Multiple distinct fraud patterns detected from the same user within a 24-hour window. This sequence suggests deliberate, planned insider activity rather than accidental policy violation.',
+  'Data Exfiltration Attempt': 'A pattern of bulk downloads combined with cross-department access detected. This behaviour matches known data theft sequences where insiders aggregate data before extraction.',
+  'Privilege Abuse Sequence': 'Repeated privilege escalation attempts combined with off-hours access detected. Indicates a user actively probing system boundaries beyond their authorised scope.',
+  'Treasury Manipulation': 'Velocity spikes combined with account modifications in treasury systems detected. This pattern is consistent with financial manipulation attempts targeting high-value accounts.',
+  'Escalating Insider Risk': 'Risk score has been trending upward across multiple sessions. While no single event is conclusive, the cumulative pattern warrants heightened monitoring.',
+}
+
 function severityColor(severity: string) {
   if (severity === 'critical') return C.critical
   if (severity === 'high') return C.critical
@@ -51,6 +59,11 @@ function CaseCard({
           <p style={{ margin: '4px 0 0', fontSize: 11, color: C.textMuted }}>
             {item.user_names.join(', ')} · {item.users_involved.length} user{item.users_involved.length === 1 ? '' : 's'}
           </p>
+          {CASE_EXPLANATIONS[item.name] && (
+            <p style={{ margin: '8px 0 0', fontSize: 11, color: C.textMuted, lineHeight: 1.6 }}>
+              {CASE_EXPLANATIONS[item.name]}
+            </p>
+          )}
         </div>
         <span style={{ fontSize: 10, fontWeight: 800, color, border: `1px solid ${color}`, borderRadius: 2, padding: '3px 7px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
           {item.severity}

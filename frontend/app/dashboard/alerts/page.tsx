@@ -43,21 +43,21 @@ function Select({
   )
 }
 
-function StatStrip({ alerts }: { alerts: Alert[] }) {
+function StatStrip({ alerts, stats }: { alerts: Alert[]; stats: Stats | null }) {
   const open = alerts.filter((a) => a.status === 'open').length
-  const tp = alerts.filter((a) => a.label === 'TP').length
-  const fp = alerts.filter((a) => a.label === 'FP').length
-  const labeled = tp + fp
-  const tpr = labeled > 0 ? ((tp / labeled) * 100).toFixed(1) : '—'
-  const fpr = labeled > 0 ? ((fp / labeled) * 100).toFixed(1) : '—'
+  const labeled = stats?.labels_collected ?? 0
+  const fprRaw = stats?.false_positive_rate ?? null
+  const tprRaw = fprRaw !== null && labeled > 0 ? (100 - fprRaw).toFixed(1) : null
+  const fprDisplay = labeled === 0 ? 'No labels yet' : fprRaw !== null ? `${fprRaw.toFixed(1)}%` : '—'
+  const tprDisplay = labeled === 0 ? 'No labels yet' : tprRaw !== null ? `${tprRaw}%` : '—'
   const avgConf = alerts.length > 0
     ? (alerts.reduce((s, a) => s + a.model_scores.xgboost, 0) / alerts.length).toFixed(2)
     : '—'
 
   const items = [
     { label: 'Open Alerts', value: String(open), color: C.critical },
-    { label: 'True Positive Rate', value: tpr !== '—' ? `${tpr}%` : '—', color: C.low },
-    { label: 'False Positive Rate', value: fpr !== '—' ? `${fpr}%` : '—', color: C.medium },
+    { label: 'True Positive Rate', value: tprDisplay, color: labeled === 0 ? C.textMuted : C.low },
+    { label: 'False Positive Rate', value: fprDisplay, color: labeled === 0 ? C.textMuted : C.medium },
     { label: 'Avg. XGB Confidence', value: avgConf, color: C.textPrimary },
   ]
 
@@ -95,6 +95,7 @@ export default function AlertsPage() {
   const [timeRange, setTimeRange] = useState('all')
   const [page, setPage] = useState(1)
   const [threshold, setThreshold] = useState(50)
+  const [simulateToast, setSimulateToast] = useState('')
   const PAGE_SIZE = 20
 
   const fetch = useCallback(async () => {
@@ -234,7 +235,14 @@ export default function AlertsPage() {
                 {retraining ? 'RETRAINING' : 'RETRAIN XGB'}
               </button>
               <button
-                onClick={() => api.simulate()}
+                onClick={async () => {
+                  await api.simulate().catch(() => null)
+                  setSimulateToast('Attack scenario injected')
+                  setTimeout(() => {
+                    setSimulateToast('')
+                    fetch()
+                  }, 3000)
+                }}
                 style={{
                   padding: '7px 14px', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
                   background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted,
@@ -245,6 +253,12 @@ export default function AlertsPage() {
               </button>
             </div>
           </div>
+
+          {simulateToast && (
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 4, padding: '10px 14px', color: C.medium, fontSize: 12, fontWeight: 600 }}>
+              {simulateToast} — refreshing in 3 seconds
+            </div>
+          )}
 
           {retrainMessage && (
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 4, padding: '10px 14px', color: C.low, fontSize: 12, fontWeight: 600 }}>
@@ -279,7 +293,8 @@ export default function AlertsPage() {
                   ← Prev
                 </button>
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const pg = Math.max(1, Math.min(page - 2 + i, totalPages - 4 + i))
+                  const start = Math.max(1, Math.min(page - 2, totalPages - 4))
+                  const pg = start + i
                   return (
                     <button
                       key={pg}
@@ -311,8 +326,8 @@ export default function AlertsPage() {
             </div>
           )}
 
-          {/* Stats strip — reflects threshold-filtered set */}
-          <StatStrip alerts={filteredAlerts} />
+          {/* Stats strip — TP/FP from backend labels, open count from filtered set */}
+          <StatStrip alerts={filteredAlerts} stats={stats} />
         </main>
       </div>
 

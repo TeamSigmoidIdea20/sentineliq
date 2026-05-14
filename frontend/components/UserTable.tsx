@@ -13,24 +13,25 @@ function TrendArrow({ trend }: { trend?: string }) {
   return <span style={{ fontSize: 13, color: C.textMuted }}>→</span>
 }
 
-function MiniSparkline({ score, userId }: { score: number; userId: string }) {
+function MiniSparkline({ score, userId, trend }: { score: number; userId: string; trend?: string }) {
   const points = useMemo(() => {
     const seed = userId.split('').reduce((acc, c, i) => acc + c.charCodeAt(0) * (i + 1), 0)
     return Array.from({ length: 7 }, (_, i) => {
-      const pseudo = Math.sin(seed + i * 127.1) * 0.5 + 0.5
-      const jitter = (pseudo - 0.5) * 20
-      return Math.max(0, Math.min(100, score + jitter))
+      const jitter = (Math.sin(seed + i * 37.3) * 0.5 + 0.5) * 6 - 3
+      let base = score
+      if (trend === 'up') base = score - 18 + (i / 6) * 22
+      else if (trend === 'down') base = score + 18 - (i / 6) * 22
+      return Math.max(0, Math.min(100, base + jitter))
     })
-  }, [userId, score])
+  }, [userId, score, trend])
   const max = 100
   const h = 28
   const w = 60
-  const path = points
-    .map((v, i) => `${(i / 6) * w},${h - (v / max) * h}`)
-    .join(' L ')
+  const path = points.map((v, i) => `${(i / 6) * w},${h - (v / max) * h}`).join(' L ')
+  const strokeColor = trend === 'up' ? '#DC2626' : trend === 'down' ? '#16A34A' : '#8B949E'
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-      <polyline points={path} fill="none" stroke={riskColor(score)} strokeWidth="1.5" />
+      <polyline points={path} fill="none" stroke={strokeColor} strokeWidth="1.5" />
     </svg>
   )
 }
@@ -41,9 +42,10 @@ interface Props {
   onSelectUser?: (id: string) => void
   watchlist?: Set<string>
   onToggleWatchlist?: (id: string) => void
+  restrictedUsers?: Set<string>
 }
 
-export default function UserTable({ users, loading, onSelectUser, watchlist, onToggleWatchlist }: Props) {
+export default function UserTable({ users, loading, onSelectUser, watchlist, onToggleWatchlist, restrictedUsers }: Props) {
   if (loading) {
     return (
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 4 }}>
@@ -78,6 +80,7 @@ export default function UserTable({ users, loading, onSelectUser, watchlist, onT
           {users.map((user) => {
             const level = riskLevel(user.risk_score)
             const isWatched = watchlist?.has(user.id) ?? false
+            const isRestricted = restrictedUsers?.has(user.id) ?? user.restricted ?? false
             return (
               <tr
                 key={user.id}
@@ -136,6 +139,15 @@ export default function UserTable({ users, loading, onSelectUser, watchlist, onT
                         WATCH
                       </span>
                     )}
+                    {isRestricted && (
+                      <span style={{
+                        fontSize: 8, fontWeight: 700, color: C.critical,
+                        border: `1px solid ${C.critical}`, borderRadius: 2,
+                        padding: '1px 5px', letterSpacing: '0.05em', marginLeft: 4,
+                      }}>
+                        RESTRICTED
+                      </span>
+                    )}
                   </div>
                 </td>
                 <td style={{ padding: '10px 14px', color: C.textMuted, textTransform: 'capitalize' }}>
@@ -154,7 +166,7 @@ export default function UserTable({ users, loading, onSelectUser, watchlist, onT
                   </div>
                 </td>
                 <td style={{ padding: '10px 14px' }}>
-                  <MiniSparkline score={user.risk_score} userId={user.id} />
+                  <MiniSparkline score={user.risk_score} userId={user.id} trend={user.risk_trend} />
                 </td>
                 <td style={{ padding: '10px 14px', color: C.textMuted }}>
                   {timeAgo(user.last_seen)}

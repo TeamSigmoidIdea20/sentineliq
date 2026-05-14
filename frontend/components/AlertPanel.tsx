@@ -195,7 +195,7 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
       )}
 
       <aside className="panel-full" style={{
-        position: 'fixed', top: 0, right: 0, bottom: 0, width: 420,
+        position: 'fixed', top: 0, right: 0, bottom: 0, width: 480,
         background: C.card, borderLeft: `1px solid ${C.border}`,
         zIndex: 50, overflowY: 'auto',
         display: 'flex', flexDirection: 'column',
@@ -337,10 +337,15 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
                     ({peerData.role.replace(/_/g, ' ')} peers)
                   </span>
                 </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   {peerData.metrics.map((m) => {
                     const color = m.multiplier > 3 ? C.critical : m.multiplier > 1.5 ? C.medium : C.low
                     const barPct = Math.min(100, (m.multiplier / 6) * 100)
+                    const peerContext = m.multiplier <= 1.2
+                      ? `This user's ${m.metric.toLowerCase()} is within normal range for their role.`
+                      : m.multiplier > 3
+                      ? `This is ${m.multiplier.toFixed(1)}x higher than the ${peerData.role.replace(/_/g, ' ')} average — a strong indicator of abnormal behaviour for this role.`
+                      : `This is ${m.multiplier.toFixed(1)}x higher than the ${peerData.role.replace(/_/g, ' ')} average — a significant deviation.`
                     return (
                       <div key={m.metric}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, alignItems: 'baseline', gap: 8 }}>
@@ -349,9 +354,10 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
                             {m.multiplier.toFixed(1)}x peer avg
                           </span>
                         </div>
-                        <div style={{ height: 4, background: C.border, borderRadius: 2, overflow: 'hidden' }}>
+                        <div style={{ height: 4, background: C.border, borderRadius: 2, overflow: 'hidden', marginBottom: 5 }}>
                           <div style={{ width: `${barPct}%`, height: '100%', background: color, transition: 'width 0.4s ease' }} />
                         </div>
+                        <p style={{ margin: 0, fontSize: 10, color: C.textMuted, lineHeight: 1.5 }}>{peerContext}</p>
                       </div>
                     )
                   })}

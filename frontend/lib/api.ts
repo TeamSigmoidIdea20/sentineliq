@@ -44,6 +44,8 @@ export interface User {
   last_seen: string
   location: string
   risk_trend?: 'up' | 'down' | 'stable'
+  restricted?: boolean
+  escalated?: boolean
 }
 
 export interface UserDetail extends User {
@@ -130,6 +132,10 @@ export interface Intelligence {
   anomaly_type_breakdown: { fraud_type: string; count: number }[]
   model_agreement_rate: number
   false_positive_rate_trend: { date: string; rate: number }[]
+  labeled_count: number
+  last_retrain_ts: string | null
+  training_events: number
+  anomaly_rate: number
 }
 
 async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
@@ -203,6 +209,12 @@ export const api = {
   intelligence: () => fetchApi<Intelligence>('/api/intelligence'),
 
   simulate: () => fetchApi<{ status: string }>('/api/simulate', { method: 'POST' }),
+
+  restrictUser: (id: string) =>
+    fetchApi<{ status: string; user_id: string }>(`/api/users/${id}/restrict`, { method: 'POST' }),
+
+  escalateUser: (id: string) =>
+    fetchApi<{ status: string; user_id: string }>(`/api/users/${id}/escalate`, { method: 'POST' }),
 
   retrain: () => fetchApi<{ status: string; message: string; precision_before?: number; precision_after?: number; labels_used: number }>('/api/retrain', { method: 'POST' }),
 }

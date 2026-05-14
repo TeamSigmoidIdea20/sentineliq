@@ -34,23 +34,52 @@ function RiskHistoryChart({ history }: { history: { date: string; score: number 
   )
 }
 
-function UserProfilePanel({ userId, onClose }: { userId: string; onClose: () => void }) {
+function UserProfilePanel({
+  userId, onClose, onRestrict, onEscalate,
+}: {
+  userId: string
+  onClose: () => void
+  onRestrict: (id: string, name: string) => void
+  onEscalate: (id: string, name: string) => void
+}) {
   const [detail, setDetail] = useState<UserDetail | null>(null)
   const [loading, setLoading] = useState(true)
-  const [actionMsg, setActionMsg] = useState<string | null>(null)
-
-  function showAction(msg: string) {
-    setActionMsg(msg)
-    setTimeout(() => setActionMsg(null), 3000)
-  }
+  const [restricted, setRestricted] = useState(false)
+  const [escalated, setEscalated] = useState(false)
+  const [banner, setBanner] = useState<{ text: string; color: string } | null>(null)
 
   useEffect(() => {
     setLoading(true)
+    setRestricted(false)
+    setEscalated(false)
+    setBanner(null)
     api.user(userId)
-      .then(setDetail)
+      .then((d) => {
+        setDetail(d)
+        setRestricted(d.restricted ?? false)
+        setEscalated(d.escalated ?? false)
+      })
       .catch(() => setDetail(null))
       .finally(() => setLoading(false))
   }, [userId])
+
+  const handleRestrict = async () => {
+    if (restricted || !detail) return
+    await api.restrictUser(userId).catch(() => null)
+    setRestricted(true)
+    const msg = `Access restricted for ${detail.name}. All active sessions terminated. Security team notified.`
+    setBanner({ text: msg, color: '#DC2626' })
+    onRestrict(userId, detail.name)
+  }
+
+  const handleEscalate = async () => {
+    if (escalated || !detail) return
+    await api.escalateUser(userId).catch(() => null)
+    setEscalated(true)
+    const ref = `ESC-${Math.floor(1000 + Math.random() * 9000)}`
+    setBanner({ text: `Case escalated to Senior Investigator. Reference: ${ref}`, color: '#D97706' })
+    onEscalate(userId, detail.name)
+  }
 
   return (
     <aside
@@ -167,37 +196,44 @@ function UserProfilePanel({ userId, onClose }: { userId: string; onClose: () => 
           )}
 
           {/* Actions */}
-          {actionMsg && (
+          {banner && (
             <div
               role="status"
               aria-live="polite"
               style={{
-                padding: '8px 12px', fontSize: 11, color: C.textPrimary,
-                background: C.hover, border: `1px solid ${C.border}`, borderRadius: 3,
+                padding: '10px 12px', fontSize: 11, color: '#F0F6FC',
+                background: `${banner.color}22`, border: `1px solid ${banner.color}`, borderRadius: 3,
+                lineHeight: 1.5,
               }}
             >
-              {actionMsg}
+              {banner.text}
             </div>
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
             <button
-              onClick={() => showAction(`Access restricted for ${detail?.name ?? userId}`)}
+              onClick={handleRestrict}
+              disabled={restricted}
               style={{
                 padding: '9px 0', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
-                background: C.critical, border: 'none', color: '#F0F6FC', borderRadius: 3, cursor: 'pointer',
+                background: restricted ? '#30363D' : C.critical,
+                border: 'none', color: restricted ? C.textMuted : '#F0F6FC',
+                borderRadius: 3, cursor: restricted ? 'default' : 'pointer',
               }}
             >
-              RESTRICT ACCESS
+              {restricted ? 'ACCESS RESTRICTED' : 'RESTRICT ACCESS'}
             </button>
             <button
-              onClick={() => showAction(`Case escalated for ${detail?.name ?? userId}`)}
+              onClick={handleEscalate}
+              disabled={escalated}
               style={{
                 padding: '9px 0', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
-                background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted,
-                borderRadius: 3, cursor: 'pointer',
+                background: escalated ? `${C.amber}22` : 'transparent',
+                border: `1px solid ${escalated ? C.amber : C.border}`,
+                color: escalated ? C.amber : C.textMuted,
+                borderRadius: 3, cursor: escalated ? 'default' : 'pointer',
               }}
             >
-              ESCALATE CASE
+              {escalated ? 'ESCALATED' : 'ESCALATE CASE'}
             </button>
           </div>
         </div>
@@ -211,6 +247,7 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true)
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
   const [watchlistFilter, setWatchlistFilter] = useState<'all' | 'watchlist'>('all')
+  const [restrictedUsers, setRestrictedUsers] = useState<Set<string>>(new Set())
   const [watchlist, setWatchlist] = useState<Set<string>>(() => {
     if (typeof window === 'undefined') return new Set()
     try {
@@ -339,12 +376,18 @@ export default function UsersPage() {
             onSelectUser={setSelectedUserId}
             watchlist={watchlist}
             onToggleWatchlist={toggleWatchlist}
+            restrictedUsers={restrictedUsers}
           />
         </main>
       </div>
 
       {selectedUserId && (
-        <UserProfilePanel userId={selectedUserId} onClose={() => setSelectedUserId(null)} />
+        <UserProfilePanel
+          userId={selectedUserId}
+          onClose={() => setSelectedUserId(null)}
+          onRestrict={(id) => setRestrictedUsers((prev) => new Set([...prev, id]))}
+          onEscalate={() => {}}
+        />
       )}
     </div>
   )
