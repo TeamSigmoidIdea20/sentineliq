@@ -219,7 +219,7 @@ export const api = {
   escalateUser: (id: string) =>
     fetchApi<{ status: string; user_id: string }>(`/api/users/${id}/escalate`, { method: 'POST' }),
 
-  retrain: () => fetchApi<{ status: string; message: string; precision_before?: number; precision_after?: number; labels_used: number }>('/api/retrain', { method: 'POST' }),
+  retrain: () => fetchApi<{ status: string; message: string; precision_before?: number; precision_after?: number; recall_after?: number; f1_after?: number; labels_used: number }>('/api/retrain', { method: 'POST' }),
 }
 
 export function riskLevel(score: number): 'critical' | 'high' | 'medium' | 'low' {

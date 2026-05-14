@@ -193,4 +193,6 @@ class RetrainResponse(BaseModel):
     message: str
     precision_before: Optional[float] = None
     precision_after: Optional[float] = None
+    recall_after: Optional[float] = None
+    f1_after: Optional[float] = None
     labels_used: int = 0

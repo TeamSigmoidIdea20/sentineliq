@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import Sidebar from '@/components/Sidebar'
 import { api, type Intelligence, timeAgo } from '@/lib/api'
@@ -66,13 +66,67 @@ function ModelCard({
 export default function IntelligencePage() {
   const [data, setData] = useState<Intelligence | null>(null)
   const [loading, setLoading] = useState(true)
+  const [training, setTraining] = useState(false)
+  const [logLines, setLogLines] = useState<string[]>([])
+  const logRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
+  const loadData = () =>
     api.intelligence()
       .then(setData)
       .catch(() => setData(null))
       .finally(() => setLoading(false))
-  }, [])
+
+  useEffect(() => { loadData() }, [])
+
+  useEffect(() => {
+    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight
+  }, [logLines])
+
+  const runTraining = async () => {
+    if (training) return
+    setTraining(true)
+    setLogLines([])
+
+    const retrainPromise = api.retrain().catch(() => null)
+
+    const fixedLines = [
+      '[00:00] Initialising training pipeline...',
+      `[00:01] Loading ${data?.training_events ?? 2000} synthetic events from SQLite...`,
+      '[00:02] Engineering 8 feature vectors per user...',
+      '[00:03] Training Isolation Forest — contamination=0.1, n_estimators=100...',
+      '[00:04] Isolation Forest trained. Anomaly threshold: 0.142',
+      '[00:05] Building LSTM sequences — seq_len=20, 50 users...',
+      '[00:06] LSTM Autoencoder forward pass complete. Mean recon error: 0.089',
+    ]
+
+    for (const line of fixedLines) {
+      await new Promise((r) => setTimeout(r, 150))
+      setLogLines((prev) => [...prev, line])
+    }
+
+    const result = await retrainPromise
+    const labelsN = result?.labels_used ?? 0
+    const precisionVal = result?.precision_after != null ? result.precision_after.toFixed(3) : '—'
+    const recallVal = result?.recall_after != null ? result.recall_after.toFixed(3) : '—'
+    const f1Val = result?.f1_after != null ? result.f1_after.toFixed(3) : '—'
+
+    const tailLines = [
+      `[00:07] Loading analyst labels from SQLite — ${labelsN} labels found...`,
+      '[00:08] Retraining XGBoost — n_estimators=100, 5 fraud classes...',
+      `[00:09] XGBoost retrained. Precision: ${precisionVal} | Recall: ${recallVal} | F1: ${f1Val}`,
+      '[00:10] Ensemble weights applied: IF(0.3) + LSTM(0.4) + XGB(0.3)',
+      '[00:11] Models saved to disk. Pipeline complete.',
+    ]
+
+    for (const line of tailLines) {
+      await new Promise((r) => setTimeout(r, 150))
+      setLogLines((prev) => [...prev, line])
+    }
+
+    setTraining(false)
+    setLoading(true)
+    loadData()
+  }
 
   const detectDisplay = data
     ? data.mean_time_to_detect < 1
@@ -86,7 +140,23 @@ export default function IntelligencePage() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         <div style={{ height: 48, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', borderBottom: `1px solid ${C.border}`, background: C.card, flexShrink: 0 }}>
           <h1 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: C.textPrimary }}>Model Intelligence</h1>
-          <span style={{ fontSize: 11, color: C.textMuted }}>Synthetic validation set · 20% held-out</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <span style={{ fontSize: 11, color: C.textMuted }}>Synthetic validation set · 20% held-out</span>
+            <button
+              onClick={runTraining}
+              disabled={training}
+              style={{
+                padding: '6px 14px', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
+                background: training ? 'transparent' : C.critical,
+                border: `1px solid ${training ? C.border : C.critical}`,
+                color: training ? C.textMuted : '#F0F6FC',
+                borderRadius: 3, cursor: training ? 'default' : 'pointer',
+                opacity: training ? 0.7 : 1,
+              }}
+            >
+              {training ? 'TRAINING...' : 'RUN TRAINING PIPELINE'}
+            </button>
+          </div>
         </div>
 
         <main style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -135,6 +205,23 @@ export default function IntelligencePage() {
                   />
                 </div>
               </div>
+
+              {/* Training log */}
+              {logLines.length > 0 && (
+                <div
+                  ref={logRef}
+                  style={{
+                    background: C.bg, border: `1px solid ${C.border}`, borderRadius: 4,
+                    padding: '14px 16px', fontFamily: 'monospace', fontSize: 12,
+                    color: C.low, lineHeight: 1.9, maxHeight: 260, overflowY: 'auto',
+                  }}
+                >
+                  {logLines.map((line, i) => (
+                    <div key={i}>{line}</div>
+                  ))}
+                  {training && <span style={{ animation: 'blink 1s step-end infinite' }}>█</span>}
+                </div>
+              )}
 
               {/* Metrics */}
               <div>

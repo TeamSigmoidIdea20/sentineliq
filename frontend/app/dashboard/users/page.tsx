@@ -247,6 +247,7 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true)
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
   const [watchlistFilter, setWatchlistFilter] = useState<'all' | 'watchlist'>('all')
+  const [searchQuery, setSearchQuery] = useState('')
   const [restrictedUsers, setRestrictedUsers] = useState<Set<string>>(new Set())
   const [watchlist, setWatchlist] = useState<Set<string>>(() => {
     if (typeof window === 'undefined') return new Set()
@@ -293,8 +294,10 @@ export default function UsersPage() {
   }, [fetchUsers])
 
   // Sort: watchlisted first, then by risk_score descending
+  const q = searchQuery.trim().toLowerCase()
   const displayedUsers = users
     .filter((u) => watchlistFilter === 'all' || watchlist.has(u.id))
+    .filter((u) => !q || u.name.toLowerCase().includes(q) || u.id.toLowerCase().includes(q))
     .sort((a, b) => {
       const aW = watchlist.has(a.id) ? 1 : 0
       const bW = watchlist.has(b.id) ? 1 : 0
@@ -369,6 +372,21 @@ export default function UsersPage() {
               EXPORT REPORT
             </button>
           </div>
+
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by name or user ID..."
+            style={{
+              width: '100%', padding: '8px 12px', marginBottom: 12,
+              background: C.card, border: `1px solid ${C.border}`, borderRadius: 0,
+              color: C.textPrimary, fontSize: 12, fontFamily: 'inherit', outline: 'none',
+              boxSizing: 'border-box',
+            }}
+            onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = '#4D5562' }}
+            onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = C.border }}
+          />
 
           <UserTable
             users={displayedUsers}

@@ -45,8 +45,8 @@ export default function SHAPChart({ values }: Props) {
 
         return (
           <div key={sv.feature}>
-            {/* Label row */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+            {/* Label row: feature name left, SHAP value right */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
               <span style={{ fontSize: 11, color: C.textMuted, fontWeight: 500 }}>
                 {LABELS[sv.feature] || sv.feature}
               </span>
@@ -55,44 +55,38 @@ export default function SHAPChart({ values }: Props) {
               </span>
             </div>
 
-            {/* Centered waterfall bar + inline val */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', height: 6 }}>
-                {/* Left half — negative bars grow rightward (toward center) */}
-                <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', height: '100%', alignItems: 'center' }}>
-                  {!isPositive && (
-                    <div
-                      style={{
-                        width: `${pct}%`,
-                        height: 6,
-                        background: C.negative,
-                        borderRadius: '2px 0 0 2px',
-                        transition: 'width 0.4s ease',
-                      }}
-                    />
-                  )}
-                </div>
-
-                {/* Center line */}
-                <div style={{ width: 1, height: 10, background: C.divider, flexShrink: 0 }} />
-
-                {/* Right half — positive bars grow leftward (away from center) */}
-                <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-start', height: '100%', alignItems: 'center' }}>
-                  {isPositive && (
-                    <div
-                      style={{
-                        width: `${pct}%`,
-                        height: 6,
-                        background: C.positive,
-                        borderRadius: '0 2px 2px 0',
-                        transition: 'width 0.4s ease',
-                      }}
-                    />
-                  )}
-                </div>
+            {/* Bar row: [left half 50%] [center 1px] [right half 50%] [val fixed] */}
+            <div style={{ display: 'flex', alignItems: 'center', height: 8 }}>
+              {/* Left 50%: negative bars extend left from center */}
+              <div style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                {!isPositive && (
+                  <div style={{
+                    width: `${pct}%`, height: 6,
+                    background: C.negative,
+                    borderRadius: '2px 0 0 2px',
+                    transition: 'width 0.4s ease',
+                  }} />
+                )}
               </div>
-              <span style={{ fontSize: 9, color: C.textMuted, flexShrink: 0, width: 46, textAlign: 'right' }}>
-                val: {sv.value.toFixed(3)}
+
+              {/* Center axis */}
+              <div style={{ width: 1, height: 10, background: C.divider, flexShrink: 0 }} />
+
+              {/* Right 50%: positive bars extend right from center */}
+              <div style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
+                {isPositive && (
+                  <div style={{
+                    width: `${pct}%`, height: 6,
+                    background: C.positive,
+                    borderRadius: '0 2px 2px 0',
+                    transition: 'width 0.4s ease',
+                  }} />
+                )}
+              </div>
+
+              {/* Inline val — fixed width, right of bar area */}
+              <span style={{ fontSize: 9, color: C.textMuted, width: 52, flexShrink: 0, textAlign: 'right', paddingLeft: 6 }}>
+                {sv.value.toFixed(3)}
               </span>
             </div>
           </div>

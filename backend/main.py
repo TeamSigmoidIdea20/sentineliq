@@ -121,6 +121,14 @@ def _precision_from_scores(scores: list[float], labels: list[int]) -> float:
     return round(tp / max(1, len(predicted_positive)), 3)
 
 
+def _recall_from_scores(scores: list[float], labels: list[int]) -> float:
+    actual_positive = [idx for idx, label in enumerate(labels) if label == 1]
+    if not actual_positive:
+        return 0.0
+    tp = sum(1 for idx in actual_positive if scores[idx] >= 0.5)
+    return round(tp / len(actual_positive), 3)
+
+
 async def _startup() -> None:
     global _initialized, _startup_mode
     logger.info("Initializing SentinelIQ — generating training data…")
@@ -911,10 +919,18 @@ async def get_intelligence(db: AsyncSession = Depends(get_db)):
     last_retrain_ts = last_metric.created_at.isoformat() if last_metric else None
 
     total_events = await db.scalar(select(func.count()).select_from(EventModel)) or 0
-    fraud_events = await db.scalar(
-        select(func.count()).select_from(EventModel).where(EventModel.is_fraud == 1)
+    twenty_four_hours_ago = datetime.utcnow() - timedelta(hours=24)
+    alerts_24h = await db.scalar(
+        select(func.count()).select_from(AlertModel).where(
+            AlertModel.timestamp >= twenty_four_hours_ago
+        )
     ) or 0
-    anomaly_rate = round((fraud_events / max(1, total_events)) * 100, 1)
+    fraud_alerts_24h = await db.scalar(
+        select(func.count()).select_from(AlertModel).where(
+            and_(AlertModel.timestamp >= twenty_four_hours_ago, AlertModel.fraud_type != "")
+        )
+    ) or 0
+    anomaly_rate = round((fraud_alerts_24h / max(1, alerts_24h)) * 100, 1)
 
     return IntelligenceResponse(
         precision=precision,
@@ -994,12 +1010,16 @@ async def retrain(db: AsyncSession = Depends(get_db)):
     ensemble.save(SAVED_MODEL_DIR)
     after_scores = [ensemble.xgb_model.score(feat) for feat in X_arr]
     precision_after = max(_precision_from_scores(after_scores, list(y_arr)), min(0.999, precision_before + 0.044))
+    recall_after = _recall_from_scores(after_scores, list(y_arr))
+    f1_after = round((2 * precision_after * recall_after) / max(0.001, precision_after + recall_after), 3)
 
     db.add(ModelMetricModel(
         id=str(uuid.uuid4()),
         model_name="XGBoost v1.0.0",
         precision_before=precision_before,
         precision_after=round(precision_after, 3),
+        recall=recall_after,
+        f1=f1_after,
         labels_used=len(X),
     ))
     await db.commit()
@@ -1008,5 +1028,7 @@ async def retrain(db: AsyncSession = Depends(get_db)):
         message=f"XGBoost precision: {precision_before:.3f} -> {precision_after:.3f} after retraining with {len(X)} analyst labels",
         precision_before=precision_before,
         precision_after=round(precision_after, 3),
+        recall_after=recall_after,
+        f1_after=f1_after,
         labels_used=len(X),
     )

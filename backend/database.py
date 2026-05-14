@@ -78,6 +78,8 @@ class ModelMetricModel(Base):
     model_name: Mapped[str] = mapped_column(String)
     precision_before: Mapped[float] = mapped_column(Float, default=0.0)
     precision_after: Mapped[float] = mapped_column(Float, default=0.0)
+    recall: Mapped[float] = mapped_column(Float, default=0.0)
+    f1: Mapped[float] = mapped_column(Float, default=0.0)
     labels_used: Mapped[int] = mapped_column(Integer, default=0)
 
 
@@ -94,6 +96,8 @@ async def init_db():
             "ALTER TABLE alerts ADD COLUMN label_updated_at DATETIME",
             "ALTER TABLE users ADD COLUMN restricted INTEGER DEFAULT 0",
             "ALTER TABLE users ADD COLUMN escalated INTEGER DEFAULT 0",
+            "ALTER TABLE model_metrics ADD COLUMN recall REAL DEFAULT 0.0",
+            "ALTER TABLE model_metrics ADD COLUMN f1 REAL DEFAULT 0.0",
         ]:
             try:
                 await conn.execute(text(stmt))
