@@ -227,9 +227,10 @@ export default function LandingPage() {
             style={{
               margin: '0 auto 24px',
               maxWidth: 680,
-              fontSize: 14,
-              color: C.muted,
-              lineHeight: 1.72,
+              fontSize: 20,
+              fontWeight: 500,
+              color: C.primary,
+              lineHeight: 1.7,
             }}
           >
             Every year, insider fraud costs Indian banks thousands of crores. Most cases are discovered 12–18 months after the damage is done; by which point it is too late. SentinelIQ watches every privileged user, every action, in real time. The moment behaviour deviates from baseline, investigators know.
