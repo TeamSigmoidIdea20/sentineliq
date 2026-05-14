@@ -121,14 +121,14 @@ Note: These results are on synthetic data. Performance on real bank data would r
 
 ## Team
 
-[Name 1] — ML model development (Isolation Forest + LSTM Autoencoder + XGBoost ensemble)  
-[Name 2] — Backend, data pipeline, and synthetic data generation  
-[Name 3] — Frontend dashboard (Next.js, live feed, SHAP visualisation)  
-[Name 4] — Domain research, PS analysis, documentation  
+[Rehaan Ahmad khan] — ML model development (Isolation Forest + LSTM Autoencoder + XGBoost ensemble)  
+[Shantanu Singh] — Backend, data pipeline, and synthetic data generation  
+[Vishnu Tripathi] — Frontend dashboard (Next.js, live feed, SHAP visualisation)  
+[Krishna Agarwal] — Domain research, PS analysis, documentation  
 
 ## Contact
 
 Team Name: Team SIGMOID  
-Institute: [Your College Name]  
-Email: [Team email]  
+Institute: JSS University, Noida
+Email: rehtrooper@gmail.com
 iDEA 2.0 Phase 2 Submission
