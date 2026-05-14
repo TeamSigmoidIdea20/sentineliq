@@ -1,0 +1,123 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #0D1117;
+  color: #F0F6FC;
+  font-family: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: #DC2626;
+  color: #fff;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0D1117;
+}
+::-webkit-scrollbar-thumb {
+  background: #30363D;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #8B949E;
+}
+
+@keyframes slideInTop {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.animate-slide-in {
+  animation: slideInTop 0.3s ease-out forwards;
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+/* Keyboard focus indicator — applies to all interactive elements */
+:focus-visible {
+  outline: 2px solid #4D5562;
+  outline-offset: 2px;
+}
+
+/* Responsive layout helpers */
+@media (max-width: 1024px) {
+  .stat-grid-4 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .stat-grid-2 {
+    grid-template-columns: 1fr !important;
+  }
+  .intel-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .steps-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .problem-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .alert-demo-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .stat-grid-4 {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .sidebar-hidden {
+    display: none !important;
+  }
+  .panel-full {
+    width: 100% !important;
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    bottom: 0 !important;
+    height: 80vh !important;
+    border-left: none !important;
+    border-top: 1px solid #30363D !important;
+    border-radius: 8px 8px 0 0 !important;
+  }
+  .feed-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .cases-grid {
+    grid-template-columns: 1fr !important;
+    overflow: auto !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .stat-grid-4 {
+    grid-template-columns: 1fr !important;
+  }
+}

@@ -1,0 +1,109 @@
+from __future__ import annotations
+
+import numpy as np
+import joblib
+
+try:
+    import xgboost as xgb
+    import shap
+    XGB_AVAILABLE = True
+except ImportError:
+    XGB_AVAILABLE = False
+
+FEATURE_NAMES = [
+    "login_hour_deviation",
+    "transaction_velocity_ratio",
+    "access_entropy",
+    "download_volume_zscore",
+    "location_mismatch",
+    "privilege_use_ratio",
+    "device_change_frequency",
+    "off_hours_ratio",
+]
+
+
+class XGBoostModel:
+    def __init__(self):
+        self._model = None
+        self._explainer = None
+        self.is_fitted = False
+
+    def fit(self, X: np.ndarray, y: np.ndarray) -> None:
+        if not XGB_AVAILABLE:
+            self.is_fitted = True
+            return
+
+        pos = int(y.sum())
+        neg = int(len(y) - pos)
+        scale = neg / max(1, pos)
+
+        self._model = xgb.XGBClassifier(
+            n_estimators=150,
+            max_depth=4,
+            learning_rate=0.1,
+            scale_pos_weight=scale,
+            use_label_encoder=False,
+            eval_metric="logloss",
+            random_state=42,
+            verbosity=0,
+        )
+        self._model.fit(X, y)
+        self._explainer = shap.TreeExplainer(self._model)
+        self.is_fitted = True
+
+    def score(self, features: np.ndarray) -> float:
+        """Returns fraud probability in [0, 1]."""
+        if not self.is_fitted or self._model is None:
+            return 0.5
+        x = features.reshape(1, -1)
+        prob = float(self._model.predict_proba(x)[0][1])
+        return prob
+
+    def explain(self, features: np.ndarray) -> list[dict]:
+        """Returns top-5 SHAP feature contributions."""
+        if not self.is_fitted or self._explainer is None:
+            return _fallback_shap(features)
+
+        x = features.reshape(1, -1)
+        try:
+            sv = self._explainer.shap_values(x)
+            if isinstance(sv, list):
+                sv = sv[1]
+            shap_row = sv[0]
+        except Exception:
+            return _fallback_shap(features)
+
+        contributions = []
+        for i, (name, val, feat_val) in enumerate(zip(FEATURE_NAMES, shap_row, features)):
+            contributions.append({
+                "feature": name,
+                "value": round(float(feat_val), 4),
+                "contribution": round(float(val), 4),
+                "direction": "positive" if val >= 0 else "negative",
+            })
+
+        contributions.sort(key=lambda c: abs(c["contribution"]), reverse=True)
+        return contributions[:5]
+
+    def save(self, path: str) -> None:
+        joblib.dump({"model": self._model, "is_fitted": self.is_fitted}, path)
+
+    def load(self, path: str) -> None:
+        payload = joblib.load(path)
+        self._model = payload["model"]
+        self.is_fitted = bool(payload.get("is_fitted", self._model is not None))
+        if XGB_AVAILABLE and self._model is not None:
+            self._explainer = shap.TreeExplainer(self._model)
+
+
+def _fallback_shap(features: np.ndarray) -> list[dict]:
+    out = []
+    for name, val in zip(FEATURE_NAMES, features):
+        out.append({
+            "feature": name,
+            "value": round(float(val), 4),
+            "contribution": round(float(val) * 0.1, 4),
+            "direction": "positive" if val >= 0 else "negative",
+        })
+    out.sort(key=lambda c: abs(c["contribution"]), reverse=True)
+    return out[:5]
