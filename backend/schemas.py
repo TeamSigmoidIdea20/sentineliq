@@ -7,6 +7,7 @@ class SHAPValue(BaseModel):
     feature: str
     value: float
     contribution: float
+    direction: str = "positive"
     direction: str
 
 

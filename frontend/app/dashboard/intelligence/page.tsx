@@ -243,27 +243,6 @@ export default function IntelligencePage() {
                 </div>
               </div>
 
-              {/* Terminal log — shown once training starts, persists until cleared */}
-              {logLines.length > 0 && (
-                <div
-                  ref={logRef}
-                  style={{
-                    background: C.bg, border: `1px solid ${C.border}`, borderRadius: 4,
-                    padding: '14px 16px', fontFamily: 'monospace', fontSize: 12,
-                    color: C.low, lineHeight: 1.9, maxHeight: 260, overflowY: 'auto',
-                  }}
-                >
-                  {logLines.map((line, i) => (
-                    <div key={i} style={{ color: line.includes('Skipping') || line.includes('insufficient') ? C.medium : C.low }}>
-                      {line}
-                    </div>
-                  ))}
-                  {training && (
-                    <div style={{ display: 'inline-block', width: 8, height: 14, background: C.low, verticalAlign: 'middle', marginLeft: 2 }} />
-                  )}
-                </div>
-              )}
-
               {/* Ensemble Performance stats */}
               <div>
                 <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
@@ -279,6 +258,33 @@ export default function IntelligencePage() {
                   <Stat label="Mean Detect Time" value={detectDisplay} sub="event scored to alert created" />
                 </div>
               </div>
+
+              {/* Training log — own full-width section, below ensemble performance */}
+              {logLines.length > 0 && (
+                <div>
+                  <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    Training Log
+                  </p>
+                  <div
+                    ref={logRef}
+                    style={{
+                      background: '#0D1117', border: '1px solid #30363D', borderRadius: 4,
+                      padding: 16, fontFamily: 'monospace', fontSize: 12,
+                      color: '#16A34A', lineHeight: 1.9,
+                      minHeight: 200, maxHeight: 400, overflowY: 'auto',
+                    }}
+                  >
+                    {logLines.map((line, i) => (
+                      <div key={i} style={{ color: line.includes('Skipping') || line.includes('insufficient') ? '#D97706' : '#16A34A' }}>
+                        {line}
+                      </div>
+                    ))}
+                    {training && (
+                      <div style={{ display: 'inline-block', width: 8, height: 14, background: '#16A34A', verticalAlign: 'middle', marginLeft: 2 }} />
+                    )}
+                  </div>
+                </div>
+              )}
 
               <IntelligenceCharts data={data} />
             </>
