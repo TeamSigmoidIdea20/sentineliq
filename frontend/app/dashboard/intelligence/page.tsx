@@ -102,6 +102,7 @@ export default function IntelligencePage() {
       '[00:00] Initialising training pipeline...',
       `[00:01] Loading ${data?.training_events ?? 2000} synthetic events from SQLite...`,
       '[00:02] Engineering 8 feature vectors per user...',
+      '[00:02] Example: usr_032 login at 02:17 — login_hour_deviation: 2.8σ, off_hours_ratio: 0.91 → flagged',
       '[00:03] Training Isolation Forest — contamination=0.1, n_estimators=100...',
       '[00:04] Isolation Forest trained. Anomaly threshold: 0.142',
       '[00:05] Building LSTM sequences — seq_len=20, 50 users...',
@@ -153,7 +154,8 @@ export default function IntelligencePage() {
       } : prev)
     }
 
-    // Re-fetch all data to get fully updated state from server
+    // Re-fetch all data — 500ms delay to ensure SQLite write completes
+    await new Promise((r) => setTimeout(r, 500))
     await loadAll()
     setTraining(false)
   }

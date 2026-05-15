@@ -8,7 +8,6 @@ class SHAPValue(BaseModel):
     value: float
     contribution: float
     direction: str = "positive"
-    direction: str
 
 
 class ModelScores(BaseModel):

@@ -1013,9 +1013,37 @@ async def retrain(db: AsyncSession = Depends(get_db)):
 
     ensemble.xgb_model.fit(X_arr, y_arr)
     ensemble.save(SAVED_MODEL_DIR)
-    after_scores = [ensemble.xgb_model.score(feat) for feat in X_arr]
-    precision_after = max(_precision_from_scores(after_scores, list(y_arr)), min(0.999, precision_before + 0.044))
-    recall_after = _recall_from_scores(after_scores, list(y_arr))
+
+    # Compute metrics on held-out validation set: last 400 events with feature vectors
+    val_event_rows = (
+        await db.execute(
+            select(EventModel)
+            .where(EventModel.features_json != "{}")
+            .order_by(desc(EventModel.timestamp))
+            .limit(400)
+        )
+    ).scalars().all()
+
+    val_X: list[np.ndarray] = []
+    val_y: list[int] = []
+    for ev_row in val_event_rows:
+        try:
+            feat = np.array(json.loads(ev_row.features_json), dtype=np.float32)
+            if len(feat) == 8:
+                val_X.append(feat)
+                val_y.append(ev_row.is_fraud)
+        except Exception:
+            continue
+
+    if val_X:
+        val_scores = [ensemble.xgb_model.score(feat) for feat in val_X]
+        precision_after = _precision_from_scores(val_scores, val_y)
+        recall_after = _recall_from_scores(val_scores, val_y)
+    else:
+        after_scores = [ensemble.xgb_model.score(feat) for feat in X_arr]
+        precision_after = _precision_from_scores(after_scores, list(y_arr))
+        recall_after = _recall_from_scores(after_scores, list(y_arr))
+
     f1_after = round((2 * precision_after * recall_after) / max(0.001, precision_after + recall_after), 3)
 
     db.add(ModelMetricModel(
@@ -1030,10 +1058,52 @@ async def retrain(db: AsyncSession = Depends(get_db)):
     await db.commit()
     return RetrainResponse(
         status="ok",
-        message=f"XGBoost precision: {precision_before:.3f} -> {precision_after:.3f} after retraining with {len(X)} analyst labels",
+        message=f"XGBoost retrained on {len(X)} labels. Validation — Precision: {precision_after:.3f} | Recall: {recall_after:.3f} | F1: {f1_after:.3f}",
         precision_before=precision_before,
         precision_after=round(precision_after, 3),
         recall_after=recall_after,
         f1_after=f1_after,
         labels_used=len(X),
     )
+
+
+# ---------------------------------------------------------------------------
+# Debug
+# ---------------------------------------------------------------------------
+
+@app.get("/api/debug/shap")
+async def debug_shap(db: AsyncSession = Depends(get_db)):
+    row = (
+        await db.execute(
+            select(AlertModel)
+            .where(AlertModel.shap_values_json != "[]")
+            .order_by(desc(AlertModel.timestamp))
+            .limit(1)
+        )
+    ).scalars().first()
+
+    if not row:
+        return {"error": "no alerts with SHAP data found"}
+
+    stored = json.loads(row.shap_values_json or "[]")
+    recomputed = None
+    ev_row = None
+
+    if row.event_id:
+        ev_row = await db.get(EventModel, row.event_id)
+
+    if ev_row:
+        try:
+            feat = np.array(json.loads(ev_row.features_json), dtype=np.float32)
+            recomputed = ensemble.xgb_model.explain(feat)
+        except Exception as exc:
+            recomputed = {"error": str(exc)}
+
+    return {
+        "alert_id": row.id,
+        "stored_shap_values": stored,
+        "recomputed_shap_values": recomputed,
+        "xgb_is_fitted": ensemble.xgb_model.is_fitted,
+        "xgb_model_none": ensemble.xgb_model._model is None,
+        "explainer_none": ensemble.xgb_model._explainer is None,
+    }

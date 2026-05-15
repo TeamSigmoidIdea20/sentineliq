@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import logging
 import numpy as np
 import joblib
+
+logger = logging.getLogger(__name__)
 
 try:
     import xgboost as xgb
@@ -20,6 +23,9 @@ FEATURE_NAMES = [
     "device_change_frequency",
     "off_hours_ratio",
 ]
+
+# Expected magnitude for each feature when "normal" — used to scale fallback contributions
+_FEATURE_SCALE = [2.0, 1.0, 1.5, 1.0, 1.0, 0.5, 0.5, 0.5]
 
 
 class XGBoostModel:
@@ -52,7 +58,6 @@ class XGBoostModel:
         self.is_fitted = True
 
     def score(self, features: np.ndarray) -> float:
-        """Returns fraud probability in [0, 1]."""
         if not self.is_fitted or self._model is None:
             return 0.5
         x = features.reshape(1, -1)
@@ -60,30 +65,52 @@ class XGBoostModel:
         return prob
 
     def explain(self, features: np.ndarray) -> list[dict]:
-        """Returns top-5 SHAP feature contributions."""
         if not self.is_fitted or self._explainer is None:
+            logger.debug("[SHAP] Model not fitted — using fallback")
             return _fallback_shap(features)
 
         x = features.reshape(1, -1)
         try:
-            sv = self._explainer.shap_values(x)
+            sv = self._explainer.shap_values(x, check_additivity=False)
+
+            # Normalise all possible return shapes from different SHAP/XGB versions:
+            # - list([cls0_arr, cls1_arr]) where each is (1, n_features)  → take cls1
+            # - ndarray (1, n_features)                                    → use directly
+            # - ndarray (1, n_features, n_classes)                        → take [:,:,1]
             if isinstance(sv, list):
-                sv = sv[1]
-            shap_row = sv[0]
-        except Exception:
+                # Legacy SHAP format: list of per-class arrays
+                arr = np.array(sv[1] if len(sv) > 1 else sv[0])
+            else:
+                arr = np.array(sv)
+
+            if arr.ndim == 3:
+                # (n_samples, n_features, n_classes) — take positive class
+                arr = arr[:, :, 1]
+
+            shap_row = arr[0]  # shape (n_features,)
+
+            logger.debug("[SHAP] raw shap_row: %s", shap_row.tolist())
+
+            # If everything is genuinely zero (degenerate model), use fallback
+            if np.all(np.abs(shap_row) < 1e-9):
+                logger.warning("[SHAP] All SHAP values are zero — using fallback")
+                return _fallback_shap(features)
+
+            contributions = []
+            for name, val, feat_val in zip(FEATURE_NAMES, shap_row, features):
+                contributions.append({
+                    "feature": name,
+                    "value": round(float(feat_val), 4),
+                    "contribution": round(float(val), 4),
+                    "direction": "positive" if val >= 0 else "negative",
+                })
+
+            contributions.sort(key=lambda c: abs(c["contribution"]), reverse=True)
+            return contributions[:5]
+
+        except Exception as exc:
+            logger.warning("[SHAP] explain() exception: %s — using fallback", exc)
             return _fallback_shap(features)
-
-        contributions = []
-        for i, (name, val, feat_val) in enumerate(zip(FEATURE_NAMES, shap_row, features)):
-            contributions.append({
-                "feature": name,
-                "value": round(float(feat_val), 4),
-                "contribution": round(float(val), 4),
-                "direction": "positive" if val >= 0 else "negative",
-            })
-
-        contributions.sort(key=lambda c: abs(c["contribution"]), reverse=True)
-        return contributions[:5]
 
     def save(self, path: str) -> None:
         joblib.dump({"model": self._model, "is_fitted": self.is_fitted}, path)
@@ -97,13 +124,18 @@ class XGBoostModel:
 
 
 def _fallback_shap(features: np.ndarray) -> list[dict]:
+    """Fallback when TreeExplainer is unavailable or produces zeros.
+    Scales contributions by per-feature expected magnitude so values are meaningful.
+    """
     out = []
-    for name, val in zip(FEATURE_NAMES, features):
+    for name, val, scale in zip(FEATURE_NAMES, features, _FEATURE_SCALE):
+        # Contribution = how many σ-equivalents away from 0 this feature is
+        contrib = float(val) / max(1e-6, scale)
         out.append({
             "feature": name,
             "value": round(float(val), 4),
-            "contribution": round(float(val) * 0.1, 4),
-            "direction": "positive" if val >= 0 else "negative",
+            "contribution": round(contrib, 4),
+            "direction": "positive" if contrib >= 0 else "negative",
         })
     out.sort(key=lambda c: abs(c["contribution"]), reverse=True)
     return out[:5]
