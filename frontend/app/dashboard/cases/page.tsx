@@ -116,7 +116,7 @@ export default function CasesPage() {
               Related alerts from the same user grouped into attack sequences — see the full pattern, not isolated events.
             </p>
           </div>
-          <span style={{ fontSize: 11, color: C.textMuted }}>{cases.length} active patterns</span>
+          <span style={{ fontSize: 11, color: C.textMuted }}>Top {cases.length} by severity</span>
         </div>
 
         <main className="cases-grid" style={{ flex: 1, overflow: 'hidden', padding: 24, display: 'grid', gridTemplateColumns: 'minmax(360px, 1fr) 420px', gap: 18 }}>

@@ -758,8 +758,9 @@ async def get_cases(db: AsyncSession = Depends(get_db)):
             )
         )
 
-    cases.sort(key=lambda c: (c.severity != "critical", c.start_time), reverse=False)
-    return cases
+    _sev = {"critical": 0, "high": 1, "medium": 2}
+    cases.sort(key=lambda c: (_sev.get(c.severity, 3), -c.start_time.timestamp()))
+    return cases[:10]
 
 
 @app.get("/api/users/{user_id}", response_model=UserDetailResponse)
