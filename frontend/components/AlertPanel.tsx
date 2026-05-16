@@ -222,7 +222,7 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
         </div>
       )}
 
-      <aside className="panel-full" style={{
+      <aside className="panel-full panel-slide-in" style={{
         position: 'fixed', top: 0, right: 0, bottom: 0, width: 480,
         background: C.card, borderLeft: `1px solid ${C.border}`,
         zIndex: 50, overflowY: 'auto',

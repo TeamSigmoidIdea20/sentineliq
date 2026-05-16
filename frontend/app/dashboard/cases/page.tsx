@@ -32,18 +32,25 @@ function CaseCard({
   onClick: () => void
 }) {
   const color = severityColor(item.severity)
+  const [hovered, setHovered] = useState(false)
   return (
     <button
       onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         textAlign: 'left',
-        background: active ? C.hover : C.card,
-        border: `1px solid ${active ? color : C.border}`,
+        background: active || hovered ? C.hover : C.card,
+        borderTop: `1px solid ${active ? color : C.border}`,
+        borderRight: `1px solid ${active ? color : C.border}`,
+        borderBottom: `1px solid ${active ? color : C.border}`,
+        borderLeft: `3px solid ${color}`,
         borderRadius: 4,
         padding: 18,
         cursor: 'pointer',
         color: C.textPrimary,
         fontFamily: 'inherit',
+        transition: 'background 0.15s',
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', marginBottom: 12 }}>

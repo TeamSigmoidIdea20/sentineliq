@@ -13,20 +13,26 @@ const RISK_COLORS: Record<string, string> = {
 
 function FeedRow({ event, isNew }: { event: FeedEvent; isNew: boolean }) {
   const color = event.risk_level ? RISK_COLORS[event.risk_level] || C.textMuted : C.textMuted
+  const [hovered, setHovered] = useState(false)
+  const pulse = event.is_anomalous && (event.risk_level === 'critical' || event.risk_level === 'high')
 
   return (
     <div
       className={isNew ? 'animate-slide-in' : ''}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         display: 'flex',
         alignItems: 'flex-start',
         gap: 10,
         padding: '10px 12px',
         borderBottom: `1px solid ${C.border}`,
+        background: hovered ? C.hover : 'transparent',
         transition: 'background 0.15s',
       }}
     >
       <div
+        className={pulse ? 'animate-pulse-dot' : ''}
         style={{
           width: 8,
           height: 8,

@@ -60,6 +60,21 @@ body {
   animation: pulse-dot 1.5s ease-in-out infinite;
 }
 
+@keyframes panel-slide-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.panel-slide-in {
+  animation: panel-slide-in 0.22s ease-out forwards;
+}
+
 /* Keyboard focus indicator — applies to all interactive elements */
 :focus-visible {
   outline: 2px solid #4D5562;

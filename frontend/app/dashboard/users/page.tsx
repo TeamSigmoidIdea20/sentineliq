@@ -83,9 +83,9 @@ function UserProfilePanel({
 
   return (
     <aside
-      className="panel-full"
+      className="panel-full panel-slide-in"
       style={{
-        width: 380, flexShrink: 0, height: '100vh', position: 'sticky', top: 0,
+        width: 480, flexShrink: 0, height: '100vh', position: 'sticky', top: 0,
         background: C.card, borderLeft: `1px solid ${C.border}`,
         overflowY: 'auto', display: 'flex', flexDirection: 'column',
       }}
@@ -401,6 +401,7 @@ export default function UsersPage() {
 
       {selectedUserId && (
         <UserProfilePanel
+          key={selectedUserId}
           userId={selectedUserId}
           onClose={() => setSelectedUserId(null)}
           onRestrict={(id) => setRestrictedUsers((prev) => new Set([...prev, id]))}
