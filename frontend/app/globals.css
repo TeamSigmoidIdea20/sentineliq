@@ -75,6 +75,18 @@ body {
   animation: panel-slide-in 0.22s ease-out forwards;
 }
 
+/* Action button hover — applies to all interactive buttons across the app */
+.btn-action {
+  transition: opacity 0.12s, transform 0.12s;
+}
+.btn-action:hover:not(:disabled) {
+  opacity: 0.8;
+  transform: scale(1.02);
+}
+.btn-action:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
 /* Landing page interactive hover states */
 .landing-btn-primary {
   transition: opacity 0.15s, transform 0.15s;

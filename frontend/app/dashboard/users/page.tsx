@@ -211,6 +211,7 @@ function UserProfilePanel({
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
             <button
+              className="btn-action"
               onClick={handleRestrict}
               disabled={restricted}
               style={{
@@ -223,6 +224,7 @@ function UserProfilePanel({
               {restricted ? 'ACCESS RESTRICTED' : 'RESTRICT ACCESS'}
             </button>
             <button
+              className="btn-action"
               onClick={handleEscalate}
               disabled={escalated}
               style={{

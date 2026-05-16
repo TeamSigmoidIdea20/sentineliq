@@ -52,6 +52,7 @@ export default function AlertTable({ alerts, loading, onSelectAlert, onResolved 
           {(['MARK RESOLVED', 'DISMISS'] as const).map((action) => (
             <button
               key={action}
+              className="btn-action"
               style={{
                 padding: '4px 10px', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
                 background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted,

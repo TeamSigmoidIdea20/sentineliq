@@ -428,6 +428,7 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
                 {(['TP', 'FP'] as const).map((lbl) => (
                   <button
                     key={lbl}
+                    className="btn-action"
                     disabled={acting}
                     onClick={() => handleLabel(lbl)}
                     style={{
@@ -467,6 +468,7 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
               {alert.status === 'open' && (
                 <>
                   <button
+                    className="btn-action"
                     disabled={acting}
                     onClick={handleResolve}
                     style={{
@@ -479,6 +481,7 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
                     MARK RESOLVED
                   </button>
                   <button
+                    className="btn-action"
                     disabled={acting}
                     onClick={handleDismiss}
                     style={{
@@ -500,6 +503,7 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
                 </div>
               )}
               <button
+                className="btn-action"
                 onClick={handleExport}
                 title="Export Evidence Package"
                 style={{
