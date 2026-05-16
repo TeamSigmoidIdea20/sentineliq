@@ -139,6 +139,16 @@ export interface Intelligence {
   anomaly_rate: number
 }
 
+export interface RetrainResponse {
+  status: string
+  message: string
+  precision_before?: number
+  precision_after?: number
+  recall_after?: number
+  f1_after?: number
+  labels_used: number
+}
+
 async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { 'Content-Type': 'application/json' },
@@ -163,12 +173,14 @@ export const api = {
     status?: string
     time_range?: string
     page?: number
+    page_size?: number
   }) => {
     const q = new URLSearchParams()
     if (params?.risk_level) q.set('risk_level', params.risk_level)
     if (params?.status) q.set('status', params.status)
     if (params?.time_range) q.set('time_range', params.time_range)
     if (params?.page) q.set('page', String(params.page))
+    if (params?.page_size) q.set('page_size', String(params.page_size))
     return fetchApi<AlertListResponse>(`/api/alerts?${q}`)
   },
 
@@ -220,7 +232,7 @@ export const api = {
   escalateUser: (id: string) =>
     fetchApi<{ status: string; user_id: string }>(`/api/users/${id}/escalate`, { method: 'POST' }),
 
-  retrain: () => fetchApi<{ status: string; message: string; precision_before?: number; precision_after?: number; recall_after?: number; f1_after?: number; labels_used: number }>('/api/retrain', { method: 'POST' }),
+  retrain: () => fetchApi<RetrainResponse>('/api/retrain', { method: 'POST' }),
 }
 
 export function riskLevel(score: number): 'critical' | 'high' | 'medium' | 'low' {
@@ -234,11 +246,15 @@ export function formatFraudType(t: string): string {
   return t.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
+// Backend sends naive UTC datetimes (no Z suffix). Without Z, JS Date parses
+// date-time strings as *local* time, making them appear future in timezones
+// behind UTC. Append Z to force correct UTC interpretation.
+export function normaliseIso(iso: string): string {
+  return /Z$|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : iso + 'Z'
+}
+
 export function timeAgo(iso: string): string {
-  // Backend sends naive UTC datetimes (no Z suffix). Without Z, JS Date parses
-  // date-time strings as *local* time, making them appear future in timezones
-  // behind UTC. Append Z to force correct UTC interpretation.
-  const normalised = /Z$|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : iso + 'Z'
+  const normalised = normaliseIso(iso)
   const diff = Date.now() - new Date(normalised).getTime()
   const s = Math.floor(diff / 1000)
   if (s <= 5) return 'Just now'

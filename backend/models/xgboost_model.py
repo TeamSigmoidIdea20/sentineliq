@@ -61,8 +61,12 @@ class XGBoostModel:
         if not self.is_fitted or self._model is None:
             return 0.5
         x = features.reshape(1, -1)
-        prob = float(self._model.predict_proba(x)[0][1])
-        return prob
+        return float(self._model.predict_proba(x)[0][1])
+
+    def score_batch(self, X: np.ndarray) -> list[float]:
+        if not self.is_fitted or self._model is None:
+            return [0.5] * len(X)
+        return self._model.predict_proba(X)[:, 1].tolist()
 
     def explain(self, features: np.ndarray) -> list[dict]:
         if not self.is_fitted or self._explainer is None:

@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Download } from 'lucide-react'
-import { api, type Alert, type PeerComparison, type UserEvent, formatFraudType, timeAgo } from '@/lib/api'
-import { C } from '@/lib/tokens'
+import { api, type Alert, type PeerComparison, type UserEvent, formatFraudType, timeAgo, normaliseIso } from '@/lib/api'
+import { C, riskColor } from '@/lib/tokens'
 import RiskBadge from './RiskBadge'
 import SHAPChart from './SHAPChart'
 
@@ -19,19 +19,18 @@ const FEATURE_DESC: Record<string, string> = {
 }
 
 const EVENT_DOT: Record<string, string> = {
-  login: '#4472C4',
-  transaction: '#16A34A',
-  report_download: '#D97706',
-  data_export: '#D97706',
-  privilege_use: '#DC2626',
-  department_access: '#8B49C4',
-  file_access: '#8B49C4',
-  system_query: '#8B49C4',
+  login: C.textMuted,
+  transaction: C.low,
+  report_download: C.medium,
+  data_export: C.medium,
+  privilege_use: C.critical,
+  department_access: C.medium,
+  file_access: C.medium,
+  system_query: C.textMuted,
 }
 
 function formatTs(iso: string): string {
-  const normalised = /Z$|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : iso + 'Z'
-  const diff = Math.abs(Date.now() - new Date(normalised).getTime())
+  const diff = Math.abs(Date.now() - new Date(normaliseIso(iso)).getTime())
   const s = Math.floor(diff / 1000)
   if (s < 60) return `${s}s ago`
   const m = Math.floor(s / 60)
@@ -78,7 +77,7 @@ function recommendedAction(risk: number): { text: string; color: string } {
       color: C.critical,
     }
   }
-  if (risk >= 50) {
+  if (risk >= 40) {
     return {
       text: 'Force MFA re-authentication. Flag for supervisor review within 4 hours.',
       color: C.medium,
@@ -127,6 +126,12 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
       .catch(() => setPeerData(null))
   }, [alert?.id])
 
+  useEffect(() => {
+    return () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current)
+    }
+  }, [])
+
   const showToast = (msg: string) => {
     setToast(msg)
     if (toastTimer.current) clearTimeout(toastTimer.current)
@@ -136,19 +141,29 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
   const handleResolve = async () => {
     if (!alert) return
     setActing(true)
-    await api.resolveAlert(alert.id).catch(() => null)
-    setAlert({ ...alert, status: 'resolved' })
-    setActing(false)
-    onResolved?.(alert.id, 'resolved')
+    try {
+      await api.resolveAlert(alert.id)
+      setAlert({ ...alert, status: 'resolved' })
+      onResolved?.(alert.id, 'resolved')
+    } catch {
+      showToast('Failed to resolve — please try again')
+    } finally {
+      setActing(false)
+    }
   }
 
   const handleDismiss = async () => {
     if (!alert) return
     setActing(true)
-    await api.dismissAlert(alert.id).catch(() => null)
-    setAlert({ ...alert, status: 'dismissed' })
-    setActing(false)
-    onResolved?.(alert.id, 'dismissed')
+    try {
+      await api.dismissAlert(alert.id)
+      setAlert({ ...alert, status: 'dismissed' })
+      onResolved?.(alert.id, 'dismissed')
+    } catch {
+      showToast('Failed to dismiss — please try again')
+    } finally {
+      setActing(false)
+    }
   }
 
   const handleLabel = async (label: 'TP' | 'FP') => {
@@ -179,12 +194,13 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
       a.click()
       URL.revokeObjectURL(url)
     } catch {
-      // silently fail
+      showToast('Export failed — please try again')
     }
   }
 
   if (!alertId) return null
 
+  const scoreColor = alert ? riskColor(alert.risk_score) : C.critical
   const action = alert ? recommendedAction(alert.risk_score) : null
 
   return (
@@ -234,7 +250,7 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                 <div style={{
                   width: 36, height: 36, borderRadius: '50%',
-                  background: C.critical, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: scoreColor, display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 13, fontWeight: 700, color: C.textPrimary, flexShrink: 0,
                 }}>
                   {alert.user_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
@@ -257,12 +273,12 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                 <span style={{ fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Risk Score</span>
-                <span style={{ fontSize: 18, fontWeight: 800, color: C.critical }}>
+                <span style={{ fontSize: 18, fontWeight: 800, color: scoreColor }}>
                   {Math.round(alert.risk_score)}<span style={{ fontSize: 11, fontWeight: 400, color: C.textMuted }}>/100</span>
                 </span>
               </div>
               <div style={{ height: 8, background: C.border, borderRadius: 2, overflow: 'hidden' }}>
-                <div style={{ width: `${alert.risk_score}%`, height: '100%', background: C.critical, borderRadius: 2, transition: 'width 0.4s ease' }} />
+                <div style={{ width: `${alert.risk_score}%`, height: '100%', background: scoreColor, borderRadius: 2, transition: 'width 0.4s ease' }} />
               </div>
             </div>
 
@@ -389,7 +405,7 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
                 id="case-notes"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                onBlur={(e) => { saveNote(); (e.target as HTMLTextAreaElement).style.borderColor = C.border }}
+                onBlur={(e) => { saveNote(); e.target.style.borderColor = C.border }}
                 onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') saveNote() }}
                 placeholder="Add investigator notes… (Cmd+Enter to save)"
                 style={{
@@ -398,7 +414,7 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
                   color: C.textPrimary, fontSize: 12, fontFamily: 'inherit', lineHeight: 1.6,
                   resize: 'vertical', outline: 'none', boxSizing: 'border-box',
                 }}
-                onFocus={(e) => { (e.target as HTMLTextAreaElement).style.borderColor = '#4D5562' }}
+                onFocus={(e) => { e.target.style.borderColor = '#4D5562' }}
               />
               {noteSavedAt && (
                 <p style={{ margin: '4px 0 0', fontSize: 10, color: C.low }}>Saved {timeAgo(noteSavedAt.toISOString())}</p>

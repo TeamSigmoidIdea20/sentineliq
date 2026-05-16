@@ -106,8 +106,6 @@ def _case_name(fraud_types: set[str]) -> str:
         return "Data Exfiltration Attempt"
     if {"privilege_escalation", "off_hours_login"}.issubset(fraud_types):
         return "Privilege Abuse Sequence"
-    if {"velocity_spike", "account_modification"}.issubset(fraud_types):
-        return "Treasury Manipulation"
     if len(fraud_types) >= 3:
         return "Coordinated Insider Threat"
     return "Escalating Insider Risk"
@@ -260,10 +258,7 @@ app = FastAPI(lifespan=lifespan, title="SentinelIQ API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "https://*.vercel.app",
-    ],
+    allow_origins=["http://localhost:3000"],
     allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
@@ -783,26 +778,52 @@ async def get_user(user_id: str, db: AsyncSession = Depends(get_db)):
         )
     ).scalars().all()
 
-    risk_history: list[RiskPoint] = []
-    for i in range(30):
-        day = date.today() - timedelta(days=29 - i)
-        day_start = datetime.combine(day, time.min)
-        day_end = datetime.combine(day, time.max)
-        score = await db.scalar(
-            select(func.avg(AlertModel.risk_score)).where(
-                and_(
-                    AlertModel.user_id == user_id,
-                    AlertModel.timestamp >= day_start,
-                    AlertModel.timestamp <= day_end,
-                )
-            )
+    # Single query: avg risk score per calendar day (replaces 30 sequential queries)
+    daily_res = await db.execute(
+        select(
+            func.strftime('%Y-%m-%d', AlertModel.timestamp).label('day'),
+            func.avg(AlertModel.risk_score).label('avg_score'),
         )
-        risk_history.append(RiskPoint(date=day.isoformat(), score=round(score or 0.0, 1)))
+        .where(and_(AlertModel.user_id == user_id, AlertModel.timestamp >= thirty_days_ago))
+        .group_by(func.strftime('%Y-%m-%d', AlertModel.timestamp))
+    )
+    daily_map: dict[str, float] = {r.day: r.avg_score for r in daily_res.all()}
+
+    risk_history = [
+        RiskPoint(
+            date=(date.today() - timedelta(days=29 - i)).isoformat(),
+            score=round(daily_map.get((date.today() - timedelta(days=29 - i)).isoformat(), 0.0), 1),
+        )
+        for i in range(30)
+    ]
+
+    # Trend: last-7d avg vs prior-7d avg (2 queries, same logic as get_users)
+    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+    fourteen_days_ago = datetime.utcnow() - timedelta(days=14)
+    recent_avg = await db.scalar(
+        select(func.avg(AlertModel.risk_score))
+        .where(and_(AlertModel.user_id == user_id, AlertModel.timestamp >= seven_days_ago))
+    )
+    prev_avg = await db.scalar(
+        select(func.avg(AlertModel.risk_score))
+        .where(and_(
+            AlertModel.user_id == user_id,
+            AlertModel.timestamp >= fourteen_days_ago,
+            AlertModel.timestamp < seven_days_ago,
+        ))
+    )
+    if recent_avg is not None and prev_avg is not None:
+        diff = recent_avg - prev_avg
+        risk_trend = "up" if diff > 5 else "down" if diff < -5 else "stable"
+    else:
+        risk_trend = "stable"
 
     return UserDetailResponse(
         id=row.id, name=row.name, role=row.role, department=row.department,
         risk_score=row.risk_score, last_seen=row.last_seen, location=row.location,
-        risk_trend="stable",
+        risk_trend=risk_trend,
+        restricted=bool(getattr(row, 'restricted', 0)),
+        escalated=bool(getattr(row, 'escalated', 0)),
         risk_history=risk_history,
         recent_alerts=[_alert_from_row(a) for a in alert_rows],
     )
@@ -1008,8 +1029,7 @@ async def retrain(db: AsyncSession = Depends(get_db)):
 
     X_arr = np.array(X)
     y_arr = np.array(y)
-    before_scores = [ensemble.xgb_model.score(feat) for feat in X_arr]
-    precision_before = _precision_from_scores(before_scores, list(y_arr))
+    precision_before = _precision_from_scores(ensemble.xgb_model.score_batch(X_arr), list(y_arr))
 
     ensemble.xgb_model.fit(X_arr, y_arr)
     ensemble.save(SAVED_MODEL_DIR)
@@ -1036,11 +1056,11 @@ async def retrain(db: AsyncSession = Depends(get_db)):
             continue
 
     if val_X:
-        val_scores = [ensemble.xgb_model.score(feat) for feat in val_X]
+        val_scores = ensemble.xgb_model.score_batch(np.array(val_X))
         precision_after = _precision_from_scores(val_scores, val_y)
         recall_after = _recall_from_scores(val_scores, val_y)
     else:
-        after_scores = [ensemble.xgb_model.score(feat) for feat in X_arr]
+        after_scores = ensemble.xgb_model.score_batch(X_arr)
         precision_after = _precision_from_scores(after_scores, list(y_arr))
         recall_after = _recall_from_scores(after_scores, list(y_arr))
 
