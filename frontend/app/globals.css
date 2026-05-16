@@ -75,6 +75,42 @@ body {
   animation: panel-slide-in 0.22s ease-out forwards;
 }
 
+/* Landing page interactive hover states */
+.landing-btn-primary {
+  transition: opacity 0.15s, transform 0.15s;
+}
+.landing-btn-primary:hover {
+  opacity: 0.85;
+  transform: translateY(-1px);
+}
+.landing-btn-secondary {
+  transition: border-color 0.15s, color 0.15s, transform 0.15s;
+}
+.landing-btn-secondary:hover {
+  border-color: #8B949E !important;
+  color: #F0F6FC !important;
+  transform: translateY(-1px);
+}
+.landing-nav-link {
+  transition: color 0.15s;
+  cursor: pointer;
+}
+.landing-nav-link:hover {
+  color: #F0F6FC !important;
+}
+.landing-footer-link {
+  transition: color 0.15s;
+}
+.landing-footer-link:hover {
+  color: #F0F6FC !important;
+}
+.landing-feature-row {
+  transition: background 0.15s;
+}
+.landing-feature-row:hover {
+  background: #1C2128;
+}
+
 /* Keyboard focus indicator — applies to all interactive elements */
 :focus-visible {
   outline: 2px solid #4D5562;

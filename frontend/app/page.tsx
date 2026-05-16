@@ -160,9 +160,9 @@ export default function LandingPage() {
           </div>
           <nav style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
             {['Features', 'Models', 'Enterprise'].map((item) => (
-              <span key={item} style={{ fontSize: 13, color: C.muted, cursor: 'default' }}>{item}</span>
+              <span key={item} className="landing-nav-link" style={{ fontSize: 13, color: C.muted }}>{item}</span>
             ))}
-            <Link href="/dashboard" style={{
+            <Link href="/dashboard" className="landing-btn-primary" style={{
               fontSize: 12, fontWeight: 700, letterSpacing: '0.05em',
               padding: '7px 16px', borderRadius: 3,
               background: C.primary, color: C.bg, textDecoration: 'none',
@@ -243,7 +243,7 @@ export default function LandingPage() {
             transition={{ duration: 0.55, delay: 0.28 }}
             style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}
           >
-            <Link href="/dashboard" style={{
+            <Link href="/dashboard" className="landing-btn-primary" style={{
               fontSize: 14, fontWeight: 700, letterSpacing: '0.02em',
               padding: '12px 28px', borderRadius: 3,
               background: C.primary, color: C.bg, textDecoration: 'none',
@@ -251,7 +251,7 @@ export default function LandingPage() {
             }}>
               View Live Demo →
             </Link>
-            <a href="#how-it-works" style={{
+            <a href="#how-it-works" className="landing-btn-secondary" style={{
               fontSize: 14, fontWeight: 600,
               padding: '12px 28px', borderRadius: 3,
               background: 'transparent', color: C.primary,
@@ -451,8 +451,9 @@ export default function LandingPage() {
             {/* Right: threat patterns */}
             <motion.div variants={fadeInUp} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {THREAT_PATTERNS.map(({ type, desc }) => (
-                <div
+                <motion.div
                   key={type}
+                  whileHover={{ borderColor: '#4D5562', backgroundColor: '#1C2128', transition: { duration: 0.2 } }}
                   style={{
                     padding: '18px 20px',
                     background: C.bg,
@@ -462,7 +463,7 @@ export default function LandingPage() {
                 >
                   <p style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 700, color: C.primary, letterSpacing: '-0.01em' }}>{type}</p>
                   <p style={{ margin: 0, fontSize: 12, color: C.muted, lineHeight: 1.65 }}>{desc}</p>
-                </div>
+                </motion.div>
               ))}
             </motion.div>
 
@@ -493,6 +494,7 @@ export default function LandingPage() {
               <motion.div
                 key={step}
                 variants={fadeInUp}
+                whileHover={{ borderColor: '#4D5562', transition: { duration: 0.2 } }}
                 style={{
                   position: 'relative', overflow: 'hidden',
                   padding: '32px 28px',
@@ -576,6 +578,7 @@ export default function LandingPage() {
           {FEATURES.map(({ title, desc, badge }, i) => (
             <div
               key={title}
+              className="landing-feature-row"
               style={{
                 display: 'grid', gridTemplateColumns: '52px 1fr auto',
                 gap: 28, padding: '32px 36px',
@@ -721,7 +724,7 @@ export default function LandingPage() {
             SentinelIQ surfaces it before the damage is done.
           </p>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <Link href="/dashboard" style={{
+            <Link href="/dashboard" className="landing-btn-primary" style={{
               fontSize: 14, fontWeight: 700, letterSpacing: '0.02em',
               padding: '12px 28px', borderRadius: 3,
               background: C.primary, color: C.bg, textDecoration: 'none',
@@ -729,7 +732,7 @@ export default function LandingPage() {
             }}>
               Get a Demo
             </Link>
-            <a href="#" style={{
+            <a href="#" className="landing-btn-secondary" style={{
               fontSize: 14, fontWeight: 600,
               padding: '12px 28px', borderRadius: 3,
               background: 'transparent', color: C.primary,
@@ -763,8 +766,8 @@ export default function LandingPage() {
 
             {/* Links */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'flex-end' }}>
-              <a href="#" style={{ fontSize: 13, color: C.muted, textDecoration: 'none' }}>GitHub Repository</a>
-              <Link href="/dashboard" style={{ fontSize: 13, color: C.muted, textDecoration: 'none' }}>View Demo</Link>
+              <a href="#" className="landing-footer-link" style={{ fontSize: 13, color: C.muted, textDecoration: 'none' }}>GitHub Repository</a>
+              <Link href="/dashboard" className="landing-footer-link" style={{ fontSize: 13, color: C.muted, textDecoration: 'none' }}>View Demo</Link>
             </div>
           </div>
 
