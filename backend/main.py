@@ -305,7 +305,7 @@ async def _process_event(ev: dict) -> None:
             user.risk_score = round(risk_score, 2)
             user.last_seen = ev["timestamp"]
 
-        if risk_score >= 60 or ev["is_fraud"] == 1:
+        if risk_score >= 60:
             shap_vals = ensemble.explain(feat)
             alert = AlertModel(
                 id=str(uuid.uuid4()),
@@ -425,6 +425,22 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
     fpr = round((fp / max(1, fp + tp)) * 100, 1)
     labels_collected = fp + tp
 
+    last_metric_row = (
+        await db.execute(
+            select(ModelMetricModel).order_by(desc(ModelMetricModel.created_at)).limit(1)
+        )
+    ).scalars().first()
+    if last_metric_row:
+        hours_since = (datetime.utcnow() - last_metric_row.created_at).total_seconds() / 3600
+        if hours_since < 1:
+            next_retrain_in = "< 1h ago"
+        elif hours_since < 24:
+            next_retrain_in = f"{int(hours_since)}h ago"
+        else:
+            next_retrain_in = f"{int(hours_since // 24)}d ago"
+    else:
+        next_retrain_in = "Never"
+
     # Coordinated activity: same fraud_type triggered by 3+ distinct users in last 30 min
     thirty_min_ago = datetime.utcnow() - timedelta(minutes=30)
     recent_fraud = (
@@ -462,7 +478,7 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
         alerts_change=alerts_today - alerts_yesterday,
         high_risk_change=high_risk_count - high_risk_yesterday,
         labels_collected=labels_collected,
-        next_retrain_in="3h",
+        next_retrain_in=next_retrain_in,
         coordinated_patterns=coordinated,
         events_today=events_today,
     )
@@ -660,6 +676,7 @@ async def peer_comparison(alert_id: str, db: AsyncSession = Depends(get_db)):
                     EventModel.timestamp <= alert.timestamp,
                 )
             )
+            .limit(1000)
         )
     ).scalars().all()
 
@@ -802,6 +819,7 @@ async def get_cases(db: AsyncSession = Depends(get_db)):
             select(AlertModel)
             .where(AlertModel.timestamp >= since)
             .order_by(AlertModel.user_id, AlertModel.timestamp)
+            .limit(2000)
         )
     ).scalars().all()
 
@@ -1050,7 +1068,10 @@ async def get_intelligence(db: AsyncSession = Depends(get_db)):
     ) or 0
     fraud_alerts_24h = await db.scalar(
         select(func.count()).select_from(AlertModel).where(
-            and_(AlertModel.timestamp >= twenty_four_hours_ago, AlertModel.fraud_type != "")
+            and_(
+                AlertModel.timestamp >= twenty_four_hours_ago,
+                AlertModel.fraud_type.notin_(["", "anomalous_behavior"]),
+            )
         )
     ) or 0
     anomaly_rate = round((fraud_alerts_24h / max(1, alerts_24h)) * 100, 1)

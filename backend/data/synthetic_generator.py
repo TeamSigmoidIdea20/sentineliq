@@ -125,6 +125,11 @@ class SyntheticGenerator:
             "description": f"{name} performed {event_type.replace('_', ' ')} in {department}",
             "risk_score": 0.0,
             "features_json": "{}",
+            # Baseline metadata for FeatureEngineer._get_history — not stored to DB
+            "login_start": ls,
+            "login_end": le,
+            "avg_daily_tx": avg_tx,
+            "normal_locations": norm_locs,
         }
 
     def _fraud_event(self, spec, ts: datetime, pattern: str) -> dict:
@@ -176,7 +181,7 @@ class SyntheticGenerator:
             ts = base_ts + timedelta(seconds=i * random.randint(10, 60))
 
             if self._event_counter % 30 == 0:
-                pattern = fraud_patterns[(self._event_counter // 30) % len(fraud_patterns)]
+                pattern = random.choice(fraud_patterns)
                 ev = self._fraud_event(spec, ts, pattern)
             else:
                 ev = self._normal_event(spec, ts)
