@@ -63,6 +63,7 @@ export interface FeedEvent {
   risk_score?: number
   description: string
   is_anomalous: boolean
+  alert_id?: string | null
 }
 
 export interface UserEvent {

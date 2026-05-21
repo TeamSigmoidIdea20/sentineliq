@@ -207,6 +207,19 @@ export default function DashboardPage() {
         </AnimatePresence>
 
         {/* Coordinated activity banners */}
+        {dismissedPatterns.size > 0 && activePatterns.length === 0 && (
+          <div style={{ padding: '6px 24px', background: C.card, borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => {
+                try { localStorage.removeItem('sentinel_dismissed_patterns') } catch {}
+                setDismissedPatterns(new Set())
+              }}
+              style={{ fontSize: 10, color: C.textMuted, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' }}
+            >
+              Reset dismissed alerts
+            </button>
+          </div>
+        )}
         <AnimatePresence>
           {activePatterns.map((cp) => (
             <motion.div
@@ -306,7 +319,7 @@ export default function DashboardPage() {
 
           {/* Feed + Recent alerts */}
           <div className="feed-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
-            <LiveFeed />
+            <LiveFeed onAlertClick={setSelectedAlertId} />
 
             <div
               style={{

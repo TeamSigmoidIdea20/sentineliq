@@ -11,16 +11,18 @@ const RISK_COLORS: Record<string, string> = {
   low: C.low,
 }
 
-function FeedRow({ event, isNew }: { event: FeedEvent; isNew: boolean }) {
+function FeedRow({ event, isNew, onAlertClick }: { event: FeedEvent; isNew: boolean; onAlertClick?: (id: string) => void }) {
   const color = event.risk_level ? RISK_COLORS[event.risk_level] || C.textMuted : C.textMuted
   const [hovered, setHovered] = useState(false)
   const pulse = event.is_anomalous && (event.risk_level === 'critical' || event.risk_level === 'high')
+  const clickable = !!event.alert_id && !!onAlertClick
 
   return (
     <div
       className={isNew ? 'animate-slide-in' : ''}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onClick={() => clickable && onAlertClick!(event.alert_id!)}
       style={{
         display: 'flex',
         alignItems: 'flex-start',
@@ -29,6 +31,7 @@ function FeedRow({ event, isNew }: { event: FeedEvent; isNew: boolean }) {
         borderBottom: `1px solid ${C.border}`,
         background: hovered ? C.hover : 'transparent',
         transition: 'background 0.15s',
+        cursor: clickable ? 'pointer' : 'default',
       }}
     >
       <div
@@ -62,7 +65,7 @@ function FeedRow({ event, isNew }: { event: FeedEvent; isNew: boolean }) {
   )
 }
 
-export default function LiveFeed() {
+export default function LiveFeed({ onAlertClick }: { onAlertClick?: (alertId: string) => void } = {}) {
   const [events, setEvents] = useState<FeedEvent[]>([])
   const [newIds, setNewIds] = useState<Set<string>>(new Set())
   const prevIds = useRef<Set<string>>(new Set())
@@ -131,7 +134,7 @@ export default function LiveFeed() {
       ) : (
         <div style={{ maxHeight: 380, overflowY: 'auto' }}>
           {events.map((ev) => (
-            <FeedRow key={ev.id} event={ev} isNew={newIds.has(ev.id)} />
+            <FeedRow key={ev.id} event={ev} isNew={newIds.has(ev.id)} onAlertClick={onAlertClick} />
           ))}
         </div>
       )}

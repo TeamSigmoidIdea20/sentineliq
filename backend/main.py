@@ -291,6 +291,8 @@ async def _process_event(ev: dict) -> None:
         return
     ev["features_json"] = json.dumps(feat.tolist())
 
+    alert_id = str(uuid.uuid4()) if risk_score >= 60 else None
+
     feed_entry = {
         "id": ev["id"],
         "user_id": ev["user_id"],
@@ -301,6 +303,7 @@ async def _process_event(ev: dict) -> None:
         "risk_score": round(risk_score, 1),
         "description": ev["description"],
         "is_anomalous": ev["is_fraud"] == 1 or risk_score >= 60,
+        "alert_id": alert_id,
     }
     _feed_buffer.insert(0, feed_entry)
     if len(_feed_buffer) > _MAX_FEED:
@@ -314,10 +317,10 @@ async def _process_event(ev: dict) -> None:
             user.risk_score = round(risk_score, 2)
             user.last_seen = ev["timestamp"]
 
-        if risk_score >= 60:
+        if alert_id:
             shap_vals = ensemble.explain(feat)
             alert = AlertModel(
-                id=str(uuid.uuid4()),
+                id=alert_id,
                 user_id=ev["user_id"],
                 user_name=ev["user_name"],
                 timestamp=ev["timestamp"],
@@ -339,7 +342,7 @@ async def _event_loop() -> None:
     while True:
         await asyncio.sleep(5)
         try:
-            batch = generator.generate_batch(n=random.randint(1, 3))
+            batch = generator.generate_batch(n=random.randint(1, 3), base_ts=datetime.utcnow())
             for ev in batch:
                 await _process_event(ev)
         except Exception as exc:

@@ -73,6 +73,7 @@ class FeedEvent(BaseModel):
     risk_score: Optional[float] = None
     description: str
     is_anomalous: bool
+    alert_id: Optional[str] = None
 
 
 class UserEventResponse(BaseModel):
