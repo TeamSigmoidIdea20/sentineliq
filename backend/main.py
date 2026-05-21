@@ -276,9 +276,13 @@ async def _process_event(ev: dict) -> None:
     global _events_processed
     _events_processed += 1
 
+    force_alert = ev.pop("_force_alert", False)
+
     feat = engineer.compute_features(ev["user_id"], ev)
     scores = ensemble.predict(ev["user_id"], feat)
     risk_score = scores["ensemble"] * 100.0
+    if force_alert and risk_score < 75.0:
+        risk_score = 75.0
     ev["risk_score"] = risk_score
     ev["features_json"] = json.dumps(feat.tolist())
 
@@ -1108,6 +1112,7 @@ async def simulate(body: SimulateRequest = None):
         body = SimulateRequest()
     pattern = _SCENARIO_PATTERNS.get(body.scenario or "") if body.scenario else None
     ev = generator.generate_forced_fraud(pattern) if pattern else generator.generate_one()
+    ev["_force_alert"] = True
     asyncio.create_task(_process_event(ev))
     return {"status": "ok", "event_id": ev["id"], "scenario": body.scenario}
 

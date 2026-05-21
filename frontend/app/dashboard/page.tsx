@@ -12,30 +12,11 @@ import UserTable from '@/components/UserTable'
 import { api, type Alert, type Stats, type User, formatFraudType } from '@/lib/api'
 import { C } from '@/lib/tokens'
 
-function TopBar({ lastUpdated }: { lastUpdated: Date | null }) {
-  return (
-    <div
-      style={{
-        height: 48, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 24px', borderBottom: `1px solid ${C.border}`,
-        background: C.card, flexShrink: 0,
-      }}
-    >
-      <h1 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: C.textPrimary }}>Fraud Intelligence Overview</h1>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        {lastUpdated && (
-          <span style={{ fontSize: 10, color: C.textMuted }}>
-            Updated {lastUpdated.toLocaleTimeString()}
-          </span>
-        )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: C.low, display: 'inline-block' }} />
-          <span style={{ fontSize: 11, color: C.low, fontWeight: 600 }}>OPERATIONAL</span>
-        </div>
-      </div>
-    </div>
-  )
-}
+const _SIMULATE_SCENARIOS = [
+  { label: 'Bulk Data Exfiltration', scenario: 'bulk_exfiltration' },
+  { label: 'Privilege Escalation', scenario: 'privilege_escalation' },
+  { label: 'Off-Hours Treasury Access', scenario: 'off_hours_treasury' },
+]
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null)
@@ -49,6 +30,9 @@ export default function DashboardPage() {
   const [newAlertNotif, setNewAlertNotif] = useState<Alert | null>(null)
   const prevAlertIds = useRef<Set<string>>(new Set())
   const notifTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [simOpen, setSimOpen] = useState(false)
+  const [simToast, setSimToast] = useState('')
+  const simRef = useRef<HTMLDivElement>(null)
   const [dismissedPatterns, setDismissedPatterns] = useState<Set<string>>(() => {
     if (typeof window === 'undefined') return new Set()
     try {
@@ -115,6 +99,15 @@ export default function DashboardPage() {
     return () => clearInterval(interval)
   }, [fetchStats, fetchAlerts])
 
+  useEffect(() => {
+    if (!simOpen) return
+    const handler = (e: MouseEvent) => {
+      if (simRef.current && !simRef.current.contains(e.target as Node)) setSimOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [simOpen])
+
   const activePatterns = (stats?.coordinated_patterns ?? []).filter(
     (cp) => !dismissedPatterns.has(cp.pattern)
   )
@@ -124,7 +117,50 @@ export default function DashboardPage() {
       <Sidebar />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-        <TopBar lastUpdated={lastUpdated} />
+        {/* Topbar */}
+        <div style={{ height: 48, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', borderBottom: `1px solid ${C.border}`, background: C.card, flexShrink: 0 }}>
+          <h1 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: C.textPrimary }}>Fraud Intelligence Overview</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            {simToast && (
+              <span style={{ fontSize: 11, color: C.medium, fontWeight: 600 }}>{simToast}</span>
+            )}
+            <div ref={simRef} style={{ position: 'relative' }}>
+              <button
+                onClick={() => setSimOpen((o) => !o)}
+                style={{ padding: '5px 12px', fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: 3, cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                Simulate ▾
+              </button>
+              {simOpen && (
+                <div style={{ position: 'absolute', right: 0, top: '110%', background: C.card, border: `1px solid ${C.border}`, borderRadius: 4, zIndex: 50, minWidth: 210, boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+                  {_SIMULATE_SCENARIOS.map(({ label, scenario }, idx, arr) => (
+                    <button
+                      key={scenario}
+                      onClick={async () => {
+                        setSimOpen(false)
+                        await api.simulate(scenario).catch(() => null)
+                        setSimToast(`${label} injected`)
+                        setTimeout(() => setSimToast(''), 7000)
+                      }}
+                      style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 12, color: C.textPrimary, background: 'transparent', border: 'none', borderBottom: idx < arr.length - 1 ? `1px solid ${C.border}` : 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = C.hover }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {lastUpdated && (
+              <span style={{ fontSize: 10, color: C.textMuted }}>Updated {lastUpdated.toLocaleTimeString()}</span>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: C.low, display: 'inline-block' }} />
+              <span style={{ fontSize: 11, color: C.low, fontWeight: 600 }}>OPERATIONAL</span>
+            </div>
+          </div>
+        </div>
 
         {/* New alert pop-up notification */}
         <AnimatePresence>
