@@ -34,10 +34,12 @@ class EnsembleModel:
         lstm_score = self.lstm_model.score(user_id, features)
         xgb_score = self.xgb_model.score(features)
         ensemble = IF_WEIGHT * if_score + LSTM_WEIGHT * lstm_score + XGB_WEIGHT * xgb_score
+        if np.isnan(ensemble):
+            ensemble = 0.5
         return {
-            "isolation_forest": round(if_score, 4),
-            "lstm": round(lstm_score, 4),
-            "xgboost": round(xgb_score, 4),
+            "isolation_forest": round(float(np.nan_to_num(if_score, nan=0.5)), 4),
+            "lstm": round(float(np.nan_to_num(lstm_score, nan=0.5)), 4),
+            "xgboost": round(float(np.nan_to_num(xgb_score, nan=0.5)), 4),
             "ensemble": round(float(np.clip(ensemble, 0.0, 1.0)), 4),
         }
 

@@ -82,8 +82,13 @@ class FeatureEngineer:
             dl_mean = float(np.mean(h.downloads))
             dl_std = float(np.std(h.downloads)) + 1e-6
             dl_z = (download - dl_mean) / dl_std
+        elif len(h.downloads) == 1:
+            prev = h.downloads[0]
+            dl_z = (download - prev) / (prev + 1e-6)
         else:
-            dl_z = 0.0
+            # No history: ratio vs rough expected baseline per event
+            baseline = max(1.0, h.avg_tx * 0.1)
+            dl_z = download / baseline
 
         # location_mismatch
         loc_mismatch = 0.0 if location in h.normal_locations else 1.0
