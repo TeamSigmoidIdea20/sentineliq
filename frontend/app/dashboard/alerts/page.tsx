@@ -275,7 +275,7 @@ export default function AlertsPage() {
                           setSimulateOpen(false)
                           await api.simulate(scenario).catch(() => null)
                           setSimulateToast(`${label} injected`)
-                          setTimeout(() => { setSimulateToast(''); fetch() }, 3000)
+                          setTimeout(() => { setSimulateToast(''); fetch() }, 5000)
                         }}
                         style={{
                           display: 'block', width: '100%', textAlign: 'left',
@@ -298,7 +298,7 @@ export default function AlertsPage() {
 
           {simulateToast && (
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 4, padding: '10px 14px', color: C.medium, fontSize: 12, fontWeight: 600 }}>
-              {simulateToast} — refreshing in 3 seconds
+              {simulateToast} — alert will appear in the table below in ~5 seconds
             </div>
           )}
 
