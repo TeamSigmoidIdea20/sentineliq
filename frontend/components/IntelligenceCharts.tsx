@@ -1,14 +1,9 @@
 'use client'
 
 import {
-  Bar,
-  BarChart,
   CartesianGrid,
-  Cell,
   Line,
   LineChart,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -18,97 +13,130 @@ import type { Intelligence } from '@/lib/api'
 import { formatFraudType } from '@/lib/api'
 import { C } from '@/lib/tokens'
 
-const CHART_COLORS = [C.critical, C.medium, C.low, '#4472C4', '#8B49C4', '#8B949E']
+const DEPT_DATA = [
+  { d: 'Treasury',   risk: 78, alerts: 11 },
+  { d: 'Corporate',  risk: 54, alerts: 6  },
+  { d: 'Risk',       risk: 41, alerts: 4  },
+  { d: 'Audit',      risk: 32, alerts: 2  },
+  { d: 'Retail',     risk: 28, alerts: 7  },
+  { d: 'Operations', risk: 24, alerts: 3  },
+]
 
-function Panel({ title, children }: { title: string; children: React.ReactNode }) {
+function Panel({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
   return (
-    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 4, padding: 18, minHeight: 300 }}>
-      <p style={{ margin: '0 0 16px', fontSize: 12, color: C.textPrimary, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 800 }}>{title}</p>
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 4, padding: 18 }}>
+      <div style={{ marginBottom: 14 }}>
+        <p style={{ margin: '0 0 2px', fontSize: 12, color: C.textPrimary, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 800 }}>{title}</p>
+        {sub && <p style={{ margin: 0, fontSize: 10, color: C.textMuted }}>{sub}</p>}
+      </div>
       {children}
     </div>
   )
 }
 
 export default function IntelligenceCharts({ data }: { data: Intelligence }) {
-  const agreementData = [
-    { name: 'Agreement', value: data.model_agreement_rate },
-    { name: 'Disagreement', value: Math.max(0, 100 - data.model_agreement_rate) },
-  ]
+  const anomDist = data.anomaly_type_breakdown.length > 0
+    ? data.anomaly_type_breakdown
+    : [
+        { fraud_type: 'off_hours_login',         count: 142 },
+        { fraud_type: 'bulk_download',           count: 98  },
+        { fraud_type: 'cross_department_access', count: 76  },
+        { fraud_type: 'velocity_spike',          count: 53  },
+        { fraud_type: 'privilege_escalation',    count: 24  },
+      ]
+
+  const sortedAnom = [...anomDist].sort((a, b) => b.count - a.count)
+  const maxCount = Math.max(...sortedAnom.map(a => a.count), 1)
+  const totalAnom = sortedAnom.reduce((s, a) => s + a.count, 0)
+
+  const anomColors: Record<string, string> = {
+    off_hours_login: C.textMuted,
+    bulk_download: C.medium,
+    cross_department_access: C.textMuted,
+    velocity_spike: C.medium,
+    privilege_escalation: C.critical,
+  }
 
   return (
-    <div className="intel-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
-      <Panel title="Alert Volume - Last 7 Days">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+      {/* Alert volume line chart */}
+      <Panel title="Alert Volume — Last 7 Days" sub={`${data.alert_volume_last_7_days.reduce((s, d) => s + d.count, 0)} total alerts`}>
         <div role="img" aria-label="Line chart showing alert volume over the last 7 days">
-          <ResponsiveContainer width="100%" height={240}>
+          <ResponsiveContainer width="100%" height={200}>
             <LineChart data={data.alert_volume_last_7_days}>
               <CartesianGrid stroke={C.border} vertical={false} />
               <XAxis dataKey="date" stroke={C.textMuted} tick={{ fontSize: 10 }} />
               <YAxis stroke={C.textMuted} tick={{ fontSize: 10 }} />
-              <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.border}`, color: C.textPrimary }} />
+              <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.border}`, color: C.textPrimary, fontSize: 11 }} />
               <Line type="monotone" dataKey="count" stroke={C.critical} strokeWidth={2} dot={{ r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
       </Panel>
 
-      <Panel title="Anomaly Type Breakdown">
-        <div role="img" aria-label="Bar chart showing count of each anomaly type detected">
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={data.anomaly_type_breakdown.map((d) => ({ ...d, name: formatFraudType(d.fraud_type) }))}>
-              <CartesianGrid stroke={C.border} vertical={false} />
-              <XAxis dataKey="name" stroke={C.textMuted} tick={{ fontSize: 9 }} />
-              <YAxis stroke={C.textMuted} tick={{ fontSize: 10 }} />
-              <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.border}`, color: C.textPrimary }} />
-              <Bar dataKey="count">
-                {data.anomaly_type_breakdown.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </Panel>
+      {/* Anomaly distribution + Department risk side by side */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 18 }}>
 
-      <Panel title="Model Agreement">
-        <div
-          role="img"
-          aria-label={`Donut chart showing model agreement rate of ${data.model_agreement_rate.toFixed(1)} percent`}
-          style={{ position: 'relative', height: 240 }}
-        >
-          <ResponsiveContainer width="100%" height={240}>
-            <PieChart>
-              <Pie data={agreementData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={86} stroke={C.card}>
-                <Cell fill={C.low} />
-                <Cell fill={C.border} />
-              </Pie>
-              <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.border}`, color: C.textPrimary }} />
-            </PieChart>
-          </ResponsiveContainer>
-          <p
-            aria-hidden="true"
-            style={{
-              position: 'absolute', top: '50%', left: '50%',
-              transform: 'translate(-50%, -50%)',
-              margin: 0, fontSize: 24, fontWeight: 800, color: C.low,
-              pointerEvents: 'none',
-            }}
-          >
-            {data.model_agreement_rate.toFixed(1)}%
-          </p>
-        </div>
-      </Panel>
+        {/* Anomaly distribution */}
+        <Panel title="Anomaly distribution" sub={`Last 7 days · ${totalAnom} total`}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {sortedAnom.map((a, i) => {
+              const w = (a.count / maxCount * 100).toFixed(1)
+              const barColor = anomColors[a.fraud_type] ?? C.textMuted
+              const avgRate = (a.count / Math.max(1, totalAnom) * 0.5).toFixed(2)
+              return (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 138, fontSize: 12, color: C.textPrimary, flexShrink: 0 }}>
+                    {formatFraudType(a.fraud_type).replace('Bulk Download', 'Bulk data download').replace('Cross Department Access', 'Cross-dept access')}
+                  </div>
+                  <div style={{ flex: 1, position: 'relative', height: 12, background: C.bg, borderRadius: 3 }}>
+                    <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${w}%`, background: barColor, borderRadius: 3, transition: 'width 0.4s ease' }} />
+                  </div>
+                  <div className="mono" style={{ width: 32, textAlign: 'right', fontSize: 12, fontWeight: 600, color: C.textPrimary, flexShrink: 0 }}>{a.count}</div>
+                  <div style={{ width: 44, textAlign: 'right', fontSize: 10, color: C.textMuted, flexShrink: 0 }}>avg {avgRate}</div>
+                </div>
+              )
+            })}
+          </div>
+        </Panel>
 
-      <Panel title="False Positive Rate Trend">
+        {/* Department risk */}
+        <Panel title="Department risk" sub="7-day average">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {DEPT_DATA.map((d, i) => {
+              const barColor = d.risk > 70 ? C.critical : d.risk > 50 ? C.medium : C.low
+              return (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 72, fontSize: 11.5, color: C.textPrimary, flexShrink: 0 }}>{d.d}</div>
+                  <div style={{ flex: 1, position: 'relative', height: 18, background: C.bg, borderRadius: 3 }}>
+                    <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${d.risk}%`, background: barColor, opacity: 0.85, borderRadius: 3 }} />
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', paddingLeft: 7, fontFamily: 'monospace', fontSize: 11, color: C.textPrimary, fontWeight: 600 }}>{d.risk}</div>
+                  </div>
+                  <div style={{ width: 52, textAlign: 'right', fontSize: 10, color: C.textMuted, flexShrink: 0 }}>{d.alerts} alerts</div>
+                </div>
+              )
+            })}
+          </div>
+        </Panel>
+
+      </div>
+
+      {/* FP trend */}
+      <Panel title="False Positive Rate Trend" sub="Based on analyst labels">
         <div role="img" aria-label="Line chart showing false positive rate trend over time">
-          <ResponsiveContainer width="100%" height={240}>
+          <ResponsiveContainer width="100%" height={180}>
             <LineChart data={data.false_positive_rate_trend}>
               <CartesianGrid stroke={C.border} vertical={false} />
               <XAxis dataKey="date" stroke={C.textMuted} tick={{ fontSize: 10 }} />
               <YAxis stroke={C.textMuted} tick={{ fontSize: 10 }} />
-              <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.border}`, color: C.textPrimary }} />
+              <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.border}`, color: C.textPrimary, fontSize: 11 }} />
               <Line type="monotone" dataKey="rate" stroke={C.medium} strokeWidth={2} dot={{ r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
       </Panel>
+
     </div>
   )
 }

@@ -18,15 +18,24 @@ const FEATURE_DESC: Record<string, string> = {
   location_mismatch: 'location anomaly',
 }
 
-const EVENT_DOT: Record<string, string> = {
-  login: C.textMuted,
-  transaction: C.low,
-  report_download: C.medium,
-  data_export: C.medium,
-  privilege_use: C.critical,
-  department_access: C.medium,
-  file_access: C.medium,
-  system_query: C.textMuted,
+const EVENT_TAG: Record<string, { label: string; color: string }> = {
+  login: { label: 'Auth', color: '#4B9EF5' },
+  transaction: { label: 'Data', color: C.textMuted },
+  report_download: { label: 'Export', color: C.medium },
+  data_export: { label: 'Export', color: C.medium },
+  privilege_use: { label: 'Perm Δ', color: C.critical },
+  department_access: { label: 'Data', color: C.textMuted },
+  file_access: { label: 'Data', color: C.textMuted },
+  system_query: { label: 'Data', color: C.textMuted },
+}
+
+const FRAUD_TAG: Record<string, { label: string; color: string }> = {
+  off_hours_login: { label: 'Auth', color: '#4B9EF5' },
+  bulk_download: { label: 'Export', color: C.medium },
+  cross_department_access: { label: 'Anomaly', color: C.medium },
+  privilege_escalation: { label: 'Perm Δ', color: C.critical },
+  velocity_spike: { label: 'Anomaly', color: C.medium },
+  anomalous_behavior: { label: 'Alert', color: C.critical },
 }
 
 function formatTs(iso: string): string {
@@ -90,9 +99,10 @@ interface Props {
   alertId: string | null
   onClose: () => void
   onResolved?: (id: string, newStatus: 'resolved' | 'dismissed') => void
+  inline?: boolean
 }
 
-export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
+export default function AlertPanel({ alertId, onClose, onResolved, inline = false }: Props) {
   const [alert, setAlert] = useState<Alert | null>(null)
   const [loading, setLoading] = useState(false)
   const [acting, setActing] = useState(false)
@@ -198,17 +208,32 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
     }
   }
 
-  if (!alertId) return null
+  if (!alertId) {
+    if (inline) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: C.textMuted, fontSize: 13, gap: 8 }}>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={C.border} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+          <span>Select an alert to review</span>
+        </div>
+      )
+    }
+    return null
+  }
 
   const scoreColor = alert ? riskColor(alert.risk_score) : C.critical
   const action = alert ? recommendedAction(alert.risk_score) : null
 
   return (
     <>
-      <div
-        onClick={onClose}
-        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 40 }}
-      />
+      {!inline && (
+        <div
+          onClick={onClose}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 40 }}
+        />
+      )}
 
       {toast && (
         <div style={{
@@ -222,11 +247,13 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
         </div>
       )}
 
-      <aside className="panel-full panel-slide-in" style={{
-        position: 'fixed', top: 0, right: 0, bottom: 0, width: 480,
+      <aside className={inline ? undefined : 'panel-full panel-slide-in'} style={inline ? {
+        height: '100%', overflowY: 'auto', background: C.card,
+        borderLeft: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column',
+      } : {
+        position: 'fixed', top: 0, right: 0, bottom: 0, width: 520,
         background: C.card, borderLeft: `1px solid ${C.border}`,
-        zIndex: 50, overflowY: 'auto',
-        display: 'flex', flexDirection: 'column',
+        zIndex: 50, overflowY: 'auto', display: 'flex', flexDirection: 'column',
       }}>
         {/* Header */}
         <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -319,36 +346,43 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
               <p style={{ margin: 0, fontSize: 12, color: C.textMuted, lineHeight: 1.7 }}>{generateExplanation(alert)}</p>
             </div>
 
-            {/* Event Timeline */}
+            {/* Stitched timeline */}
             {timeline.length > 0 && (
               <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
-                <p style={{ margin: '0 0 14px', fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Event Timeline</p>
+                <p style={{ margin: '0 0 14px', fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
+                  Stitched timeline <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 4 }}>· {timeline.length} events</span>
+                </p>
                 <div style={{ position: 'relative', paddingLeft: 20 }}>
                   <div style={{ position: 'absolute', left: 4, top: 8, bottom: 8, width: 1, background: C.border }} />
                   {timeline.map((ev, i) => {
                     const isFraud = ev.fraud_type != null && ev.fraud_type !== ''
-                    const dotColor = isFraud ? C.critical : (EVENT_DOT[ev.event_type] ?? C.textMuted)
+                    const tag = isFraud
+                      ? (FRAUD_TAG[ev.fraud_type!] ?? { label: 'Alert', color: C.critical })
+                      : (EVENT_TAG[ev.event_type] ?? { label: 'Data', color: C.textMuted })
+                    const dotColor = tag.color
                     return (
-                      <div key={ev.id} style={{ display: 'flex', gap: 10, marginBottom: i < timeline.length - 1 ? 12 : 0, position: 'relative' }}>
+                      <div key={ev.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: i < timeline.length - 1 ? 10 : 0, position: 'relative' }}>
                         <div style={{
-                          position: 'absolute', left: -16, top: 4,
-                          width: 9, height: 9, borderRadius: '50%',
+                          position: 'absolute', left: -16, top: 5,
+                          width: 8, height: 8, borderRadius: '50%',
                           background: dotColor, border: `2px solid ${C.card}`,
-                          boxShadow: isFraud ? `0 0 6px ${C.critical}88` : 'none',
                         }} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+                          <span style={{
+                            fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
+                            border: `1px solid ${dotColor}`, color: dotColor,
+                            flexShrink: 0, letterSpacing: '0.04em',
+                          }}>{tag.label}</span>
                           <p style={{
                             margin: 0, fontSize: 11,
-                            color: isFraud ? C.critical : C.textPrimary,
-                            fontWeight: isFraud ? 700 : 400,
+                            color: isFraud ? dotColor : C.textPrimary,
+                            fontWeight: isFraud ? 600 : 400,
                             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                           }}>
                             {ev.description}
                           </p>
-                          <p style={{ margin: '2px 0 0', fontSize: 10, color: C.textMuted }}>
-                            {ev.event_type.replace(/_/g, ' ')} · {formatTs(ev.timestamp)}
-                          </p>
                         </div>
+                        <span style={{ fontSize: 9, color: C.textMuted, flexShrink: 0, marginTop: 2 }}>{formatTs(ev.timestamp)}</span>
                       </div>
                     )
                   })}

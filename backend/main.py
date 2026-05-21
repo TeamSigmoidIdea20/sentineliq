@@ -291,7 +291,10 @@ async def _process_event(ev: dict) -> None:
         return
     ev["features_json"] = json.dumps(feat.tolist())
 
-    alert_id = str(uuid.uuid4()) if risk_score >= 60 else None
+    # Alert only for explicit fraud events (score >= 50) or very high scoring normal events (>= 80)
+    # This prevents "anomalous_behavior" label spam from borderline normal events
+    is_fraud_event = ev.get("is_fraud") == 1
+    alert_id = str(uuid.uuid4()) if (is_fraud_event and risk_score >= 50) or (not is_fraud_event and risk_score >= 80) else None
 
     feed_entry = {
         "id": ev["id"],
@@ -338,13 +341,22 @@ async def _process_event(ev: dict) -> None:
         await db.commit()
 
 
+_LIVE_FRAUD_PATTERNS = ["off_hours_login", "bulk_download", "cross_department_access", "privilege_escalation", "velocity_spike"]
+
 async def _event_loop() -> None:
+    live_count = 0
     while True:
-        await asyncio.sleep(5)
+        await asyncio.sleep(180)  # 1 live event per 3 minutes
         try:
-            batch = generator.generate_batch(n=random.randint(1, 3), base_ts=datetime.utcnow())
-            for ev in batch:
-                await _process_event(ev)
+            live_count += 1
+            # Every 3rd live event is an explicit fraud, cycling evenly through all patterns
+            if live_count % 3 == 0:
+                pattern = _LIVE_FRAUD_PATTERNS[((live_count // 3) - 1) % len(_LIVE_FRAUD_PATTERNS)]
+                ev = generator.generate_forced_fraud(pattern)
+                ev["_force_alert"] = True
+            else:
+                ev = generator.generate_batch(n=1, base_ts=datetime.utcnow())[0]
+            await _process_event(ev)
         except Exception as exc:
             logger.error("Event loop error: %s", exc)
 

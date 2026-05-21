@@ -55,6 +55,25 @@ export default function Sidebar() {
         </div>
       </div>
 
+      {/* Search */}
+      <div style={{ padding: '8px 10px', borderBottom: `1px solid ${C.border}` }}>
+        <button
+          onClick={() => window.dispatchEvent(new Event('sentinel:cmdk'))}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+            padding: '7px 10px', background: C.bg, border: `1px solid ${C.border}`,
+            borderRadius: 4, cursor: 'pointer', fontFamily: 'inherit',
+            color: C.textMuted, fontSize: 12,
+          }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.textMuted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <span style={{ flex: 1, textAlign: 'left' }}>Search…</span>
+          <kbd style={{ fontSize: 9, border: `1px solid ${C.border}`, borderRadius: 2, padding: '1px 4px', color: C.textMuted }}>⌘K</kbd>
+        </button>
+      </div>
+
       {/* Nav */}
       <nav style={{ padding: '12px 10px', flex: 1 }}>
         <p style={{ margin: '0 0 6px 10px', fontSize: 10, color: C.textMuted, letterSpacing: '0.08em', fontWeight: 600, textTransform: 'uppercase' }}>

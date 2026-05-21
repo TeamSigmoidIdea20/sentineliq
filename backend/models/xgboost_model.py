@@ -45,9 +45,13 @@ class XGBoostModel:
 
         self._model = xgb.XGBClassifier(
             n_estimators=150,
-            max_depth=4,
+            max_depth=3,
             learning_rate=0.1,
             scale_pos_weight=scale,
+            subsample=0.8,
+            colsample_bytree=0.7,
+            min_child_weight=3,
+            gamma=0.1,
             use_label_encoder=False,
             eval_metric="logloss",
             random_state=42,
@@ -95,9 +99,11 @@ class XGBoostModel:
 
             logger.debug("[SHAP] raw shap_row: %s", shap_row.tolist())
 
-            # If everything is genuinely zero (degenerate model), use fallback
-            if np.all(np.abs(shap_row) < 1e-9):
-                logger.warning("[SHAP] All SHAP values are zero — using fallback")
+            # Use fallback if all zero OR fewer than 2 features contribute meaningfully
+            # (catches single-feature dominance where model ignores most inputs)
+            non_trivial = int(np.sum(np.abs(shap_row) > 1e-3))
+            if np.all(np.abs(shap_row) < 1e-9) or non_trivial < 2:
+                logger.warning("[SHAP] Degenerate SHAP (%d non-trivial) — using fallback", non_trivial)
                 return _fallback_shap(features)
 
             contributions = []

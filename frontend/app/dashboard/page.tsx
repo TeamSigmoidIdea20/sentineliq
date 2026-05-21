@@ -138,9 +138,17 @@ export default function DashboardPage() {
                       key={scenario}
                       onClick={async () => {
                         setSimOpen(false)
-                        await api.simulate(scenario).catch(() => null)
-                        setSimToast(`${label} injected`)
-                        setTimeout(() => setSimToast(''), 7000)
+                        setSimToast(`Simulating ${label}…`)
+                        try {
+                          await api.simulate(scenario)
+                          setSimToast(`${label} injected — alert incoming`)
+                          // Force an immediate poll to catch the new alert
+                          setTimeout(() => { fetchAlerts(); fetchStats() }, 1500)
+                          setTimeout(() => { fetchAlerts(); fetchStats() }, 4000)
+                        } catch {
+                          setSimToast('Simulate failed — backend may be starting up')
+                        }
+                        setTimeout(() => setSimToast(''), 8000)
                       }}
                       style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 12, color: C.textPrimary, background: 'transparent', border: 'none', borderBottom: idx < arr.length - 1 ? `1px solid ${C.border}` : 'none', cursor: 'pointer', fontFamily: 'inherit' }}
                       onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = C.hover }}
@@ -341,7 +349,7 @@ export default function DashboardPage() {
                         <div style={{ width: 40, height: 10, background: '#30363D', borderRadius: 2 }} />
                       </div>
                     ))
-                  : alerts.slice(0, 10).map((alert) => {
+                  : alerts.filter(a => a.risk_score >= 50).slice(0, 10).map((alert) => {
                       const color =
                         alert.risk_level === 'critical' || alert.risk_level === 'high'
                           ? C.critical
