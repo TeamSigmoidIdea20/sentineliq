@@ -275,7 +275,12 @@ export default function AlertsPage() {
                           setSimulateOpen(false)
                           await api.simulate(scenario).catch(() => null)
                           setSimulateToast(`${label} injected`)
-                          setTimeout(() => { setSimulateToast(''); fetch() }, 5000)
+                          setTimeout(() => {
+                            setSimulateToast('')
+                            setPage(1)
+                            setRiskLevel('all')
+                            setStatus('all')
+                          }, 5000)
                         }}
                         style={{
                           display: 'block', width: '100%', textAlign: 'left',
@@ -363,6 +368,17 @@ export default function AlertsPage() {
                   }}
                 >
                   Next →
+                </button>
+                <button
+                  disabled={page >= totalPages}
+                  onClick={() => setPage(totalPages)}
+                  style={{
+                    padding: '5px 12px', fontSize: 11, fontWeight: 600,
+                    background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted, opacity: page >= totalPages ? 0.4 : 1,
+                    borderRadius: 3, cursor: page >= totalPages ? 'default' : 'pointer',
+                  }}
+                >
+                  Last →|
                 </button>
               </div>
             </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { AnimatePresence, motion } from 'framer-motion'
 import { AlertTriangle, X } from 'lucide-react'
@@ -46,6 +46,9 @@ export default function DashboardPage() {
   const [usersLoading, setUsersLoading] = useState(true)
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [newAlertNotif, setNewAlertNotif] = useState<Alert | null>(null)
+  const prevAlertIds = useRef<Set<string>>(new Set())
+  const notifTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [dismissedPatterns, setDismissedPatterns] = useState<Set<string>>(() => {
     if (typeof window === 'undefined') return new Set()
     try {
@@ -71,7 +74,18 @@ export default function DashboardPage() {
   const fetchAlerts = useCallback(async () => {
     try {
       const res = await api.alerts({ page: 1 })
-      setAlerts(res.alerts)
+      const incoming = res.alerts
+      if (prevAlertIds.current.size > 0) {
+        const fresh = incoming.filter((a) => !prevAlertIds.current.has(a.id))
+        if (fresh.length > 0) {
+          const top = fresh.sort((a, b) => b.risk_score - a.risk_score)[0]
+          setNewAlertNotif(top)
+          if (notifTimer.current) clearTimeout(notifTimer.current)
+          notifTimer.current = setTimeout(() => setNewAlertNotif(null), 7000)
+        }
+      }
+      incoming.forEach((a) => prevAlertIds.current.add(a.id))
+      setAlerts(incoming)
     } catch {
       // backend starting up
     } finally {
@@ -111,6 +125,50 @@ export default function DashboardPage() {
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         <TopBar lastUpdated={lastUpdated} />
+
+        {/* New alert pop-up notification */}
+        <AnimatePresence>
+          {newAlertNotif && (
+            <motion.div
+              key={newAlertNotif.id}
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              style={{ flexShrink: 0 }}
+            >
+              <div
+                role="alert"
+                style={{
+                  background: '#1A2233', padding: '10px 24px',
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  borderBottom: `1px solid ${C.border}`,
+                  borderLeft: `3px solid ${newAlertNotif.risk_level === 'critical' || newAlertNotif.risk_level === 'high' ? C.critical : newAlertNotif.risk_level === 'medium' ? C.medium : C.low}`,
+                }}
+              >
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: newAlertNotif.risk_level === 'critical' || newAlertNotif.risk_level === 'high' ? C.critical : newAlertNotif.risk_level === 'medium' ? C.medium : C.low, flexShrink: 0, display: 'inline-block' }} />
+                <p style={{ margin: 0, fontSize: 12, color: C.textPrimary, fontWeight: 600, flex: 1 }}>
+                  New alert — <span style={{ fontWeight: 700 }}>{newAlertNotif.user_name}</span>
+                  {' · '}{newAlertNotif.fraud_type.replace(/_/g, ' ')}
+                  {' · '}score <span style={{ fontWeight: 800, color: newAlertNotif.risk_level === 'critical' || newAlertNotif.risk_level === 'high' ? C.critical : newAlertNotif.risk_level === 'medium' ? C.medium : C.low }}>{Math.round(newAlertNotif.risk_score)}</span>
+                </p>
+                <button
+                  onClick={() => { setSelectedAlertId(newAlertNotif.id); setNewAlertNotif(null) }}
+                  style={{ fontSize: 11, color: C.textMuted, background: 'none', border: `1px solid ${C.border}`, borderRadius: 3, padding: '3px 10px', cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  View
+                </button>
+                <button
+                  onClick={() => setNewAlertNotif(null)}
+                  aria-label="Dismiss"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textMuted, padding: 4, display: 'flex', flexShrink: 0 }}
+                >
+                  <X size={13} strokeWidth={2} />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Coordinated activity banners */}
         <AnimatePresence>

@@ -178,7 +178,7 @@ export default function IntelligencePage() {
         <div style={{ height: 48, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', borderBottom: `1px solid ${C.border}`, background: C.card, flexShrink: 0 }}>
           <h1 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: C.textPrimary }}>Model Intelligence</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <span style={{ fontSize: 11, color: C.textMuted }}>Synthetic validation set · 20% held-out</span>
+            <span style={{ fontSize: 11, color: C.textMuted }}>Live alert data · last 7 days</span>
             <button
               onClick={runTraining}
               disabled={training}
@@ -251,7 +251,7 @@ export default function IntelligencePage() {
                   Ensemble Performance
                 </p>
                 <p style={{ margin: '0 0 14px', fontSize: 11, color: C.textMuted }}>
-                  Metrics computed on held-out 20% of synthetic validation set · Training data: {data.training_events || 2000} events
+                  Precision and recall computed on live alerts (last 7 days) using ground-truth fraud labels · {data.training_events || 0} total events processed
                 </p>
                 <div className="stat-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
                   <Stat label="Precision" value={`${(data.precision * 100).toFixed(1)}%`} />
