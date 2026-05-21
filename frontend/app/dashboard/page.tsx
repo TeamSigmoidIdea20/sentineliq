@@ -1,282 +1,409 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { api, type Alert, type Stats, type User, timeAgo } from '@/lib/api'
-import { sevClass, sevLabel } from '@/lib/tokens'
-import Accordion from '@/components/Accordion'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
+import { AnimatePresence, motion } from 'framer-motion'
+import { AlertTriangle, X } from 'lucide-react'
+import Sidebar from '@/components/Sidebar'
+import StatCard from '@/components/StatCard'
+import LiveFeed from '@/components/LiveFeed'
+import AlertPanel from '@/components/AlertPanel'
+import UserTable from '@/components/UserTable'
+import { api, type Alert, type Stats, type User, formatFraudType } from '@/lib/api'
+import { C } from '@/lib/tokens'
 
-function MiniSparkline({ data }: { data: number[] }) {
-  if (data.length < 2) return null
-  const w = 80, h = 18
-  const min = Math.min(...data), max = Math.max(...data)
-  const range = max - min || 1
-  const pts = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - min) / range) * (h - 2) - 1}`).join(' ')
-  return (
-    <svg width={w} height={h} style={{ display: 'block' }}>
-      <polyline points={pts} fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
+const _SIMULATE_SCENARIOS = [
+  { label: 'Bulk Data Exfiltration', scenario: 'bulk_exfiltration' },
+  { label: 'Privilege Escalation', scenario: 'privilege_escalation' },
+  { label: 'Off-Hours Treasury Access', scenario: 'off_hours_treasury' },
+]
 
-function StaticSparkline({ color, data }: { color: string; data: number[] }) {
-  const w = 300, h = 56
-  if (data.length < 2) return <div style={{ height: h, background: 'var(--bg-2)', borderRadius: 4 }} />
-  const min = Math.min(...data), max = Math.max(...data)
-  const range = max - min || 1
-  const pts = data.map((v, i) => ({ x: (i / (data.length - 1)) * w, y: h - ((v - min) / range) * (h - 4) - 2 }))
-  const line = pts.map(p => `${p.x},${p.y}`).join(' ')
-  const area = `M ${pts.map(p => `${p.x},${p.y}`).join(' L ')} L ${w},${h} L 0,${h} Z`
-  return (
-    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ display: 'block' }}>
-      <path d={area} fill={color} fillOpacity={0.12} />
-      <polyline points={line} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-export default function MonitorPage() {
-  const router = useRouter()
-  const [alerts, setAlerts] = useState<Alert[]>([])
+export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null)
+  const [statsLoading, setStatsLoading] = useState(true)
+  const [alerts, setAlerts] = useState<Alert[]>([])
+  const [alertsLoading, setAlertsLoading] = useState(true)
   const [users, setUsers] = useState<User[]>([])
-  const [banner, setBanner] = useState<Alert | null>(null)
+  const [usersLoading, setUsersLoading] = useState(true)
+  const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [newAlertNotif, setNewAlertNotif] = useState<Alert | null>(null)
   const prevAlertIds = useRef<Set<string>>(new Set())
-  const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [pulse, setPulse] = useState<number[]>(() => Array.from({ length: 24 }, () => 700 + Math.random() * 300))
-
-  useEffect(() => {
-    const id = setInterval(() => setPulse(p => [...p.slice(1), 700 + Math.random() * 350]), 1200)
-    return () => clearInterval(id)
-  }, [])
-
-  useEffect(() => {
-    let mounted = true
-    const load = async () => {
-      try {
-        const [aData, sData, uData] = await Promise.all([api.alerts({ page_size: 20 }), api.stats(), api.users()])
-        if (!mounted) return
-        const newIds = aData.alerts.map(a => a.id)
-        const newOnes = newIds.filter(id => prevAlertIds.current.size > 0 && !prevAlertIds.current.has(id))
-        prevAlertIds.current = new Set(newIds)
-        if (newOnes.length > 0) {
-          const newest = aData.alerts.find(a => a.id === newOnes[0])
-          if (newest) {
-            setBanner(newest)
-            if (bannerTimer.current) clearTimeout(bannerTimer.current)
-            bannerTimer.current = setTimeout(() => setBanner(null), 6500)
-          }
-        }
-        setAlerts(aData.alerts)
-        setStats(sData)
-        setUsers(uData)
-      } catch { /* backend not ready */ }
+  const notifTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [simOpen, setSimOpen] = useState(false)
+  const [simToast, setSimToast] = useState('')
+  const simRef = useRef<HTMLDivElement>(null)
+  const [dismissedPatterns, setDismissedPatterns] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set()
+    try {
+      const stored = localStorage.getItem('sentinel_dismissed_patterns')
+      return new Set(stored ? JSON.parse(stored) : [])
+    } catch {
+      return new Set()
     }
-    load()
-    const id = setInterval(load, 5000)
-    return () => { mounted = false; clearInterval(id) }
+  })
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const s = await api.stats()
+      setStats(s)
+      setLastUpdated(new Date())
+    } catch {
+      // backend starting up
+    } finally {
+      setStatsLoading(false)
+    }
   }, [])
 
-  const openAlerts = alerts.filter(a => a.status === 'open')
-  const critAlerts = openAlerts.filter(a => a.risk_level === 'critical')
-  const highAlerts = openAlerts.filter(a => a.risk_level === 'high')
-  const medAlerts  = openAlerts.filter(a => a.risk_level === 'medium')
-  const heroAlert  = critAlerts[0] || highAlerts[0]
-  const recentAlerts = openAlerts.filter(a => a.id !== heroAlert?.id).slice(0, 5)
+  const fetchAlerts = useCallback(async () => {
+    try {
+      const res = await api.alerts({ page: 1 })
+      const incoming = res.alerts
+      if (prevAlertIds.current.size > 0) {
+        const fresh = incoming.filter((a) => !prevAlertIds.current.has(a.id))
+        if (fresh.length > 0) {
+          const top = fresh.sort((a, b) => b.risk_score - a.risk_score)[0]
+          setNewAlertNotif(top)
+          if (notifTimer.current) clearTimeout(notifTimer.current)
+          notifTimer.current = setTimeout(() => setNewAlertNotif(null), 7000)
+        }
+      }
+      incoming.forEach((a) => prevAlertIds.current.add(a.id))
+      setAlerts(incoming)
+    } catch {
+      // backend starting up
+    } finally {
+      setAlertsLoading(false)
+    }
+  }, [])
 
-  const tiers = {
-    crit:   users.filter(u => u.risk_score > 80).length,
-    high:   users.filter(u => u.risk_score > 60 && u.risk_score <= 80).length,
-    watch:  users.filter(u => u.risk_score > 35 && u.risk_score <= 60).length,
-    normal: users.filter(u => u.risk_score <= 35).length,
-    offline: 4,
-  }
+  const fetchUsers = useCallback(async () => {
+    try {
+      const u = await api.users()
+      setUsers(u)
+    } catch {
+      // backend starting up
+    } finally {
+      setUsersLoading(false)
+    }
+  }, [])
 
-  const evtPerMin = stats ? Math.round(stats.events_today / 24 / 60) : 0
-  const online = users.length > 0 ? users.length - tiers.offline : 46
-  const threatColor = critAlerts.length > 0 ? 'var(--red)' : highAlerts.length > 0 ? 'var(--amber)' : 'var(--green)'
-  const threatLabel = critAlerts.length > 0 ? 'Elevated' : highAlerts.length > 0 ? 'Guarded' : 'Normal'
+  useEffect(() => {
+    fetchStats()
+    fetchAlerts()
+    fetchUsers()
+    const interval = setInterval(() => {
+      fetchStats()
+      fetchAlerts()
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [fetchStats, fetchAlerts])
 
-  const navToAlert = (id: string) => router.push(`/dashboard/alerts?id=${id}`)
+  useEffect(() => {
+    if (!simOpen) return
+    const handler = (e: MouseEvent) => {
+      if (simRef.current && !simRef.current.contains(e.target as Node)) setSimOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [simOpen])
+
+  const activePatterns = (stats?.coordinated_patterns ?? []).filter(
+    (cp) => !dismissedPatterns.has(cp.pattern)
+  )
 
   return (
-    <div className="main-scroll">
-      {banner && (
-        <div className="alert-banner" onClick={() => { navToAlert(banner.id); setBanner(null) }}>
-          <span className="dot" style={{ background: '#fff', width: 8, height: 8 }} />
-          <span>New {banner.risk_level} alert · {banner.user_name} · {banner.fraud_type.replace(/_/g, ' ')}</span>
-          <button className="btn sm" style={{ background: 'rgba(255,255,255,.20)', border: '1px solid rgba(255,255,255,.45)', color: '#fff' }}>Review →</button>
-        </div>
-      )}
+    <div style={{ display: 'flex', height: '100vh', background: C.bg, overflow: 'hidden' }}>
+      <Sidebar />
 
-      <div className="page-h">
-        <div>
-          <div className="crumbs">Home <span className="sep">/</span> Live operations</div>
-          <h1>Operations overview</h1>
-          <div className="sub">Real-time detection across {users.length || 50} bank employees · {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} IST</div>
-        </div>
-        <div className="page-h right">
-          <button className="btn ghost">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
-            Filter
-          </button>
-          <button className="btn" onClick={() => api.simulate()}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>
-            Simulate alert
-          </button>
-        </div>
-      </div>
-
-      <div style={{ padding: 'var(--pad)', display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
-
-        <div className="grid-4">
-          <div className={`metric ${critAlerts.length > 0 ? 'alert' : ''}`}>
-            <div className="lbl"><IcoAlert />Open alerts</div>
-            <div className="val">{openAlerts.length}</div>
-            <div className="delta up">{critAlerts.length} critical · {highAlerts.length} high · {medAlerts.length} med</div>
-          </div>
-          <div className="metric">
-            <div className="lbl"><IcoDiamond />Threat level</div>
-            <div className="val" style={{ color: threatColor }}>{threatLabel}</div>
-            <div className="delta">Ensemble model · IF · LSTM · XGB</div>
-          </div>
-          <div className="metric">
-            <div className="lbl"><IcoUsers />Workforce online</div>
-            <div className="val">{online}<span className="unit">/ {users.length || 50}</span></div>
-            <div className="delta">2 logged in within the hour</div>
-          </div>
-          <div className="metric">
-            <div className="lbl"><IcoBolt />Events / min</div>
-            <div className="val">{evtPerMin || '—'}</div>
-            <div className="delta" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <MiniSparkline data={pulse} /> Last 24 min
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+        {/* Topbar */}
+        <div style={{ height: 48, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', borderBottom: `1px solid ${C.border}`, background: C.card, flexShrink: 0 }}>
+          <h1 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: C.textPrimary }}>Fraud Intelligence Overview</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            {simToast && (
+              <span style={{ fontSize: 11, color: C.medium, fontWeight: 600 }}>{simToast}</span>
+            )}
+            <div ref={simRef} style={{ position: 'relative' }}>
+              <button
+                onClick={() => setSimOpen((o) => !o)}
+                style={{ padding: '5px 12px', fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: 3, cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                Simulate ▾
+              </button>
+              {simOpen && (
+                <div style={{ position: 'absolute', right: 0, top: '110%', background: C.card, border: `1px solid ${C.border}`, borderRadius: 4, zIndex: 50, minWidth: 210, boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+                  {_SIMULATE_SCENARIOS.map(({ label, scenario }, idx, arr) => (
+                    <button
+                      key={scenario}
+                      onClick={async () => {
+                        setSimOpen(false)
+                        await api.simulate(scenario).catch(() => null)
+                        setSimToast(`${label} injected`)
+                        setTimeout(() => setSimToast(''), 7000)
+                      }}
+                      style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 12, color: C.textPrimary, background: 'transparent', border: 'none', borderBottom: idx < arr.length - 1 ? `1px solid ${C.border}` : 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = C.hover }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {lastUpdated && (
+              <span style={{ fontSize: 10, color: C.textMuted }}>Updated {lastUpdated.toLocaleTimeString()}</span>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: C.low, display: 'inline-block' }} />
+              <span style={{ fontSize: 11, color: C.low, fontWeight: 600 }}>OPERATIONAL</span>
             </div>
           </div>
         </div>
 
-        {heroAlert && (
-          <div className="card" style={{
-            borderColor: heroAlert.risk_level === 'critical' ? 'rgba(242,92,92,.35)' : 'var(--line)',
-            background: heroAlert.risk_level === 'critical' ? 'linear-gradient(180deg, var(--bg-1), rgba(242,92,92,.04))' : 'var(--bg-1)',
-          }}>
-            <div style={{ padding: '20px 22px', display: 'grid', gridTemplateColumns: '1fr auto', gap: 18, alignItems: 'center' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                  <span className={`tag ${sevClass(heroAlert.risk_level)}`}>● Needs attention</span>
-                  <span className="muted small">{timeAgo(heroAlert.timestamp)} · {heroAlert.id}</span>
-                </div>
-                <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-.01em' }}>
-                  {heroAlert.user_name} <span style={{ color: 'var(--ink-3)', fontWeight: 400 }}>flagged for</span> {heroAlert.fraud_type.replace(/_/g, ' ').toLowerCase()}
-                </div>
-                <div className="muted" style={{ fontSize: 13.5, marginTop: 6, lineHeight: 1.55 }}>
-                  Ensemble confidence <span style={{ color: 'var(--ink)', fontWeight: 500 }}>{Math.round(heroAlert.risk_score)}%</span>
-                  {heroAlert.shap_values?.[0] && (
-                    <> · top driver <span className="mono" style={{ color: 'var(--ink)' }}>{heroAlert.shap_values[0].feature}</span> contributing
-                    <span style={{ color: heroAlert.shap_values[0].direction === 'positive' ? 'var(--red)' : 'var(--green)', fontWeight: 500 }}>
-                      {' '}{heroAlert.shap_values[0].direction === 'positive' ? '+' : ''}{heroAlert.shap_values[0].contribution.toFixed(2)}
-                    </span>
-                    </>
-                  )}
-                  {' '}· subject is <span style={{ color: 'var(--red)', fontWeight: 500 }}>{(heroAlert.model_scores.isolation_forest * 4.1).toFixed(1)}σ</span> above peer baseline
-                </div>
+        {/* New alert pop-up notification */}
+        <AnimatePresence>
+          {newAlertNotif && (
+            <motion.div
+              key={newAlertNotif.id}
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              style={{ flexShrink: 0 }}
+            >
+              <div
+                role="alert"
+                style={{
+                  background: '#1A2233', padding: '10px 24px',
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  borderBottom: `1px solid ${C.border}`,
+                  borderLeft: `3px solid ${newAlertNotif.risk_level === 'critical' || newAlertNotif.risk_level === 'high' ? C.critical : newAlertNotif.risk_level === 'medium' ? C.medium : C.low}`,
+                }}
+              >
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: newAlertNotif.risk_level === 'critical' || newAlertNotif.risk_level === 'high' ? C.critical : newAlertNotif.risk_level === 'medium' ? C.medium : C.low, flexShrink: 0, display: 'inline-block' }} />
+                <p style={{ margin: 0, fontSize: 12, color: C.textPrimary, fontWeight: 600, flex: 1 }}>
+                  New alert — <span style={{ fontWeight: 700 }}>{newAlertNotif.user_name}</span>
+                  {' · '}{newAlertNotif.fraud_type.replace(/_/g, ' ')}
+                  {' · '}score <span style={{ fontWeight: 800, color: newAlertNotif.risk_level === 'critical' || newAlertNotif.risk_level === 'high' ? C.critical : newAlertNotif.risk_level === 'medium' ? C.medium : C.low }}>{Math.round(newAlertNotif.risk_score)}</span>
+                </p>
+                <button
+                  onClick={() => { setSelectedAlertId(newAlertNotif.id); setNewAlertNotif(null) }}
+                  style={{ fontSize: 11, color: C.textMuted, background: 'none', border: `1px solid ${C.border}`, borderRadius: 3, padding: '3px 10px', cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  View
+                </button>
+                <button
+                  onClick={() => setNewAlertNotif(null)}
+                  aria-label="Dismiss"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textMuted, padding: 4, display: 'flex', flexShrink: 0 }}
+                >
+                  <X size={13} strokeWidth={2} />
+                </button>
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button className="btn ghost">Snooze</button>
-                <button className="btn primary lg" onClick={() => navToAlert(heroAlert.id)}>Review alert →</button>
-              </div>
-            </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Coordinated activity banners */}
+        {dismissedPatterns.size > 0 && activePatterns.length === 0 && (
+          <div style={{ padding: '6px 24px', background: C.card, borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => {
+                try { localStorage.removeItem('sentinel_dismissed_patterns') } catch {}
+                setDismissedPatterns(new Set())
+              }}
+              style={{ fontSize: 10, color: C.textMuted, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' }}
+            >
+              Reset dismissed alerts
+            </button>
           </div>
         )}
+        <AnimatePresence>
+          {activePatterns.map((cp) => (
+            <motion.div
+              key={cp.pattern}
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+              style={{ flexShrink: 0 }}
+            >
+              <div
+                role="alert"
+                style={{
+                  background: C.critical, padding: '10px 24px',
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  borderBottom: '1px solid rgba(255,255,255,0.1)',
+                }}
+              >
+                <AlertTriangle size={15} color="#F0F6FC" strokeWidth={2} style={{ flexShrink: 0 }} />
+                <p style={{ margin: 0, fontSize: 13, color: '#F0F6FC', fontWeight: 600, flex: 1 }}>
+                  Coordinated Activity Detected:{' '}
+                  <span style={{ fontWeight: 700 }}>{formatFraudType(cp.pattern)}</span>
+                  {' '}across <span style={{ fontWeight: 700 }}>{cp.users} users</span> in the {cp.window}.{' '}
+                  <Link
+                    href="/dashboard/alerts"
+                    style={{ color: '#F0F6FC', textDecoration: 'underline', fontSize: 13 }}
+                  >
+                    View pattern →
+                  </Link>
+                </p>
+                <button
+                  onClick={() => setDismissedPatterns((prev) => {
+                    const next = new Set(Array.from(prev).concat(cp.pattern))
+                    try { localStorage.setItem('sentinel_dismissed_patterns', JSON.stringify(Array.from(next))) } catch {}
+                    return next
+                  })}
+                  aria-label="Dismiss alert"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#F0F6FC', padding: 4, display: 'flex', flexShrink: 0 }}
+                >
+                  <X size={15} strokeWidth={2} />
+                </button>
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 'var(--gap)' }}>
-          <div className="card">
-            <div className="card-h">
-              <span className="title">Open alerts</span>
-              <span className="sub">{openAlerts.length} unresolved</span>
-              <div className="right">
-                <button className="btn sm ghost" onClick={() => router.push('/dashboard/alerts')}>View queue →</button>
+        <main style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {/* Stat cards */}
+          <div className="stat-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+            <StatCard
+              label="Users Monitored"
+              value={stats?.users_monitored ?? '—'}
+              sub="active employees"
+              loading={statsLoading}
+            />
+            <StatCard
+              label="Alerts Today"
+              value={stats?.alerts_today ?? '—'}
+              change={stats?.alerts_change}
+              sub="vs yesterday"
+              loading={statsLoading}
+              accent="red"
+            />
+            <StatCard
+              label="High Risk"
+              value={stats?.high_risk_count ?? '—'}
+              change={stats?.high_risk_change}
+              sub="open alerts ≥80"
+              loading={statsLoading}
+              accent="red"
+            />
+            <StatCard
+              label="False Positive Rate"
+              value={stats ? `${stats.false_positive_rate}%` : '—'}
+              sub={stats ? `${stats.labels_collected} labels collected · next retrain in ${stats.next_retrain_in}` : 'from labeled alerts'}
+              loading={statsLoading}
+              accent="green"
+            />
+          </div>
+
+          {/* Labels counter */}
+          {stats && stats.labels_collected > 0 && (
+            <div style={{
+              background: C.card, border: `1px solid ${C.border}`, borderRadius: 4,
+              padding: '9px 16px', display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+              <span style={{ fontSize: 11, color: C.textMuted }}>
+                <span style={{ color: C.textPrimary, fontWeight: 700 }}>{stats.labels_collected}</span>
+                {' '}analyst labels collected — next retrain in{' '}
+                <span style={{ color: C.textPrimary, fontWeight: 700 }}>{stats.next_retrain_in}</span>
+              </span>
+              <span style={{ fontSize: 10, padding: '2px 7px', border: `1px solid ${C.border}`, borderRadius: 2, color: C.textMuted, marginLeft: 'auto' }}>
+                ACTIVE LEARNING
+              </span>
+            </div>
+          )}
+
+          {/* Feed + Recent alerts */}
+          <div className="feed-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
+            <LiveFeed onAlertClick={setSelectedAlertId} />
+
+            <div
+              style={{
+                background: C.card, border: `1px solid ${C.border}`, borderRadius: 4, overflow: 'hidden',
+                display: 'flex', flexDirection: 'column',
+              }}
+            >
+              <div style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}` }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: C.textPrimary, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Recent Alerts
+                </span>
+              </div>
+              <div style={{ flex: 1, overflowY: 'auto' }}>
+                {alertsLoading
+                  ? [...Array(5)].map((_, i) => (
+                      <div key={i} style={{ height: 52, borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', padding: '0 14px', gap: 10 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#30363D' }} />
+                        <div style={{ flex: 1, height: 10, background: '#30363D', borderRadius: 2 }} />
+                        <div style={{ width: 40, height: 10, background: '#30363D', borderRadius: 2 }} />
+                      </div>
+                    ))
+                  : alerts.slice(0, 10).map((alert) => {
+                      const color =
+                        alert.risk_level === 'critical' || alert.risk_level === 'high'
+                          ? C.critical
+                          : alert.risk_level === 'medium'
+                          ? C.medium
+                          : C.low
+                      return (
+                        <div
+                          key={alert.id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setSelectedAlertId(alert.id)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedAlertId(alert.id) } }}
+                          aria-label={`Alert: ${alert.user_name}, ${alert.fraud_type.replace(/_/g, ' ')}, score ${Math.round(alert.risk_score)}`}
+                          style={{
+                            padding: '10px 14px', borderBottom: `1px solid ${C.border}`,
+                            cursor: 'pointer', transition: 'background 0.1s',
+                            display: 'flex', alignItems: 'center', gap: 10,
+                          }}
+                          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#1C2128' }}
+                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+                        >
+                          <div style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ margin: 0, fontSize: 12, color: C.textPrimary, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {alert.user_name}
+                            </p>
+                            <p style={{ margin: 0, fontSize: 10, color: C.textMuted }}>
+                              {alert.fraud_type.replace(/_/g, ' ')}
+                            </p>
+                          </div>
+                          <span style={{ fontSize: 13, fontWeight: 800, color, flexShrink: 0 }}>
+                            {Math.round(alert.risk_score)}
+                          </span>
+                        </div>
+                      )
+                    })}
               </div>
             </div>
-            <div className="card-b tight">
-              {recentAlerts.length === 0
-                ? <div className="muted" style={{ padding: 24, textAlign: 'center' }}>All clear. No additional open alerts.</div>
-                : recentAlerts.map(a => <AlertRow key={a.id} alert={a} onClick={() => navToAlert(a.id)} />)
-              }
-            </div>
           </div>
 
-          <div className="card">
-            <div className="card-h">
-              <span className="title">Workforce posture</span>
-              <span className="sub">By risk tier</span>
-              <div className="right">
-                <button className="btn sm ghost" onClick={() => router.push('/dashboard/users')}>View people →</button>
-              </div>
+          {/* Users table */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h2 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: C.textPrimary, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                Monitored Employees
+              </h2>
+              <span style={{ fontSize: 11, color: C.textMuted }}>{users.length} active</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, padding: 18 }}>
-              {[
-                { cls: 'crit',   lbl: 'Critical', n: tiers.crit },
-                { cls: 'high',   lbl: 'Elevated',  n: tiers.high },
-                { cls: 'watch',  lbl: 'Watch',      n: tiers.watch },
-                { cls: 'normal', lbl: 'Normal',     n: tiers.normal },
-                { cls: '',       lbl: 'Offline',    n: tiers.offline, numColor: 'var(--ink-3)' },
-                { cls: '',       lbl: 'Total',      n: users.length || 50, numColor: 'var(--ink)', barColor: 'var(--accent)' },
-              ].map(({ cls, lbl, n, numColor, barColor }) => (
-                <div key={lbl} className={`wf-tier ${cls}`}>
-                  <div className="lbl">{lbl}</div>
-                  <div className="num" style={numColor ? { color: numColor } : {}}>{n}</div>
-                  <div className="bar" style={barColor ? { background: barColor } : {}} />
-                </div>
-              ))}
-            </div>
+            <UserTable users={users} loading={usersLoading} />
           </div>
-        </div>
-
-        <Accordion label="System health & model performance" hint="Latency, drift, model votes — last 24h">
-          <div className="grid-3">
-            <div>
-              <div className="section-h">Inference latency</div>
-              <StaticSparkline data={[80,86,84,90,102,88,84,92,110,96,88,84]} color="var(--green)" />
-              <div className="muted small" style={{ marginTop: 8 }}>p50 <span style={{ color: 'var(--ink)' }}>84ms</span> · p95 <span style={{ color: 'var(--ink)' }}>312ms</span></div>
-            </div>
-            <div>
-              <div className="section-h">Event ingestion</div>
-              <StaticSparkline data={[640,720,810,870,920,940,920,880,950,1020,980,evtPerMin||847]} color="var(--accent)" />
-              <div className="muted small" style={{ marginTop: 8 }}>Now <span style={{ color: 'var(--ink)' }}>{evtPerMin||847}/min</span> · Peak <span style={{ color: 'var(--ink)' }}>1,062/min</span></div>
-            </div>
-            <div>
-              <div className="section-h">Model drift (PSI)</div>
-              <StaticSparkline data={[0.04,0.05,0.06,0.05,0.08,0.11,0.09]} color="var(--amber)" />
-              <div className="muted small" style={{ marginTop: 8 }}>PSI <span style={{ color: 'var(--amber)' }}>0.09</span> · Retrain in 6d</div>
-            </div>
-          </div>
-        </Accordion>
-
+        </main>
       </div>
+
+      <AlertPanel
+        alertId={selectedAlertId}
+        onClose={() => setSelectedAlertId(null)}
+        onResolved={(id, newStatus) => {
+          setAlerts((prev) => prev.map((a) => a.id === id ? { ...a, status: newStatus } : a))
+          fetchAlerts()
+        }}
+      />
     </div>
   )
 }
-
-function AlertRow({ alert, onClick }: { alert: Alert; onClick: () => void }) {
-  const [hov, setHov] = useState(false)
-  return (
-    <div onClick={onClick} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)} style={{
-      display: 'grid', gridTemplateColumns: 'auto 1fr auto 16px', alignItems: 'center', gap: 14,
-      padding: '12px 20px', borderTop: '1px solid var(--line-soft)',
-      background: hov ? 'var(--bg-2)' : 'transparent', cursor: 'pointer', transition: 'background .12s',
-    }}>
-      <span className={`tag ${sevClass(alert.risk_level)}`} style={{ fontSize: 10.5 }}>{sevLabel(alert.risk_level)}</span>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ color: 'var(--ink)', fontSize: 13.5, fontWeight: 500 }}>{alert.user_name} · {alert.fraud_type.replace(/_/g, ' ')}</div>
-        <div className="muted small" style={{ marginTop: 2 }}>{alert.user_id} · Score {(alert.risk_score / 100).toFixed(2)}</div>
-      </div>
-      <div className="muted mono small">{timeAgo(alert.timestamp)}</div>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
-    </div>
-  )
-}
-
-function IcoAlert() { return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg> }
-function IcoDiamond() { return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg> }
-function IcoUsers() { return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /></svg> }
-function IcoBolt() { return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg> }

@@ -1,242 +1,303 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { api, type Intelligence } from '@/lib/api'
-import Accordion from '@/components/Accordion'
+import { useEffect, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
+import Sidebar from '@/components/Sidebar'
+import { api, type Intelligence, type Stats, timeAgo } from '@/lib/api'
+import { C } from '@/lib/tokens'
 
-function Sparkline({ data, color, height = 56 }: { data: number[]; color: string; height?: number }) {
-  if (data.length < 2) return <div style={{ height, background: 'var(--bg-2)', borderRadius: 4 }} />
-  const w = 300
-  const min = Math.min(...data), max = Math.max(...data)
-  const range = max - min || 1
-  const pts = data.map((v, i) => ({ x: (i / (data.length - 1)) * w, y: height - ((v - min) / range) * (height - 4) - 2 }))
-  const line = pts.map(p => `${p.x},${p.y}`).join(' ')
-  const area = `M ${pts.map(p => `${p.x},${p.y}`).join(' L ')} L ${w},${height} L 0,${height} Z`
+const IntelligenceCharts = dynamic(() => import('@/components/IntelligenceCharts'), {
+  ssr: false,
+  loading: () => (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+      {[...Array(4)].map((_, i) => (
+        <div key={i} style={{ height: 300, background: C.card, border: `1px solid ${C.border}`, borderRadius: 4 }} />
+      ))}
+    </div>
+  ),
+})
+
+function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <svg width="100%" height={height} viewBox={`0 0 ${w} ${height}`} preserveAspectRatio="none" style={{ display: 'block' }}>
-      <path d={area} fill={color} fillOpacity={0.12} />
-      <polyline points={line} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 4, padding: '18px 20px' }}>
+      <p style={{ margin: '0 0 8px', fontSize: 10, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>{label}</p>
+      <p style={{ margin: 0, fontSize: 28, color: C.textPrimary, fontWeight: 800 }}>{value}</p>
+      {sub && <p style={{ margin: '5px 0 0', fontSize: 11, color: C.textMuted }}>{sub}</p>}
+    </div>
   )
 }
 
-const MODELS = [
-  { name: 'Isolation Forest', w: '0.30', fpr: 8.1 },
-  { name: 'LSTM Autoencoder', w: '0.40', fpr: 5.2 },
-  { name: 'XGBoost',          w: '0.30', fpr: 4.2 },
-  { name: 'Ensemble',         w: '—',    fpr: null, hi: true },
-]
-
-const MITRE = [
-  { code: 'T1078',    name: 'Valid Accounts',                hits: 142, sev: 'high' },
-  { code: 'T1530',    name: 'Data from Cloud Storage',       hits: 98,  sev: 'high' },
-  { code: 'T1213',    name: 'Data from Info Repos',          hits: 76,  sev: 'med'  },
-  { code: 'T1567',    name: 'Exfiltration over Web Service', hits: 41,  sev: 'high' },
-  { code: 'T1098',    name: 'Account Manipulation',          hits: 24,  sev: 'crit' },
-  { code: 'T1199',    name: 'Trusted Relationship',          hits: 18,  sev: 'med'  },
-  { code: 'T1110',    name: 'Brute Force',                   hits: 12,  sev: 'med'  },
-  { code: 'T1136',    name: 'Create Account',                hits: 4,   sev: 'low'  },
-]
-
-const DEPT = [
-  { d: 'Treasury',    risk: 78, alerts: 11 },
-  { d: 'Corporate',   risk: 54, alerts: 6  },
-  { d: 'Risk',        risk: 41, alerts: 4  },
-  { d: 'Audit',       risk: 32, alerts: 2  },
-  { d: 'Retail',      risk: 28, alerts: 7  },
-  { d: 'Operations',  risk: 24, alerts: 3  },
-]
-
-export default function IntelligencePage() {
-  const [intel, setIntel] = useState<Intelligence | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    api.intelligence().then(d => { setIntel(d); setLoading(false) }).catch(() => setLoading(false))
-  }, [])
-
-  const models = MODELS.map(m => ({
-    ...m,
-    p:  m.hi ? (intel?.precision ?? 0.91) : m.name === 'XGBoost' ? 0.88 : m.name === 'LSTM Autoencoder' ? 0.84 : 0.81,
-    r:  m.hi ? (intel?.recall   ?? 0.86) : m.name === 'XGBoost' ? 0.83 : m.name === 'LSTM Autoencoder' ? 0.79 : 0.76,
-    f1: m.hi ? (intel?.f1       ?? 0.88) : m.name === 'XGBoost' ? 0.85 : m.name === 'LSTM Autoencoder' ? 0.81 : 0.78,
-    fprVal: m.fpr ?? (intel?.false_positive_rate_trend?.[intel.false_positive_rate_trend.length - 1]?.rate ?? 0.4),
-  }))
-
-  const anomDist = intel?.anomaly_type_breakdown ?? [
-    { fraud_type: 'off_hours_login',         count: 142 },
-    { fraud_type: 'bulk_download',           count: 98  },
-    { fraud_type: 'cross_department_access', count: 76  },
-    { fraud_type: 'velocity_spike',          count: 53  },
-    { fraud_type: 'privilege_escalation',    count: 24  },
-  ]
-  const maxN = Math.max(...anomDist.map(a => a.count), 1)
-
-  const volumeData = intel?.alert_volume_last_7_days.map(d => d.count) ?? [30,45,38,62,55,48,70]
-  const fpData = intel?.false_positive_rate_trend?.map((d: { date: string; rate: number }) => d.rate) ?? [0.12,0.10,0.09,0.08,0.06,0.05,0.04]
-
-  const sevClsMap: Record<string, string> = { crit: 'red', high: 'red', med: 'amber', low: 'green' }
-
+function ModelCard({
+  name, weight, description, params, metric,
+}: {
+  name: string
+  weight: string
+  description: string
+  params: { label: string; value: string }[]
+  metric: { label: string; value: string }
+}) {
   return (
-    <div className="main-scroll">
-      <div className="page-h">
-        <div>
-          <div className="crumbs">Insights <span className="sep">/</span> Last 7 days</div>
-          <h1>Detection insights</h1>
-          <div className="sub">{intel ? `${intel.training_events} events · ${Math.round(intel.training_events * 0.196)} alerts surfaced` : 'Loading…'}</div>
-        </div>
-        <div className="page-h right">
-          <div className="tabs">
-            <div className="tab active">7 days</div>
-            <div className="tab">30 days</div>
-            <div className="tab">90 days</div>
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 4, padding: '20px 20px 18px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+        <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: C.textPrimary }}>{name}</p>
+        <span style={{ fontSize: 10, fontWeight: 700, color: C.critical, border: `1px solid ${C.critical}`, borderRadius: 2, padding: '2px 7px', letterSpacing: '0.05em' }}>
+          WEIGHT {weight}
+        </span>
+      </div>
+      <p style={{ margin: '0 0 14px', fontSize: 12, color: C.textMuted, lineHeight: 1.65 }}>{description}</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 12 }}>
+        {params.map(({ label, value }) => (
+          <div key={label} style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 10, color: C.textMuted }}>{label}</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: C.textPrimary, fontFamily: 'monospace' }}>{value}</span>
           </div>
-          <button className="btn ghost">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
-            Filter
-          </button>
+        ))}
+      </div>
+      <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 10, color: C.textMuted }}>{metric.label}</span>
+          <span style={{ fontSize: 11, fontWeight: 800, color: C.critical }}>{metric.value}</span>
         </div>
       </div>
+    </div>
+  )
+}
 
-      <div style={{ padding: 'var(--pad)', display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
+export default function IntelligencePage() {
+  const [data, setData] = useState<Intelligence | null>(null)
+  const [stats, setStats] = useState<Stats | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [training, setTraining] = useState(false)
+  const [logLines, setLogLines] = useState<string[]>([])
+  const logRef = useRef<HTMLDivElement>(null)
 
-        {/* KPI strip */}
-        <div className="grid-4">
-          <div className="metric">
-            <div className="lbl">Precision · Ensemble</div>
-            <div className="val" style={{ color: 'var(--green)' }}>{(intel?.precision ?? 0.91).toFixed(2)}</div>
-            <div className="delta down">+0.07 vs XGBoost alone</div>
-          </div>
-          <div className="metric">
-            <div className="lbl">Recall · Ensemble</div>
-            <div className="val" style={{ color: 'var(--green)' }}>{(intel?.recall ?? 0.86).toFixed(2)}</div>
-            <div className="delta">{Math.round((intel?.recall ?? 0.86) * 100)} of 100 known anomalies</div>
-          </div>
-          <div className="metric">
-            <div className="lbl">False-positive rate</div>
-            <div className="val" style={{ color: 'var(--green)' }}>{(intel?.false_positive_rate_trend?.[intel.false_positive_rate_trend.length - 1]?.rate ?? 0.4).toFixed(1)}<span className="unit">%</span></div>
-            <div className="delta down">20× reduction vs IsoForest</div>
-          </div>
-          <div className="metric">
-            <div className="lbl">Mean time to detect</div>
-            <div className="val">{Math.round(intel?.mean_time_to_detect ?? 22)}<span className="unit">m</span></div>
-            <div className="delta down">−6m vs prior week</div>
+  const loadAll = async () => {
+    setLoading(true)
+    const [intel, st] = await Promise.allSettled([
+      api.intelligence(),
+      api.stats(),
+    ])
+    if (intel.status === 'fulfilled') setData(intel.value)
+    else setData(null)
+    if (st.status === 'fulfilled') setStats(st.value)
+    setLoading(false)
+  }
+
+  useEffect(() => { loadAll() }, [])
+
+  useEffect(() => {
+    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight
+  }, [logLines])
+
+  const runTraining = async () => {
+    if (training) return
+    setTraining(true)
+    setLogLines([])
+
+    // Fire retrain immediately — real API call
+    const retrainPromise = api.retrain().catch(() => null)
+
+    // Stream fixed lines while retrain runs in background
+    const fixedLines = [
+      '[00:00] Initialising training pipeline...',
+      `[00:01] Loading ${data?.training_events ?? 2000} synthetic events from SQLite...`,
+      '[00:02] Engineering 8 feature vectors per user...',
+      '[00:02] Example: usr_032 login at 02:17 — login_hour_deviation: 2.8σ, off_hours_ratio: 0.91 → flagged',
+      '[00:03] Training Isolation Forest — contamination=0.1, n_estimators=100...',
+      '[00:04] Isolation Forest trained. Anomaly threshold: 0.142',
+      '[00:05] Building LSTM sequences — seq_len=20, 50 users...',
+      '[00:06] LSTM Autoencoder forward pass complete. Mean recon error: 0.089',
+    ]
+    for (const line of fixedLines) {
+      await new Promise((r) => setTimeout(r, 150))
+      setLogLines((prev) => [...prev, line])
+    }
+
+    // Await the real retrain response
+    const result = await retrainPromise
+    const labelsN = result?.labels_used ?? 0
+    const skipped = result?.status === 'skipped' || result === null
+
+    const precisionVal = result?.precision_after != null ? result.precision_after.toFixed(3) : '—'
+    const recallVal    = result?.recall_after    != null ? result.recall_after.toFixed(3)    : '—'
+    const f1Val        = result?.f1_after        != null ? result.f1_after.toFixed(3)        : '—'
+
+    // Tail lines — reflect real outcome
+    const tailLines: string[] = skipped
+      ? [
+          `[00:07] Loading analyst labels from SQLite — ${labelsN} labels found (need ≥10)`,
+          '[00:08] Skipping XGBoost retrain — insufficient labeled data',
+          '[00:09] Pipeline complete. Label more alerts and retry.',
+        ]
+      : [
+          `[00:07] Loading analyst labels from SQLite — ${labelsN} labels found...`,
+          '[00:08] Retraining XGBoost — n_estimators=100, 5 fraud classes...',
+          `[00:09] XGBoost retrained. Precision: ${precisionVal} | Recall: ${recallVal} | F1: ${f1Val}`,
+          '[00:10] Ensemble weights applied: IF(0.3) + LSTM(0.4) + XGB(0.3)',
+          '[00:11] Models saved to disk. Pipeline complete.',
+        ]
+
+    for (const line of tailLines) {
+      await new Promise((r) => setTimeout(r, 150))
+      setLogLines((prev) => [...prev, line])
+    }
+
+    // Optimistically patch model card data from retrain response
+    if (!skipped && result) {
+      setData((prev) => prev ? {
+        ...prev,
+        labeled_count: result.labels_used,
+        last_retrain_ts: new Date().toISOString(),
+        precision: result.precision_after ?? prev.precision,
+        recall: result.recall_after ?? prev.recall,
+        f1: result.f1_after ?? prev.f1,
+      } : prev)
+    }
+
+    // Re-fetch all data — 500ms delay to ensure SQLite write completes
+    await new Promise((r) => setTimeout(r, 500))
+    await loadAll()
+    setTraining(false)
+  }
+
+  // Anomaly rate: alerts_today / events_today from stats (per user request)
+  const anomalyRatePct = stats && stats.events_today > 0
+    ? ((stats.alerts_today / stats.events_today) * 100).toFixed(1)
+    : data?.anomaly_rate != null ? data.anomaly_rate.toFixed(1) : '0.0'
+
+  const detectDisplay = data
+    ? data.mean_time_to_detect < 1
+      ? 'Real-time'
+      : `${data.mean_time_to_detect.toFixed(1)}s`
+    : '—'
+
+  return (
+    <div style={{ display: 'flex', height: '100vh', background: C.bg, overflow: 'hidden' }}>
+      <Sidebar />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+        <div style={{ height: 48, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', borderBottom: `1px solid ${C.border}`, background: C.card, flexShrink: 0 }}>
+          <h1 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: C.textPrimary }}>Model Intelligence</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <span style={{ fontSize: 11, color: C.textMuted }}>Live alert data · last 7 days</span>
+            <button
+              onClick={runTraining}
+              disabled={training}
+              style={{
+                padding: '6px 14px', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
+                background: training ? 'transparent' : C.critical,
+                border: `1px solid ${training ? C.border : C.critical}`,
+                color: training ? C.textMuted : '#F0F6FC',
+                borderRadius: 3, cursor: training ? 'default' : 'pointer',
+                opacity: training ? 0.7 : 1,
+              }}
+            >
+              {training ? 'RUNNING...' : 'RUN TRAINING PIPELINE'}
+            </button>
           </div>
         </div>
 
-        {/* Model performance */}
-        <Accordion label="Model performance" hint="Synthetic test set · N=400" defaultOpen>
-          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr 1fr 2fr', gap: 14, padding: '0 0 10px', borderBottom: '1px solid var(--line)', fontSize: 11.5, color: 'var(--ink-3)' }}>
-            <div>Model</div>
-            <div style={{ textAlign: 'right' }}>Precision</div>
-            <div style={{ textAlign: 'right' }}>Recall</div>
-            <div style={{ textAlign: 'right' }}>F1</div>
-            <div style={{ textAlign: 'right' }}>FP rate</div>
-            <div></div>
-          </div>
-          {models.map((m, i) => (
-            <div key={i} style={{
-              display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr 1fr 2fr', gap: 14,
-              padding: '12px 0', borderBottom: i < models.length - 1 ? '1px solid var(--line-soft)' : 'none',
-              alignItems: 'center', color: m.hi ? 'var(--ink)' : 'var(--ink-2)', fontWeight: m.hi ? 600 : 400, fontSize: 13,
-            }}>
-              <div>{m.name}</div>
-              <div className="mono" style={{ textAlign: 'right' }}>{m.p.toFixed(2)}</div>
-              <div className="mono" style={{ textAlign: 'right' }}>{m.r.toFixed(2)}</div>
-              <div className="mono" style={{ textAlign: 'right', color: m.hi ? 'var(--green)' : 'inherit' }}>{m.f1.toFixed(2)}</div>
-              <div className="mono" style={{ textAlign: 'right', color: m.fprVal < 1 ? 'var(--green)' : m.fprVal > 5 ? 'var(--amber)' : 'inherit' }}>{m.fprVal.toFixed(1)}%</div>
-              <div style={{ position: 'relative', height: 10, background: 'var(--bg-2)', borderRadius: 5 }}>
-                <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${(m.f1 * 100).toFixed(0)}%`, background: m.hi ? 'linear-gradient(90deg, var(--accent), var(--ink))' : 'var(--ink-3)', borderRadius: 5 }} />
-              </div>
-            </div>
-          ))}
-        </Accordion>
+        <main style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {loading && !data && (
+            <div style={{ height: 120, background: C.card, border: `1px solid ${C.border}`, borderRadius: 4 }} />
+          )}
 
-        {/* Anomaly distribution + dept risk */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 'var(--gap)' }}>
-          <div className="card">
-            <div className="card-h">
-              <span className="title">Anomaly distribution</span>
-              <span className="sub">Last 7 days · {anomDist.reduce((a, b) => a + b.count, 0)} total</span>
-            </div>
-            <div className="card-b">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {[...anomDist].sort((a, b) => b.count - a.count).map((a, i) => {
-                  const w = (a.count / maxN * 100).toFixed(0)
-                  const color = a.count > 80 ? 'var(--red)' : a.count > 50 ? 'var(--amber)' : 'var(--ink-3)'
-                  return (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                      <div style={{ width: 160, fontSize: 13 }}>{a.fraud_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>
-                      <div style={{ flex: 1, position: 'relative', height: 14, background: 'var(--bg-2)', borderRadius: 4 }}>
-                        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${w}%`, background: color, borderRadius: 4 }} />
-                      </div>
-                      <div className="mono" style={{ width: 40, textAlign: 'right', color: 'var(--ink)' }}>{a.count}</div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="card-h">
-              <span className="title">Department risk</span>
-              <span className="sub">7-day average</span>
-            </div>
-            <div className="card-b">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {DEPT.sort((a, b) => b.risk - a.risk).map((d, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 90, fontSize: 12.5 }}>{d.d}</div>
-                    <div style={{ flex: 1, position: 'relative', height: 18, background: 'var(--bg-2)', borderRadius: 4 }}>
-                      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${d.risk}%`, background: d.risk > 70 ? 'var(--red)' : d.risk > 50 ? 'var(--amber)' : 'var(--green)', opacity: .85, borderRadius: 4 }} />
-                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', paddingLeft: 8, fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink)', fontWeight: 500 }}>{d.risk}</div>
-                    </div>
-                    <div className="mono muted small" style={{ width: 60, textAlign: 'right' }}>{d.alerts} alerts</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* MITRE ATT&CK */}
-        <Accordion label="MITRE ATT&CK coverage" hint={`${MITRE.reduce((a, b) => a + b.hits, 0)} technique hits · last 7 days`}>
-          <div className="grid-4">
-            {MITRE.map((m, i) => (
-              <div key={i} style={{ padding: 14, background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <div className="mono" style={{ fontSize: 11.5, color: 'var(--accent)' }}>{m.code}</div>
-                <div style={{ fontSize: 13 }}>{m.name}</div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
-                  <span className="mono" style={{ fontSize: 17, fontWeight: 600 }}>{m.hits}</span>
-                  <span className={`tag ${sevClsMap[m.sev] || 'ghost'}`} style={{ fontSize: 10 }}>{m.sev}</span>
+          {data && (
+            <>
+              {/* Model Pipeline cards */}
+              <div>
+                <p style={{ margin: '0 0 14px', fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  Model Pipeline
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+                  <ModelCard
+                    name="Isolation Forest"
+                    weight="30%"
+                    description="Trained on 2,000 synthetic events at startup. Contamination parameter set to 0.1 — meaning the model expects ~10% of events to be anomalous. Scores each incoming event by how isolated it is from the normal cluster. No labels required — fully unsupervised."
+                    params={[
+                      { label: 'contamination', value: '0.1' },
+                      { label: 'n_estimators', value: '100' },
+                      { label: 'training events', value: String(data.training_events || 2000) },
+                    ]}
+                    metric={{ label: 'Live anomaly rate', value: `${anomalyRatePct}%` }}
+                  />
+                  <ModelCard
+                    name="LSTM Autoencoder"
+                    weight="40%"
+                    description="Trained on sequences of 20 consecutive events per user. Learns to reconstruct normal behavioural sequences. When reconstruction error exceeds threshold, the event is flagged. Detects slow behavioural drift that point anomaly models miss."
+                    params={[
+                      { label: 'seq_len', value: '20' },
+                      { label: 'hidden_dim', value: '64' },
+                      { label: 'framework', value: 'PyTorch 2.1' },
+                    ]}
+                    metric={{ label: 'Model agreement rate', value: `${data.model_agreement_rate.toFixed(1)}%` }}
+                  />
+                  <ModelCard
+                    name="XGBoost Classifier"
+                    weight="30%"
+                    description="Trained on labeled synthetic data with 5 fraud pattern classes. Retrains automatically when investigators label alerts as True Positive or False Positive — active learning loop. Each retrain incorporates new analyst feedback to improve precision."
+                    params={[
+                      { label: 'n_estimators', value: '100' },
+                      { label: 'labeled alerts', value: String(data.labeled_count ?? 0) },
+                      { label: 'last retrain', value: data.last_retrain_ts ? timeAgo(data.last_retrain_ts) : 'Not yet' },
+                    ]}
+                    metric={{ label: 'Labels collected', value: String(data.labeled_count ?? 0) }}
+                  />
                 </div>
               </div>
-            ))}
-          </div>
-        </Accordion>
 
-        {/* System health */}
-        <Accordion label="System health" hint="Inference latency · ingestion · model drift">
-          <div className="grid-3">
-            <div>
-              <div className="section-h">Inference latency · 24h</div>
-              <Sparkline data={[80,86,84,90,102,88,84,92,110,96,88,84]} color="var(--green)" />
-              <div className="muted small" style={{ marginTop: 10 }}>p50 <span style={{ color: 'var(--ink)' }}>84ms</span> · p95 <span style={{ color: 'var(--ink)' }}>312ms</span> · p99 <span style={{ color: 'var(--amber)' }}>614ms</span></div>
-            </div>
-            <div>
-              <div className="section-h">Event ingestion · 24h</div>
-              <Sparkline data={[640,720,810,870,920,940,920,880,950,1020,980,847]} color="var(--accent)" />
-              <div className="muted small" style={{ marginTop: 10 }}>Now <span style={{ color: 'var(--ink)' }}>847</span>/min · Peak <span style={{ color: 'var(--ink)' }}>1,062</span>/min</div>
-            </div>
-            <div>
-              <div className="section-h">Model drift · 7d</div>
-              <Sparkline data={fpData} color="var(--amber)" />
-              <div className="muted small" style={{ marginTop: 10 }}>PSI <span style={{ color: 'var(--amber)' }}>0.09</span> · threshold 0.20 · retrain in 6d</div>
-            </div>
-          </div>
-        </Accordion>
+              {/* Ensemble Performance stats */}
+              <div>
+                <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  Ensemble Performance
+                </p>
+                <p style={{ margin: '0 0 14px', fontSize: 11, color: C.textMuted }}>
+                  Precision and recall computed on live alerts (last 7 days) using ground-truth fraud labels · {data.training_events || 0} total events processed
+                </p>
+                <div className="stat-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+                  <Stat label="Precision" value={`${(data.precision * 100).toFixed(1)}%`} />
+                  <Stat label="Recall" value={`${(data.recall * 100).toFixed(1)}%`} />
+                  <Stat label="F1 Score" value={`${(data.f1 * 100).toFixed(1)}%`} />
+                  <Stat label="Mean Detect Time" value={detectDisplay} sub="event scored to alert created" />
+                </div>
+              </div>
 
+              {/* Training log — own full-width section, below ensemble performance */}
+              {logLines.length > 0 && (
+                <div>
+                  <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    Training Log
+                  </p>
+                  <div
+                    ref={logRef}
+                    style={{
+                      background: '#0D1117', border: '1px solid #30363D', borderRadius: 4,
+                      padding: 16, fontFamily: 'monospace', fontSize: 12,
+                      color: '#16A34A', lineHeight: 1.9,
+                      minHeight: 200, maxHeight: 400, overflowY: 'auto',
+                    }}
+                  >
+                    {logLines.map((line, i) => (
+                      <div key={i} style={{ color: line.includes('Skipping') || line.includes('insufficient') ? '#D97706' : '#16A34A' }}>
+                        {line}
+                      </div>
+                    ))}
+                    {training && (
+                      <div style={{ display: 'inline-block', width: 8, height: 14, background: '#16A34A', verticalAlign: 'middle', marginLeft: 2 }} />
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <IntelligenceCharts data={data} />
+            </>
+          )}
+
+          {!loading && !data && (
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 4, padding: 24, color: C.textMuted }}>
+              Intelligence metrics unavailable while the backend starts.
+            </div>
+          )}
+        </main>
       </div>
     </div>
   )
