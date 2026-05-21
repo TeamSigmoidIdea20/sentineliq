@@ -30,7 +30,7 @@ const EVENT_TAG: Record<string, { label: string; color: string }> = {
 }
 
 const FRAUD_TAG: Record<string, { label: string; color: string }> = {
-  off_hours_login: { label: 'Auth', color: '#4B9EF5' },
+  off_hours_login: { label: 'Auth', color: C.critical },
   bulk_download: { label: 'Export', color: C.medium },
   cross_department_access: { label: 'Anomaly', color: C.medium },
   privilege_escalation: { label: 'Perm Δ', color: C.critical },

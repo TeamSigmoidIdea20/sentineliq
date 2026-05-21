@@ -107,7 +107,7 @@ class SyntheticGenerator:
         location = random.choice(norm_locs)
         event_type = random.choice(EVENT_TYPES)
         device = random.choice(DEVICES[:3])
-        download_mb = random.gauss(10, 3) if event_type == "report_download" else random.gauss(1, 0.5)
+        download_mb = random.gauss(3, 1) if event_type == "report_download" else random.gauss(0.5, 0.2)
         return {
             "id": str(uuid.uuid4()),
             "user_id": uid,
@@ -136,32 +136,45 @@ class SyntheticGenerator:
         ev = self._normal_event(spec, ts)
         uid, name, role, dept, ls, le, avg_tx, typ_depts, norm_locs = spec
 
+        baseline_tx = max(1, int(random.gauss(avg_tx / 8, max(1, avg_tx / 20))))
+        baseline_dl = max(0.0, random.gauss(0.5, 0.2))
+
         if pattern == "off_hours_login":
-            hour = random.choice([1, 2, 3, 4, 22, 23])
+            hour = random.choice([0, 1, 2, 3, 4, 5, 22, 23])
             ev["hour"] = hour
             ev["timestamp"] = ev["timestamp"].replace(hour=hour)
             ev["event_type"] = "login"
+            ev["tx_count"] = baseline_tx
+            ev["download_mb"] = baseline_dl
             ev["description"] = f"{name} logged in at {hour:02d}:00 — outside normal hours"
 
         elif pattern == "bulk_download":
             ev["event_type"] = "data_export"
-            ev["download_mb"] = random.uniform(800, 2000)
+            ev["download_mb"] = random.uniform(50, 200)
+            ev["tx_count"] = baseline_tx
             ev["description"] = f"{name} exported {ev['download_mb']:.0f} MB — anomalous volume"
 
         elif pattern == "cross_department_access":
-            foreign = random.choice([d for d in ALL_DEPARTMENTS if d not in typ_depts])
+            foreign_depts = [d for d in ALL_DEPARTMENTS if d not in typ_depts]
+            foreign = random.choice(foreign_depts)
             ev["department"] = foreign
             ev["event_type"] = "department_access"
+            ev["tx_count"] = baseline_tx
+            ev["download_mb"] = baseline_dl
             ev["description"] = f"{name} accessed {foreign} — outside normal scope"
 
         elif pattern == "privilege_escalation":
             ev["event_type"] = "privilege_use"
+            ev["tx_count"] = baseline_tx
+            ev["download_mb"] = baseline_dl
             ev["description"] = f"{name} invoked elevated privileges — not typical for {role}"
 
         elif pattern == "velocity_spike":
-            ev["tx_count"] = int(avg_tx * random.uniform(4, 8))
+            ev["tx_count"] = int(avg_tx * random.uniform(8, 15))
             ev["event_type"] = "transaction"
-            ev["description"] = f"{name} processed {ev['tx_count']} transactions — {ev['tx_count'] // avg_tx}x normal rate"
+            ev["department"] = random.choice(typ_depts)
+            ev["download_mb"] = baseline_dl
+            ev["description"] = f"{name} processed {ev['tx_count']} transactions — {ev['tx_count'] // max(1, avg_tx)}x normal rate"
 
         ev["fraud_type"] = pattern
         ev["is_fraud"] = 1

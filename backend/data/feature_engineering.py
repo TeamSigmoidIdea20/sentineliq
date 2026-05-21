@@ -93,18 +93,20 @@ class FeatureEngineer:
         # location_mismatch
         loc_mismatch = 0.0 if location in h.normal_locations else 1.0
 
-        # privilege_use_ratio
-        priv_count = sum(1 for e in h.event_types if e == "privilege_use")
-        priv_ratio = priv_count / max(1, len(h.event_types))
+        # privilege_use_ratio — include current event so a single privilege_use fires immediately
+        all_event_types = list(h.event_types) + [etype]
+        priv_count = sum(1 for e in all_event_types if e == "privilege_use")
+        priv_ratio = priv_count / max(1, len(all_event_types))
 
         # device_change_frequency
         unique_devices = len(set(list(h.devices) + [device]))
         device_freq = unique_devices / max(1, len(h.devices) + 1)
 
-        # off_hours_ratio
+        # off_hours_ratio — include current event so an off-hours login fires immediately
         nh_start, nh_end = h.normal_hours
-        off_count = sum(1 for hh in h.hours if hh < nh_start or hh > nh_end)
-        off_ratio = off_count / max(1, len(h.hours))
+        all_hours = list(h.hours) + [hour]
+        off_count = sum(1 for hh in all_hours if hh < nh_start or hh > nh_end)
+        off_ratio = off_count / max(1, len(all_hours))
 
         # Update history
         h.hours.append(hour)
