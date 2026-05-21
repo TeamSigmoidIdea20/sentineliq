@@ -89,38 +89,95 @@ body {
 
 /* Landing page interactive hover states */
 .landing-btn-primary {
-  transition: opacity 0.15s, transform 0.15s;
+  transition: opacity 0.15s;
 }
 .landing-btn-primary:hover {
-  opacity: 0.85;
-  transform: translateY(-1px);
+  opacity: 0.9;
 }
 .landing-btn-secondary {
-  transition: border-color 0.15s, color 0.15s, transform 0.15s;
+  transition: border-color 0.18s, color 0.18s;
 }
 .landing-btn-secondary:hover {
   border-color: #8B949E !important;
   color: #F0F6FC !important;
-  transform: translateY(-1px);
 }
+
+/* Nav link with underline slide */
 .landing-nav-link {
+  position: relative;
   transition: color 0.15s;
   cursor: pointer;
+  padding-bottom: 2px;
 }
 .landing-nav-link:hover {
   color: #F0F6FC !important;
 }
+.landing-nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: #DC2626;
+  transition: width 0.22s ease;
+}
+.landing-nav-link:hover::after {
+  width: 100%;
+}
+
 .landing-footer-link {
-  transition: color 0.15s;
+  transition: color 0.15s, transform 0.15s;
+  display: inline-block;
 }
 .landing-footer-link:hover {
   color: #F0F6FC !important;
+  transform: translateX(3px);
 }
+
 .landing-feature-row {
   transition: background 0.15s;
+  cursor: default;
 }
 .landing-feature-row:hover {
   background: #1C2128;
+}
+
+/* Framework badge hover */
+.landing-framework-item {
+  transition: color 0.15s, transform 0.15s;
+  display: inline-block;
+}
+.landing-framework-item:hover {
+  color: #F0F6FC !important;
+  transform: translateY(-2px);
+}
+
+/* Scanline sweep for browser mockup */
+@keyframes scanline {
+  0%   { transform: translateY(0); opacity: 0; }
+  5%   { opacity: 1; }
+  95%  { opacity: 1; }
+  100% { transform: translateY(340px); opacity: 0; }
+}
+.mockup-scanline {
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 1px;
+  background: rgba(240,246,252,0.07);
+  pointer-events: none;
+  z-index: 5;
+  animation: scanline 3.5s linear infinite;
+  animation-delay: 1s;
+}
+
+/* Glow pulse on critical risk score */
+@keyframes risk-glow {
+  0%, 100% { text-shadow: 0 0 8px rgba(220,38,38,0.4); }
+  50%       { text-shadow: 0 0 18px rgba(220,38,38,0.7); }
+}
+.risk-glow {
+  animation: risk-glow 2.5s ease-in-out infinite;
 }
 
 /* Keyboard focus indicator — applies to all interactive elements */
