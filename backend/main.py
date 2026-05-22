@@ -13,7 +13,7 @@ from typing import List, Optional
 import numpy as np
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import and_, desc, func, or_, select
+from sqlalchemy import and_, delete, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import AlertModel, AuditLogModel, CaseAlertModel, CaseModel, EventModel, ModelMetricModel, TimelineItemModel, UserModel, get_db, init_db, SessionLocal
@@ -484,8 +484,8 @@ async def _update_or_create_case(user_id: str, alert: AlertModel, db: AsyncSessi
         user_id=user_id,
         case_id=case_id,
         alert_id=alert.id,
-        occurred_at=now,
-        ingested_at=now,
+        occurred_at=alert_time,
+        ingested_at=alert_ingested,
         kind="trigger",
         title=f"Case opened — {case_title}",
         explanation=f"{len(all_alerts)} alerts in 24h window. Max risk: {int(max_risk)}.",
@@ -495,19 +495,63 @@ async def _update_or_create_case(user_id: str, alert: AlertModel, db: AsyncSessi
     return case_id
 
 
+SEED_VERSION = "v3"  # bump when seed logic changes to force reseed on deployed instances
+
+
+async def _clear_seed_data(db) -> None:
+    """Delete all seed-sourced events, alerts, cases, and timeline items."""
+    seed_event_ids = (await db.execute(
+        select(EventModel.id).where(EventModel.source == "seed")
+    )).scalars().all()
+    seed_alert_ids = (await db.execute(
+        select(AlertModel.id).where(AlertModel.event_id.in_(seed_event_ids))
+    )).scalars().all() if seed_event_ids else []
+    seed_case_ids = (await db.execute(
+        select(CaseAlertModel.case_id).where(CaseAlertModel.alert_id.in_(seed_alert_ids))
+    )).scalars().all() if seed_alert_ids else []
+
+    if seed_alert_ids:
+        await db.execute(delete(TimelineItemModel).where(TimelineItemModel.alert_id.in_(seed_alert_ids)))
+        await db.execute(delete(CaseAlertModel).where(CaseAlertModel.alert_id.in_(seed_alert_ids)))
+        await db.execute(delete(AlertModel).where(AlertModel.id.in_(seed_alert_ids)))
+    if seed_case_ids:
+        await db.execute(delete(TimelineItemModel).where(TimelineItemModel.case_id.in_(seed_case_ids)))
+        await db.execute(delete(CaseModel).where(CaseModel.id.in_(seed_case_ids)))
+    await db.execute(delete(EventModel).where(EventModel.source == "seed"))
+    await db.commit()
+    logger.info("_clear_seed_data: cleared %d events, %d alerts, %d cases",
+                len(seed_event_ids), len(seed_alert_ids), len(seed_case_ids))
+
+
 async def seed_demo_state() -> None:
-    """Seed deterministic demo data once. Idempotency: skip if seed events already exist."""
+    """Seed deterministic demo data once. Version-gated: clears and reseeds if version changed."""
     async with SessionLocal() as db:
-        seed_count = await db.scalar(
+        # Check for current version marker (a seed event with system == SEED_VERSION)
+        version_ok = await db.scalar(
+            select(func.count()).select_from(EventModel).where(
+                and_(EventModel.source == "seed", EventModel.system == SEED_VERSION)
+            )
+        ) or 0
+        if version_ok > 0:
+            logger.info("seed_demo_state: already at %s, skipping", SEED_VERSION)
+            return
+
+        old_count = await db.scalar(
             select(func.count()).select_from(EventModel).where(EventModel.source == "seed")
         ) or 0
-        if seed_count > 0:
-            logger.info("seed_demo_state: already seeded (%d events), skipping", seed_count)
-            return
+        if old_count > 0:
+            logger.info("seed_demo_state: old seed found (%d events), clearing for %s reseed…", old_count, SEED_VERSION)
+            await _clear_seed_data(db)
 
     logger.info("seed_demo_state: seeding demo data…")
     now = datetime.utcnow()
-    rng = random.Random(42)  # fixed seed for ingested_at offsets — reproducible structure
+    rng = random.Random(42)  # fixed seed for ingested_at offsets
+
+    # Pin global random state so generator internals (random.choice, uuid4, etc.) are reproducible
+    _rand_state = random.getstate()
+    _np_state = np.random.get_state()
+    random.seed(42)
+    np.random.seed(42)
 
     # --- 300 normal background events over last 24h ---
     normal_events = generator.generate_batch(
@@ -542,6 +586,10 @@ async def seed_demo_state() -> None:
             "label": "TP",
         },
     ]
+
+    # Restore global random state — live event loop uses its own entropy after this point
+    random.setstate(_rand_state)
+    np.random.set_state(_np_state)
 
     async with SessionLocal() as db:
         # Insert normal events
@@ -578,6 +626,8 @@ async def seed_demo_state() -> None:
                 risk_score = float(scores["ensemble"]) * 100.0
                 if i == len(chain["offsets_minutes"]) - 1:
                     risk_score = float(chain["target_risk"])
+                elif i == len(chain["offsets_minutes"]) - 2:
+                    risk_score = max(risk_score, 66.0)  # guarantee 2nd alert so case is created
                 ev["risk_score"] = risk_score
                 ev["features_json"] = json.dumps(feat.tolist())
 
@@ -726,9 +776,26 @@ async def seed_demo_state() -> None:
         for uid, alert_obj in standalone_alert_objs:
             await _update_or_create_case(uid, alert_obj, db)
 
+        # Version marker — presence of this event indicates seed_v3 has run
+        db.add(EventModel(
+            id=str(uuid.uuid5(uuid.NAMESPACE_DNS, f"seed-version-marker-{SEED_VERSION}")),
+            user_id="usr_001",
+            user_name="seed_marker",
+            timestamp=now,
+            event_type="seed_marker",
+            department="",
+            location="",
+            hour=0,
+            source="seed",
+            event_source="seed",
+            system=SEED_VERSION,
+            risk_score=0.0,
+            is_fraud=0,
+            description=f"Seed version marker {SEED_VERSION}",
+        ))
         await db.commit()
 
-    logger.info("seed_demo_state: done — seeded 300 normal events, 3 fraud chains, 12 standalone alerts")
+    logger.info("seed_demo_state: done — seeded 300 normal events, 3 fraud chains, 12 standalone alerts (%s)", SEED_VERSION)
 
 
 _LIVE_FRAUD_PATTERNS = ["off_hours_login", "bulk_download", "cross_department_access", "privilege_escalation", "velocity_spike"]
@@ -1020,14 +1087,15 @@ async def get_alerts(
 
     if time_range:
         now = datetime.utcnow()
+        _seen = func.coalesce(AlertModel.ingested_at, AlertModel.timestamp)
         if time_range == "1h":
-            filters.append(AlertModel.timestamp >= now - timedelta(hours=1))
+            filters.append(_seen >= now - timedelta(hours=1))
         elif time_range == "24h":
-            filters.append(AlertModel.timestamp >= now - timedelta(hours=24))
+            filters.append(_seen >= now - timedelta(hours=24))
         elif time_range == "7d":
-            filters.append(AlertModel.timestamp >= now - timedelta(days=7))
+            filters.append(_seen >= now - timedelta(days=7))
         elif time_range == "30d":
-            filters.append(AlertModel.timestamp >= now - timedelta(days=30))
+            filters.append(_seen >= now - timedelta(days=30))
 
     where = and_(*filters) if filters else True
     total = await db.scalar(select(func.count()).select_from(AlertModel).where(where)) or 0
@@ -1789,14 +1857,13 @@ async def get_intelligence(db: AsyncSession = Depends(get_db)):
     last_retrain_ts = last_metric.created_at.isoformat() if last_metric else None
 
     twenty_four_hours_ago = datetime.utcnow() - timedelta(hours=24)
+    _a_seen = func.coalesce(AlertModel.ingested_at, AlertModel.timestamp)
     alerts_24h = await db.scalar(
-        select(func.count()).select_from(AlertModel).where(
-            AlertModel.timestamp >= twenty_four_hours_ago
-        )
+        select(func.count()).select_from(AlertModel).where(_a_seen >= twenty_four_hours_ago)
     ) or 0
-    # Fix 6: anomaly rate = alerts fired / total events processed in last 24h
+    _e_seen = func.coalesce(EventModel.ingested_at, EventModel.timestamp)
     events_24h = await db.scalar(
-        select(func.count()).select_from(EventModel).where(EventModel.timestamp >= twenty_four_hours_ago)
+        select(func.count()).select_from(EventModel).where(_e_seen >= twenty_four_hours_ago)
     ) or 0
     anomaly_rate = round((alerts_24h / max(1, events_24h)) * 100, 1)
 
@@ -1868,10 +1935,11 @@ async def simulate(body: SimulateRequest = None):
         ev["event_source"] = "simulation"
         events.append(ev)
 
-    # Sort oldest-first and mark the last one as force_alert
+    # Sort oldest-first; force last 2 events above threshold so case is created
     events.sort(key=lambda e: e["timestamp"])
     events[-1]["_force_alert"] = True
     events[-1]["timestamp"] = now  # most recent event triggers the alert
+    events[-2]["_force_alert"] = True  # second-to-last also fires an alert → guarantees case creation
 
     alert_id = None
     for ev in events:
