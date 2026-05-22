@@ -74,6 +74,7 @@ function AlertRow({ alert, selected, onClick }: { alert: Alert; selected: boolea
 }
 
 export default function AlertsPage() {
+  const [fraudTypeFilter, setFraudTypeFilter] = useState<string | null>(null)
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -122,6 +123,20 @@ export default function AlertsPage() {
 
   useEffect(() => { fetch() }, [fetch])
   useEffect(() => { setPage(1) }, [riskLevel, status, timeRange, minScore])
+
+  // Read fraud_type URL param on mount (from "View pattern" link on dashboard)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const ft = params.get('fraud_type')
+    if (ft) setFraudTypeFilter(ft)
+  }, [])
+
+  // Auto-open first alert matching the fraud_type param once alerts load
+  useEffect(() => {
+    if (!fraudTypeFilter || alerts.length === 0 || selectedId) return
+    const match = alerts.find((a) => a.fraud_type === fraudTypeFilter)
+    if (match) setSelectedId(match.id)
+  }, [fraudTypeFilter, alerts, selectedId])
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
@@ -189,6 +204,18 @@ export default function AlertsPage() {
             />
             <span style={{ fontSize: 11, fontWeight: 700, color: C.textPrimary, width: 24, textAlign: 'right', flexShrink: 0 }}>{minScore}</span>
           </div>
+          {/* Pattern filter chip — shown when navigated from coordinated activity banner */}
+          {fraudTypeFilter && (
+            <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 9, fontWeight: 700, color: C.critical, border: `1px solid ${C.critical}`, borderRadius: 2, padding: '2px 6px', letterSpacing: '0.05em' }}>
+                PATTERN
+              </span>
+              <span style={{ fontSize: 10, color: C.textPrimary, fontWeight: 600 }}>
+                {formatFraudType(fraudTypeFilter)}
+              </span>
+              <span style={{ fontSize: 10, color: C.textMuted }}>— auto-selected below</span>
+            </div>
+          )}
         </div>
 
         {/* Simulate + actions */}

@@ -262,7 +262,7 @@ export default function DashboardPage() {
                   <span style={{ fontWeight: 700 }}>{formatFraudType(cp.pattern)}</span>
                   {' '}across <span style={{ fontWeight: 700 }}>{cp.users} users</span> in the {cp.window}.{' '}
                   <Link
-                    href="/dashboard/alerts"
+                    href={`/dashboard/alerts?fraud_type=${cp.pattern}`}
                     style={{ color: '#F0F6FC', textDecoration: 'underline', fontSize: 13 }}
                   >
                     View pattern →
