@@ -285,7 +285,7 @@ export default function DashboardPage() {
             />
             <StatCard
               label="Alerts 24h"
-              value={stats?.alerts_24h ?? '—'}
+              value={stats != null ? (stats.alerts_24h ?? stats.alerts_today ?? 0) : '—'}
               change={stats?.alerts_change}
               sub="vs prior 24h"
               loading={statsLoading}

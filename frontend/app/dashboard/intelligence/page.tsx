@@ -150,9 +150,11 @@ export default function IntelligencePage() {
     setTraining(false)
   }
 
-  // Anomaly rate: alerts_24h / events_24h from stats (per user request)
-  const anomalyRatePct = stats && stats.events_24h > 0
-    ? ((stats.alerts_24h / stats.events_24h) * 100).toFixed(1)
+  // Anomaly rate: alerts_24h / events_24h from stats (supports both old and new field names)
+  const _a24 = stats ? (stats.alerts_24h ?? stats.alerts_today ?? 0) : 0
+  const _e24 = stats ? (stats.events_24h ?? stats.events_today ?? 0) : 0
+  const anomalyRatePct = _e24 > 0
+    ? ((_a24 / _e24) * 100).toFixed(1)
     : data?.anomaly_rate != null ? data.anomaly_rate.toFixed(1) : '0.0'
 
   const detectDisplay = data

@@ -113,6 +113,7 @@ export interface DeptRiskItem {
 export interface Stats {
   users_monitored: number
   alerts_24h: number
+  alerts_today?: number  // backwards-compat alias for older backend
   high_risk_count: number
   false_positive_rate: number
   alerts_change: number
@@ -121,6 +122,7 @@ export interface Stats {
   next_retrain_in: string
   coordinated_patterns: CoordinatedPattern[]
   events_24h: number
+  events_today?: number  // backwards-compat alias for older backend
 }
 
 export interface CaseItem {
@@ -314,9 +316,14 @@ export function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(normalised).getTime()
   if (diff < -5000) {
     const futureS = Math.floor(-diff / 1000)
-    if (futureS < 60) return `in ${futureS}s`
-    const futureM = Math.floor(futureS / 60)
-    return `in ${futureM}m`
+    // Small skew (< 5 min): likely a just-processed event, show countdown
+    if (futureS < 300) {
+      if (futureS < 60) return `in ${futureS}s`
+      return `in ${Math.floor(futureS / 60)}m`
+    }
+    // Large skew (≥ 5 min): server clock issue — show absolute date so it's readable
+    const d = new Date(normalised)
+    return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
   }
   const s = Math.floor(diff / 1000)
   if (s <= 5) return 'Just now'

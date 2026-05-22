@@ -346,28 +346,24 @@ export default function AlertPanel({ alertId, onClose, onResolved, inline = fals
               <SHAPChart values={alert.shap_values} />
             </div>
 
-            {/* AI Analysis */}
-            {alert.ai_narrative && (
-              <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 4, padding: '12px 14px' }}>
-                <p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <span>✦</span> AI Analysis
-                </p>
-                <p style={{ margin: 0, fontSize: 12, color: C.textPrimary, lineHeight: 1.7 }}>{alert.ai_narrative}</p>
-              </div>
-            )}
-
-            {/* Why This Alert Fired */}
-            <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
-              <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: C.textPrimary }}>Why This Alert Fired</p>
-              <p style={{ margin: 0, fontSize: 12, color: C.textMuted, lineHeight: 1.7 }}>{generateExplanation(alert)}</p>
+            {/* AI Analysis — uses Grok narrative when available, falls back to template */}
+            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 4, padding: '12px 14px' }}>
+              <p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span>✦</span> {alert.ai_narrative ? 'AI Analysis' : 'Why This Alert Fired'}
+              </p>
+              <p style={{ margin: 0, fontSize: 12, color: C.textPrimary, lineHeight: 1.7 }}>
+                {alert.ai_narrative || generateExplanation(alert)}
+              </p>
             </div>
 
             {/* Investigation Timeline */}
-            {timeline.length > 0 && (
-              <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
-                <p style={{ margin: '0 0 14px', fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
-                  Investigation Timeline <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 4 }}>· {timeline.length} events</span>
-                </p>
+            <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
+              <p style={{ margin: '0 0 14px', fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
+                Investigation Timeline {timeline.length > 0 && <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 4 }}>· {timeline.length} events</span>}
+              </p>
+              {timeline.length === 0 ? (
+                <p style={{ margin: 0, fontSize: 11, color: C.textMuted }}>No timeline events recorded for this alert.</p>
+              ) : (
                 <div style={{ position: 'relative', paddingLeft: 20 }}>
                   <div style={{ position: 'absolute', left: 4, top: 8, bottom: 8, width: 1, background: C.border }} />
                   {timeline.map((item, i) => {
@@ -407,8 +403,8 @@ export default function AlertPanel({ alertId, onClose, onResolved, inline = fals
                     )
                   })}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Peer Comparison */}
             {peerData && peerData.metrics.length > 0 && (

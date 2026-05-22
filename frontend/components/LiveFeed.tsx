@@ -46,10 +46,15 @@ function FeedRow({ event, isNew, onAlertClick }: { event: FeedEvent; isNew: bool
         }}
       />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
           <span style={{ fontSize: 12, color: C.textPrimary, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {event.description}
           </span>
+          {event.alert_id && (
+            <span style={{ fontSize: 9, fontWeight: 700, color, border: `1px solid ${color}`, borderRadius: 2, padding: '1px 4px', letterSpacing: '0.04em', flexShrink: 0 }}>
+              ALERT ↗
+            </span>
+          )}
         </div>
         <div style={{ marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 10, color: C.textMuted }}>{event.user_id}</span>
