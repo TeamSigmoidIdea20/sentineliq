@@ -152,7 +152,7 @@ export default function CasesPage() {
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minWidth: 0 }}>
 
         {/* Case list */}
-        <div style={{ width: 360, flexShrink: 0, height: '100vh', display: 'flex', flexDirection: 'column', borderRight: `1px solid ${C.border}` }}>
+        <div style={{ flex: 1, minWidth: 300, maxWidth: 480, flexShrink: 0, height: '100vh', display: 'flex', flexDirection: 'column', borderRight: `1px solid ${C.border}` }}>
           <div style={{ height: 48, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 18px', borderBottom: `1px solid ${C.border}`, background: C.card, flexShrink: 0 }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: C.textPrimary }}>Kill Chain Cases</span>
             <span style={{ fontSize: 11, color: C.textMuted }}>{cases.length} active</span>

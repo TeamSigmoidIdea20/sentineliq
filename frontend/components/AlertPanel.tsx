@@ -267,7 +267,7 @@ export default function AlertPanel({ alertId, onClose, onResolved, inline = fals
         height: '100%', overflowY: 'auto', background: C.card,
         borderLeft: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column',
       } : {
-        position: 'fixed', top: 0, right: 0, bottom: 0, width: 520,
+        position: 'fixed', top: 0, right: 0, bottom: 0, width: 600,
         background: C.card, borderLeft: `1px solid ${C.border}`,
         zIndex: 50, overflowY: 'auto', display: 'flex', flexDirection: 'column',
       }}>

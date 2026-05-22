@@ -5,7 +5,7 @@ import Sidebar from '@/components/Sidebar'
 import UserTable from '@/components/UserTable'
 import SHAPChart from '@/components/SHAPChart'
 import RiskBadge from '@/components/RiskBadge'
-import { api, type User, type UserDetail, type AuditEntry, timeAgo } from '@/lib/api'
+import { api, type User, type UserDetail, type UserEvent, type AuditEntry, timeAgo, normaliseIso } from '@/lib/api'
 import { C, riskColor, riskLevel } from '@/lib/tokens'
 
 function RiskHistoryChart({ history }: { history: { date: string; score: number }[] }) {
@@ -31,6 +31,78 @@ function RiskHistoryChart({ history }: { history: { date: string; score: number 
       <path d={area} fill="url(#riskGrad)" />
       <polyline points={pts} fill="none" stroke={C.critical} strokeWidth="1.5" />
     </svg>
+  )
+}
+
+function ActivityHeatmap({ userId }: { userId: string }) {
+  const [events, setEvents] = useState<UserEvent[]>([])
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    setLoaded(false)
+    api.userEvents(userId, new Date().toISOString(), 200)
+      .then((evs) => { setEvents(evs); setLoaded(true) })
+      .catch(() => { setEvents([]); setLoaded(true) })
+  }, [userId])
+
+  const hourCounts = Array(24).fill(0)
+  events.forEach((ev) => {
+    try {
+      const h = new Date(normaliseIso(ev.timestamp)).getHours()
+      if (h >= 0 && h < 24) hourCounts[h]++
+    } catch {}
+  })
+  const maxCount = Math.max(...hourCounts, 1)
+  const totalEvents = events.length
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+        <p style={{ margin: 0, fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
+          24h Activity Pattern
+        </p>
+        <span style={{ fontSize: 10, color: C.textMuted }}>{loaded ? `${totalEvents} events` : '…'}</span>
+      </div>
+      <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 4, padding: '10px 12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(24, 1fr)', gap: 3, marginBottom: 6 }}>
+          {hourCounts.map((count, h) => {
+            const intensity = count / maxCount
+            const bg = count === 0 ? '#1C2128'
+              : intensity > 0.65 ? C.critical
+              : intensity > 0.3 ? C.medium
+              : C.low
+            const opacity = count === 0 ? 0.5 : 0.5 + intensity * 0.5
+            return (
+              <div
+                key={h}
+                title={`${String(h).padStart(2, '0')}:00 — ${count} event${count !== 1 ? 's' : ''}`}
+                style={{
+                  height: 20, background: bg, opacity,
+                  borderRadius: 2, cursor: 'default',
+                  transition: 'opacity 0.15s',
+                }}
+              />
+            )
+          })}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 9, color: C.textMuted }}>00:00</span>
+          <span style={{ fontSize: 9, color: C.textMuted }}>06:00</span>
+          <span style={{ fontSize: 9, color: C.textMuted }}>12:00</span>
+          <span style={{ fontSize: 9, color: C.textMuted }}>18:00</span>
+          <span style={{ fontSize: 9, color: C.textMuted }}>23:00</span>
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 8, alignItems: 'center' }}>
+          <span style={{ fontSize: 9, color: C.textMuted }}>Activity:</span>
+          {[['None', '#1C2128', 0.5], ['Low', C.low, 0.7], ['Medium', C.medium, 0.8], ['High', C.critical, 1]] .map(([label, color, op]) => (
+            <span key={label as string} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 10, height: 10, background: color as string, opacity: op as number, borderRadius: 2, display: 'inline-block' }} />
+              <span style={{ fontSize: 9, color: C.textMuted }}>{label}</span>
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -159,6 +231,9 @@ function UserProfilePanel({
               </div>
             </div>
           </div>
+
+          {/* Activity heatmap */}
+          <ActivityHeatmap userId={userId} />
 
           {/* Recent alerts */}
           <div>
