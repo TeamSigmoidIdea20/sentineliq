@@ -158,7 +158,7 @@ class IntelligenceResponse(BaseModel):
     precision: Optional[float] = None
     recall: Optional[float] = None
     f1: Optional[float] = None
-    mean_time_to_detect: float
+    mean_time_to_detect: Optional[float] = None
     alert_volume_last_7_days: List[DailyCount]
     anomaly_type_breakdown: List[BreakdownItem]
     model_agreement_rate: float

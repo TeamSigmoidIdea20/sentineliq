@@ -142,7 +142,7 @@ export interface Intelligence {
   precision: number | null
   recall: number | null
   f1: number | null
-  mean_time_to_detect: number
+  mean_time_to_detect: number | null
   alert_volume_last_7_days: { date: string; count: number }[]
   anomaly_type_breakdown: { fraud_type: string; count: number }[]
   model_agreement_rate: number

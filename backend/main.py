@@ -1567,11 +1567,19 @@ async def get_case_timeline(case_id: str, db: AsyncSession = Depends(get_db)):
 
     if stored_rows:
         seen_ids: set[str] = set()
+        seen_source_ids: set[str] = set()
         for si in stored_rows:
             if si.id in seen_ids:
                 continue
             seen_ids.add(si.id)
-            src = "audit_log" if si.kind == "analyst_action" else ("alert" if si.kind == "trigger" else "event")
+            # Baseline/suspicious events are written once per alert in the case.
+            # When multiple alerts share overlapping 4h windows, the same underlying
+            # event gets a timeline row for each alert — deduplicate by source_record_id.
+            if si.kind in ("baseline", "suspicious") and si.source_record_id:
+                if si.source_record_id in seen_source_ids:
+                    continue
+                seen_source_ids.add(si.source_record_id)
+            src = "audit_log" if si.kind == "analyst_action" else ("alert" if si.kind in ("trigger", "case_opened") else "event")
             items.append(TimelineItem(
                 id=si.id,
                 timestamp=si.occurred_at,
@@ -1804,14 +1812,15 @@ async def get_intelligence(db: AsyncSession = Depends(get_db)):
         recall = round(label_tp / max(1, len(labeled_alerts)), 3)
         f1 = round((2 * precision * recall) / max(0.001, precision + recall), 3)
 
-    # Fix 5: MTTD = created_at (processing time) - timestamp (event time)
+    # MTTD = created_at (processing time) - timestamp (event time)
+    # Cap at 300s to exclude seeded historical alerts whose timestamps are hours in the past
     detect_deltas = []
     for alert in alert_rows:
         if alert.created_at and alert.timestamp:
             delta = (alert.created_at - alert.timestamp).total_seconds()
-            if delta >= 0:
+            if 0 <= delta <= 300:
                 detect_deltas.append(delta)
-    mean_detect = round(sum(detect_deltas) / max(1, len(detect_deltas)), 1)
+    mean_detect = round(sum(detect_deltas) / len(detect_deltas), 1) if detect_deltas else None
 
     daily_counts: list[DailyCount] = []
     fp_trend: list[FPTrendPoint] = []

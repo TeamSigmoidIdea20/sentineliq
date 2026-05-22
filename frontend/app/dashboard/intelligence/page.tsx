@@ -158,9 +158,11 @@ export default function IntelligencePage() {
     : data?.anomaly_rate != null ? data.anomaly_rate.toFixed(1) : '0.0'
 
   const detectDisplay = data
-    ? data.mean_time_to_detect < 1
-      ? 'Real-time'
-      : `${data.mean_time_to_detect.toFixed(1)}s`
+    ? data.mean_time_to_detect == null
+      ? '—'
+      : data.mean_time_to_detect < 1
+        ? 'Real-time'
+        : `${data.mean_time_to_detect.toFixed(1)}s`
     : '—'
 
   return (

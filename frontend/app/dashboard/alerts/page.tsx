@@ -328,7 +328,31 @@ export default function AlertsPage() {
               style={{ fontSize: 11, background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted, padding: '3px 8px', borderRadius: 3, cursor: 'pointer', opacity: page <= 1 ? 0.4 : 1 }}>
               ← Prev
             </button>
-            <span style={{ fontSize: 10, color: C.textMuted }}>{page} / {totalPages}</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: C.textMuted }}>
+              <input
+                type="number"
+                min={1}
+                max={totalPages}
+                defaultValue={page}
+                key={page}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const v = parseInt((e.target as HTMLInputElement).value)
+                    if (!isNaN(v)) setPage(Math.max(1, Math.min(totalPages, v)))
+                  }
+                }}
+                onBlur={(e) => {
+                  const v = parseInt(e.target.value)
+                  if (!isNaN(v)) setPage(Math.max(1, Math.min(totalPages, v)))
+                }}
+                style={{
+                  width: 32, textAlign: 'center', background: C.bg, border: `1px solid ${C.border}`,
+                  color: C.textPrimary, fontSize: 10, borderRadius: 3, padding: '2px 4px',
+                  fontFamily: 'inherit', outline: 'none',
+                }}
+              />
+              / {totalPages}
+            </span>
             <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}
               style={{ fontSize: 11, background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted, padding: '3px 8px', borderRadius: 3, cursor: 'pointer', opacity: page >= totalPages ? 0.4 : 1 }}>
               Next →
