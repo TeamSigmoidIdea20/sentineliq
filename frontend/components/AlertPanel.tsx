@@ -368,12 +368,14 @@ export default function AlertPanel({ alertId, onClose, onResolved, inline = fals
                   <div style={{ position: 'absolute', left: 4, top: 8, bottom: 8, width: 1, background: C.border }} />
                   {timeline.map((item, i) => {
                     const kindColor = item.kind === 'trigger' ? C.critical
+                      : item.kind === 'case_opened' ? C.amber
                       : item.kind === 'suspicious' ? C.medium
                       : item.kind === 'analyst_action' ? C.low
                       : C.textMuted
                     const kindLabel = item.kind === 'baseline' ? 'BASE'
                       : item.kind === 'suspicious' ? 'WARN'
                       : item.kind === 'trigger' ? 'ALERT'
+                      : item.kind === 'case_opened' ? 'CASE'
                       : 'ACTION'
                     return (
                       <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: i < timeline.length - 1 ? 12 : 0, position: 'relative' }}>

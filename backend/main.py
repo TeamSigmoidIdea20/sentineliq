@@ -422,7 +422,7 @@ async def _update_or_create_case(user_id: str, alert: AlertModel, db: AsyncSessi
             alert_id=alert.id,
             occurred_at=alert_time,
             ingested_at=alert_ingested,
-            kind="trigger",
+            kind="case_opened",
             title=f"Alert added — {(alert.fraud_type or 'anomalous_behavior').replace('_', ' ').title()}",
             explanation=f"Risk score: {int(alert.risk_score)}. Case now has {existing_case.alert_count} alerts.",
             severity=_risk_level(alert.risk_score),
@@ -486,7 +486,7 @@ async def _update_or_create_case(user_id: str, alert: AlertModel, db: AsyncSessi
         alert_id=alert.id,
         occurred_at=alert_time,
         ingested_at=alert_ingested,
-        kind="trigger",
+        kind="case_opened",
         title=f"Case opened — {case_title}",
         explanation=f"{len(all_alerts)} alerts in 24h window. Max risk: {int(max_risk)}.",
         severity=severity,
@@ -495,7 +495,7 @@ async def _update_or_create_case(user_id: str, alert: AlertModel, db: AsyncSessi
     return case_id
 
 
-SEED_VERSION = "v3"  # bump when seed logic changes to force reseed on deployed instances
+SEED_VERSION = "v4"  # bump when seed logic changes to force reseed on deployed instances
 
 
 async def _clear_seed_data(db) -> None:
@@ -803,7 +803,7 @@ _LIVE_FRAUD_PATTERNS = ["off_hours_login", "bulk_download", "cross_department_ac
 async def _event_loop() -> None:
     live_count = 0
     while True:
-        await asyncio.sleep(180)  # 1 live event per 3 minutes
+        await asyncio.sleep(30)  # 1 live event per 30 seconds
         try:
             live_count += 1
             # Every 15th live event is an explicit fraud (~7% rate, matches training distribution)
@@ -895,7 +895,7 @@ def get_model_info():
 @app.get("/health", response_model=HealthResponse)
 async def health():
     return HealthResponse(
-        status="ok",
+        status="ok" if _initialized else "initializing",
         models_loaded=ensemble.is_fitted,
         db_connected=True,
         events_processed=_events_processed,
@@ -1918,40 +1918,27 @@ async def simulate(body: SimulateRequest = None):
     if body is None:
         body = SimulateRequest()
     pattern = _SCENARIO_PATTERNS.get(body.scenario or "") if body.scenario else None
+    if not pattern:
+        pattern = random.choice(_LIVE_FRAUD_PATTERNS)
     scenario_id = str(uuid.uuid4())
     now = datetime.utcnow()
 
-    # Generate 4-event chain spread across last 90 minutes
-    events = []
-    for i in range(4):
-        if pattern:
-            ev = generator.generate_forced_fraud(pattern)
-        else:
-            ev = generator.generate_one()
-        offset_minutes = random.randint(0, 85) + i * 5
-        ev["timestamp"] = now - timedelta(minutes=offset_minutes)
-        ev["scenario_id"] = scenario_id
-        ev["source"] = "simulation"
-        ev["event_source"] = "simulation"
-        events.append(ev)
+    # Inject a single forced fraud event immediately
+    ev = generator.generate_forced_fraud(pattern)
+    ev["timestamp"] = now
+    ev["scenario_id"] = scenario_id
+    ev["source"] = "simulation"
+    ev["event_source"] = "simulation"
+    ev["_force_alert"] = True
+    ev["_source"] = "simulation"
+    await _process_event(ev)
 
-    # Sort oldest-first; force last 2 events above threshold so case is created
-    events.sort(key=lambda e: e["timestamp"])
-    events[-1]["_force_alert"] = True
-    events[-1]["timestamp"] = now  # most recent event triggers the alert
-    events[-2]["_force_alert"] = True  # second-to-last also fires an alert → guarantees case creation
-
-    alert_id = None
-    for ev in events:
-        ev["_source"] = "simulation"
-        await _process_event(ev)
-
-    # Find the alert and case created for this scenario
+    # Find the alert created for this event
     async with SessionLocal() as db:
         recent_alert = (
             await db.execute(
                 select(AlertModel)
-                .where(AlertModel.user_id == events[-1].get("user_id", ""))
+                .where(AlertModel.user_id == ev.get("user_id", ""))
                 .order_by(desc(AlertModel.timestamp))
                 .limit(1)
             )
@@ -1974,7 +1961,7 @@ async def simulate(body: SimulateRequest = None):
         "status": "ok",
         "scenario": body.scenario,
         "scenario_id": scenario_id,
-        "events_created": len(events),
+        "events_created": 1,
         "alert_id": alert_id,
         "case_id": case_id,
         "risk_score": risk_score,

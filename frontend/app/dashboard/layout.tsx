@@ -10,11 +10,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter()
   const [cmdkOpen, setCmdkOpen] = useState(false)
   const [alerts, setAlerts] = useState<Alert[]>([])
-  const [backendOnline, setBackendOnline] = useState(true)
+  const [backendStatus, setBackendStatus] = useState<'ok' | 'initializing' | 'offline'>('ok')
   const gMode = useRef(false)
 
   useEffect(() => {
-    const check = () => api.health().then(() => setBackendOnline(true)).catch(() => setBackendOnline(false))
+    const check = () => api.health()
+      .then((r) => setBackendStatus(r.status === 'initializing' ? 'initializing' : 'ok'))
+      .catch(() => setBackendStatus('offline'))
     check()
     const id = setInterval(check, 30000)
     return () => clearInterval(id)
@@ -57,15 +59,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <>
-      {!backendOnline && (
+      {backendStatus === 'offline' && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
-          background: '#7C2D12', borderBottom: '1px solid #DC2626',
+          background: '#7C2D12', borderBottom: `1px solid ${C.critical}`,
           padding: '6px 16px', display: 'flex', alignItems: 'center', gap: 8,
           fontSize: 11, color: '#FEF2F2', fontFamily: 'inherit',
         }}>
           <span style={{ fontWeight: 700 }}>BACKEND OFFLINE</span>
           <span style={{ color: '#FECACA' }}>— data may be stale. Retrying every 30s.</span>
+        </div>
+      )}
+      {backendStatus === 'initializing' && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
+          background: '#431407', borderBottom: `1px solid ${C.amber}`,
+          padding: '6px 16px', display: 'flex', alignItems: 'center', gap: 8,
+          fontSize: 11, color: '#FEF3C7', fontFamily: 'inherit',
+        }}>
+          <span style={{ fontWeight: 700, color: C.amber }}>INITIALIZING</span>
+          <span style={{ color: '#FDE68A' }}>— training ML models, seeding demo data (~30s). Dashboard will populate automatically.</span>
         </div>
       )}
       {children}
