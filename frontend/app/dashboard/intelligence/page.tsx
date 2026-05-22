@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import Sidebar from '@/components/Sidebar'
-import { api, type Intelligence, type Stats, timeAgo } from '@/lib/api'
+import { api, type Intelligence, type ModelInfo, type Stats, timeAgo } from '@/lib/api'
 import { C } from '@/lib/tokens'
 
 const IntelligenceCharts = dynamic(() => import('@/components/IntelligenceCharts'), {
@@ -66,6 +66,7 @@ function ModelCard({
 export default function IntelligencePage() {
   const [data, setData] = useState<Intelligence | null>(null)
   const [stats, setStats] = useState<Stats | null>(null)
+  const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [training, setTraining] = useState(false)
   const [logLines, setLogLines] = useState<string[]>([])
@@ -73,13 +74,15 @@ export default function IntelligencePage() {
 
   const loadAll = async () => {
     setLoading(true)
-    const [intel, st] = await Promise.allSettled([
+    const [intel, st, mi] = await Promise.allSettled([
       api.intelligence(),
       api.stats(),
+      api.modelInfo(),
     ])
     if (intel.status === 'fulfilled') setData(intel.value)
     else setData(null)
     if (st.status === 'fulfilled') setStats(st.value)
+    if (mi.status === 'fulfilled') setModelInfo(mi.value)
     setLoading(false)
   }
 
@@ -94,24 +97,11 @@ export default function IntelligencePage() {
     setTraining(true)
     setLogLines([])
 
-    // Fire retrain immediately — real API call
+    // Fire retrain — real API call
+    setLogLines(['[00:00] Requesting retrain...'])
     const retrainPromise = api.retrain().catch(() => null)
-
-    // Stream fixed lines while retrain runs in background
-    const fixedLines = [
-      '[00:00] Initialising training pipeline...',
-      `[00:01] Loading ${data?.training_events ?? 2000} synthetic events from SQLite...`,
-      '[00:02] Engineering 8 feature vectors per user...',
-      '[00:02] Example: usr_032 login at 02:17 — login_hour_deviation: 2.8σ, off_hours_ratio: 0.91 → flagged',
-      '[00:03] Training Isolation Forest — contamination=0.1, n_estimators=100...',
-      '[00:04] Isolation Forest trained. Anomaly threshold: 0.142',
-      '[00:05] Building LSTM sequences — seq_len=20, 50 users...',
-      '[00:06] LSTM Autoencoder forward pass complete. Mean recon error: 0.089',
-    ]
-    for (const line of fixedLines) {
-      await new Promise((r) => setTimeout(r, 150))
-      setLogLines((prev) => [...prev, line])
-    }
+    await new Promise((r) => setTimeout(r, 200))
+    setLogLines((prev) => [...prev, '[00:01] Waiting for retrain response...'])
 
     // Await the real retrain response
     const result = await retrainPromise
@@ -212,32 +202,32 @@ export default function IntelligencePage() {
                   <ModelCard
                     name="Isolation Forest"
                     weight="30%"
-                    description="Trained on 2,000 synthetic events at startup. Contamination parameter set to 0.1 — meaning the model expects ~10% of events to be anomalous. Scores each incoming event by how isolated it is from the normal cluster. No labels required — fully unsupervised."
+                    description="Trained on synthetic events at startup. Contamination parameter set to 0.1 — the model expects ~10% of events to be anomalous. Scores each incoming event by how isolated it is from the normal cluster. No labels required — fully unsupervised."
                     params={[
-                      { label: 'contamination', value: '0.1' },
-                      { label: 'n_estimators', value: '100' },
-                      { label: 'training events', value: String(data.training_events || 2000) },
+                      { label: 'contamination', value: modelInfo ? String(modelInfo.isolation_forest.contamination) : '0.1' },
+                      { label: 'n_estimators', value: modelInfo ? String(modelInfo.isolation_forest.n_estimators) : '100' },
+                      { label: 'training events', value: String(data.training_events || 0) },
                     ]}
                     metric={{ label: 'Live anomaly rate', value: `${anomalyRatePct}%` }}
                   />
                   <ModelCard
                     name="LSTM Autoencoder"
                     weight="40%"
-                    description="Trained on sequences of 20 consecutive events per user. Learns to reconstruct normal behavioural sequences. When reconstruction error exceeds threshold, the event is flagged. Detects slow behavioural drift that point anomaly models miss."
+                    description="Trained on sequences of consecutive events per user. Learns to reconstruct normal behavioural sequences. When reconstruction error exceeds threshold, the event is flagged. Detects slow behavioural drift that point anomaly models miss."
                     params={[
-                      { label: 'seq_len', value: '20' },
-                      { label: 'hidden_dim', value: '64' },
-                      { label: 'framework', value: 'PyTorch 2.1' },
+                      { label: 'seq_len', value: modelInfo ? String(modelInfo.lstm.seq_len) : '—' },
+                      { label: 'hidden_size', value: modelInfo ? String(modelInfo.lstm.hidden_size) : '—' },
+                      { label: 'n_features', value: modelInfo ? String(modelInfo.lstm.n_features) : '—' },
                     ]}
                     metric={{ label: 'Model agreement rate', value: `${data.model_agreement_rate.toFixed(1)}%` }}
                   />
                   <ModelCard
                     name="XGBoost Classifier"
                     weight="30%"
-                    description="Trained on labeled synthetic data with 5 fraud pattern classes. Retrains automatically when investigators label alerts as True Positive or False Positive — active learning loop. Each retrain incorporates new analyst feedback to improve precision."
+                    description="Trained on labeled synthetic data with 5 fraud pattern classes. Retrains when investigators label alerts as True Positive or False Positive — active learning loop. Each retrain incorporates analyst feedback to improve precision."
                     params={[
-                      { label: 'n_estimators', value: '100' },
-                      { label: 'labeled alerts', value: String(data.labeled_count ?? 0) },
+                      { label: 'n_estimators', value: modelInfo ? String(modelInfo.xgboost.n_estimators) : '150' },
+                      { label: 'max_depth', value: modelInfo ? String(modelInfo.xgboost.max_depth) : '3' },
                       { label: 'last retrain', value: data.last_retrain_ts ? timeAgo(data.last_retrain_ts) : 'Not yet' },
                     ]}
                     metric={{ label: 'Labels collected', value: String(data.labeled_count ?? 0) }}
@@ -251,7 +241,7 @@ export default function IntelligencePage() {
                   Ensemble Performance
                 </p>
                 <p style={{ margin: '0 0 14px', fontSize: 11, color: C.textMuted }}>
-                  Precision and recall computed on live alerts (last 7 days) using ground-truth fraud labels · {data.training_events || 0} total events processed
+                  Precision and recall computed from analyst-labeled alerts (TP/FP) · {data.training_events || 0} total events processed
                 </p>
                 <div className="stat-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
                   <Stat label="Precision" value={`${(data.precision * 100).toFixed(1)}%`} />

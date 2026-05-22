@@ -86,7 +86,6 @@ export default function AlertsPage() {
   const [status, setStatus] = useState('open')
   const [timeRange, setTimeRange] = useState('all')
   const [page, setPage] = useState(1)
-  const [threshold, setThreshold] = useState(50)
   const [simOpen, setSimOpen] = useState(false)
   const [simToast, setSimToast] = useState('')
   const [simBusy, setSimBusy] = useState(false)
@@ -122,7 +121,6 @@ export default function AlertsPage() {
   useEffect(() => { fetch() }, [fetch])
   useEffect(() => { setPage(1) }, [riskLevel, status, timeRange])
 
-  const filteredAlerts = alerts.filter(a => a.risk_score >= threshold)
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   const handleResolved = (id: string, newStatus: 'resolved' | 'dismissed') => {
@@ -168,17 +166,6 @@ export default function AlertsPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: C.textPrimary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Alerts</span>
             <span style={{ fontSize: 10, color: C.textMuted }}>{total} total</span>
-          </div>
-
-          {/* Threshold slider */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <span style={{ fontSize: 10, color: C.textMuted, whiteSpace: 'nowrap' }}>Min score</span>
-            <input
-              type="range" min={0} max={100} value={threshold}
-              onChange={e => setThreshold(Number(e.target.value))}
-              style={{ flex: 1, accentColor: C.critical, height: 3, cursor: 'pointer' }}
-            />
-            <span style={{ fontSize: 12, fontWeight: 700, color: C.critical, width: 24, textAlign: 'right', flexShrink: 0 }}>{threshold}</span>
           </div>
 
           {/* Filters */}
@@ -270,7 +257,7 @@ export default function AlertsPage() {
             </div>
             <div style={{ marginLeft: 'auto' }}>
               <div style={{ fontSize: 9, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Showing</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.textPrimary }}>{filteredAlerts.length}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.textPrimary }}>{alerts.length}</div>
             </div>
           </div>
         )}
@@ -284,10 +271,10 @@ export default function AlertsPage() {
               <div style={{ width: 24, height: 10, background: C.border, borderRadius: 2 }} />
             </div>
           ))}
-          {!loading && filteredAlerts.length === 0 && (
+          {!loading && alerts.length === 0 && (
             <div style={{ padding: 20, color: C.textMuted, fontSize: 12 }}>No alerts match filters.</div>
           )}
-          {!loading && filteredAlerts.map(a => (
+          {!loading && alerts.map(a => (
             <AlertRow key={a.id} alert={a} selected={selectedId === a.id} onClick={() => setSelectedId(a.id === selectedId ? null : a.id)} />
           ))}
         </div>

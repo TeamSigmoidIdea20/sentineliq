@@ -4,6 +4,12 @@ import random
 import uuid
 from datetime import datetime, timedelta
 
+
+def _clamp_past(ts: datetime) -> datetime:
+    """Ensure generated timestamps are never in the future."""
+    now = datetime.utcnow()
+    return ts if ts <= now else now.replace(microsecond=0)
+
 FEATURE_NAMES = [
     "login_hour_deviation",
     "transaction_velocity_ratio",
@@ -102,7 +108,7 @@ class SyntheticGenerator:
     def _normal_event(self, spec, ts: datetime) -> dict:
         uid, name, role, dept, ls, le, avg_tx, typ_depts, norm_locs = spec
         hour = random.randint(ls, le - 1)
-        event_ts = ts.replace(hour=hour, minute=random.randint(0, 59), second=random.randint(0, 59))
+        event_ts = _clamp_past(ts.replace(hour=hour, minute=random.randint(0, 59), second=random.randint(0, 59)))
         department = random.choice(typ_depts)
         location = random.choice(norm_locs)
         event_type = random.choice(EVENT_TYPES)
@@ -142,7 +148,7 @@ class SyntheticGenerator:
         if pattern == "off_hours_login":
             hour = random.choice([0, 1, 2, 3, 4, 5, 22, 23])
             ev["hour"] = hour
-            ev["timestamp"] = ev["timestamp"].replace(hour=hour)
+            ev["timestamp"] = _clamp_past(ev["timestamp"].replace(hour=hour))
             ev["event_type"] = "login"
             ev["tx_count"] = baseline_tx
             ev["download_mb"] = baseline_dl
@@ -170,7 +176,7 @@ class SyntheticGenerator:
             hour = random.choice([0, 1, 2, 3, 4, 5, 22, 23])  # off-hours adds second signal
             ev["event_type"] = "privilege_use"
             ev["hour"] = hour
-            ev["timestamp"] = ev["timestamp"].replace(hour=hour)
+            ev["timestamp"] = _clamp_past(ev["timestamp"].replace(hour=hour))
             ev["tx_count"] = baseline_tx
             ev["download_mb"] = baseline_dl
             ev["description"] = f"{name} invoked elevated privileges — not typical for {role}"

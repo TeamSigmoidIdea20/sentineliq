@@ -99,6 +99,12 @@ export interface CoordinatedPattern {
   window: string
 }
 
+export interface DeptRiskItem {
+  department: string
+  avg_risk: number
+  alert_count: number
+}
+
 export interface Stats {
   users_monitored: number
   alerts_today: number
@@ -138,6 +144,13 @@ export interface Intelligence {
   last_retrain_ts: string | null
   training_events: number
   anomaly_rate: number
+  department_risk_breakdown: DeptRiskItem[]
+}
+
+export interface ModelInfo {
+  isolation_forest: { weight: number; n_estimators: number; contamination: number; fitted: boolean }
+  lstm: { weight: number; seq_len: number; hidden_size: number; n_features: number; fitted: boolean }
+  xgboost: { weight: number; n_estimators: number; max_depth: number; learning_rate: number; fitted: boolean }
 }
 
 export interface RetrainResponse {
@@ -234,11 +247,46 @@ export const api = {
     fetchApi<{ status: string; user_id: string }>(`/api/users/${id}/escalate`, { method: 'POST' }),
 
   retrain: () => fetchApi<RetrainResponse>('/api/retrain', { method: 'POST' }),
+
+  modelInfo: () => fetchApi<ModelInfo>('/api/model-info'),
+
+  alertTimeline: (id: string) => fetchApi<TimelineItem[]>(`/api/alerts/${id}/timeline`),
+
+  caseTimeline: (id: string) => fetchApi<TimelineItem[]>(`/api/cases/${id}/timeline`),
+
+  auditLog: (params?: { user_id?: string; alert_id?: string; limit?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.user_id) q.set('user_id', params.user_id)
+    if (params?.alert_id) q.set('alert_id', params.alert_id)
+    if (params?.limit) q.set('limit', String(params.limit))
+    return fetchApi<AuditEntry[]>(`/api/audit-log?${q}`)
+  },
+}
+
+export interface TimelineItem {
+  id: string
+  timestamp: string
+  kind: 'baseline' | 'suspicious' | 'trigger' | 'analyst_action'
+  title: string
+  explanation: string
+  risk_delta?: string | null
+  source: 'event' | 'alert' | 'audit_log'
+}
+
+export interface AuditEntry {
+  id: string
+  created_at: string
+  action_type: string
+  entity_type: string
+  entity_id: string
+  user_id: string
+  alert_id: string
+  message: string
 }
 
 export function riskLevel(score: number): 'critical' | 'high' | 'medium' | 'low' {
   if (score >= 80) return 'critical'
-  if (score >= 60) return 'high'
+  if (score >= 65) return 'high'
   if (score >= 40) return 'medium'
   return 'low'
 }
@@ -257,6 +305,7 @@ export function normaliseIso(iso: string): string {
 export function timeAgo(iso: string): string {
   const normalised = normaliseIso(iso)
   const diff = Date.now() - new Date(normalised).getTime()
+  if (diff < -5000) return 'Just now'
   const s = Math.floor(diff / 1000)
   if (s <= 5) return 'Just now'
   if (s < 60) return `${s} seconds ago`

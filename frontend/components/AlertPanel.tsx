@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Download } from 'lucide-react'
-import { api, type Alert, type PeerComparison, type UserEvent, formatFraudType, timeAgo, normaliseIso } from '@/lib/api'
+import { api, type Alert, type AuditEntry, type PeerComparison, type TimelineItem, formatFraudType, timeAgo, normaliseIso } from '@/lib/api'
 import { C, riskColor } from '@/lib/tokens'
 import RiskBadge from './RiskBadge'
 import SHAPChart from './SHAPChart'
@@ -39,7 +39,8 @@ const FRAUD_TAG: Record<string, { label: string; color: string }> = {
 }
 
 function formatTs(iso: string): string {
-  const diff = Math.abs(Date.now() - new Date(normaliseIso(iso)).getTime())
+  const diff = Date.now() - new Date(normaliseIso(iso)).getTime()
+  if (diff < 0) return 'Just now'
   const s = Math.floor(diff / 1000)
   if (s < 60) return `${s}s ago`
   const m = Math.floor(s / 60)
@@ -86,7 +87,7 @@ function recommendedAction(risk: number): { text: string; color: string } {
       color: C.critical,
     }
   }
-  if (risk >= 40) {
+  if (risk >= 50) {
     return {
       text: 'Force MFA re-authentication. Flag for supervisor review within 4 hours.',
       color: C.medium,
@@ -108,8 +109,9 @@ export default function AlertPanel({ alertId, onClose, onResolved, inline = fals
   const [acting, setActing] = useState(false)
   const [note, setNote] = useState('')
   const [noteSavedAt, setNoteSavedAt] = useState<Date | null>(null)
-  const [timeline, setTimeline] = useState<UserEvent[]>([])
+  const [timeline, setTimeline] = useState<TimelineItem[]>([])
   const [peerData, setPeerData] = useState<PeerComparison | null>(null)
+  const [auditLog, setAuditLog] = useState<AuditEntry[]>([])
   const [toast, setToast] = useState<string | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -127,10 +129,14 @@ export default function AlertPanel({ alertId, onClose, onResolved, inline = fals
   useEffect(() => {
     setNote(alert?.notes || '')
     setNoteSavedAt(null)
+    setAuditLog([])
     if (!alert) return
-    api.userEvents(alert.user_id, alert.timestamp, 10)
-      .then((evs) => setTimeline(evs.slice(-6)))
+    api.alertTimeline(alert.id)
+      .then(setTimeline)
       .catch(() => setTimeline([]))
+    api.auditLog({ alert_id: alert.id, limit: 10 })
+      .then(setAuditLog)
+      .catch(() => setAuditLog([]))
     api.peerComparison(alert.id)
       .then(setPeerData)
       .catch(() => setPeerData(null))
@@ -182,7 +188,7 @@ export default function AlertPanel({ alertId, onClose, onResolved, inline = fals
     await api.labelAlert(alert.id, label).catch(() => null)
     setAlert({ ...alert, label })
     setActing(false)
-    showToast('Feedback recorded — model will retrain with this signal')
+    showToast('Feedback recorded — queued for next retraining cycle')
   }
 
   const saveNote = async () => {
@@ -346,43 +352,47 @@ export default function AlertPanel({ alertId, onClose, onResolved, inline = fals
               <p style={{ margin: 0, fontSize: 12, color: C.textMuted, lineHeight: 1.7 }}>{generateExplanation(alert)}</p>
             </div>
 
-            {/* Stitched timeline */}
+            {/* Investigation Timeline */}
             {timeline.length > 0 && (
               <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
                 <p style={{ margin: '0 0 14px', fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
-                  Stitched timeline <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 4 }}>· {timeline.length} events</span>
+                  Investigation Timeline <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 4 }}>· {timeline.length} events</span>
                 </p>
                 <div style={{ position: 'relative', paddingLeft: 20 }}>
                   <div style={{ position: 'absolute', left: 4, top: 8, bottom: 8, width: 1, background: C.border }} />
-                  {timeline.map((ev, i) => {
-                    const isFraud = ev.fraud_type != null && ev.fraud_type !== ''
-                    const tag = isFraud
-                      ? (FRAUD_TAG[ev.fraud_type!] ?? { label: 'Alert', color: C.critical })
-                      : (EVENT_TAG[ev.event_type] ?? { label: 'Data', color: C.textMuted })
-                    const dotColor = tag.color
+                  {timeline.map((item, i) => {
+                    const kindColor = item.kind === 'trigger' ? C.critical
+                      : item.kind === 'suspicious' ? C.medium
+                      : item.kind === 'analyst_action' ? C.low
+                      : C.textMuted
+                    const kindLabel = item.kind === 'baseline' ? 'BASE'
+                      : item.kind === 'suspicious' ? 'WARN'
+                      : item.kind === 'trigger' ? 'ALERT'
+                      : 'ACTION'
                     return (
-                      <div key={ev.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: i < timeline.length - 1 ? 10 : 0, position: 'relative' }}>
+                      <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: i < timeline.length - 1 ? 12 : 0, position: 'relative' }}>
                         <div style={{
                           position: 'absolute', left: -16, top: 5,
                           width: 8, height: 8, borderRadius: '50%',
-                          background: dotColor, border: `2px solid ${C.card}`,
+                          background: kindColor, border: `2px solid ${C.card}`,
                         }} />
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
-                          <span style={{
-                            fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
-                            border: `1px solid ${dotColor}`, color: dotColor,
-                            flexShrink: 0, letterSpacing: '0.04em',
-                          }}>{tag.label}</span>
-                          <p style={{
-                            margin: 0, fontSize: 11,
-                            color: isFraud ? dotColor : C.textPrimary,
-                            fontWeight: isFraud ? 600 : 400,
-                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                          }}>
-                            {ev.description}
-                          </p>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                            <span style={{
+                              fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
+                              border: `1px solid ${kindColor}`, color: kindColor,
+                              flexShrink: 0, letterSpacing: '0.04em',
+                            }}>{kindLabel}</span>
+                            <p style={{ margin: 0, fontSize: 11, color: kindColor, fontWeight: item.kind !== 'baseline' ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {item.title}
+                            </p>
+                            {item.risk_delta && (
+                              <span style={{ fontSize: 10, color: C.critical, fontWeight: 700, flexShrink: 0 }}>{item.risk_delta}</span>
+                            )}
+                          </div>
+                          <p style={{ margin: 0, fontSize: 10, color: C.textMuted, lineHeight: 1.5 }}>{item.explanation}</p>
                         </div>
-                        <span style={{ fontSize: 9, color: C.textMuted, flexShrink: 0, marginTop: 2 }}>{formatTs(ev.timestamp)}</span>
+                        <span style={{ fontSize: 9, color: C.textMuted, flexShrink: 0, marginTop: 2 }}>{formatTs(item.timestamp)}</span>
                       </div>
                     )
                   })}
@@ -551,29 +561,33 @@ export default function AlertPanel({ alertId, onClose, onResolved, inline = fals
               </button>
             </div>
 
-            {/* Governance & Compliance */}
+            {/* Analyst Actions */}
             <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
-              <p style={{ margin: '0 0 12px', fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
-                Governance & Compliance
+              <p style={{ margin: '0 0 10px', fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
+                Analyst Actions
               </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                {[
-                  'Full audit trail captured in SQLite',
-                  'SHAP feature attributions available for every alert',
-                  'RBI-aligned behavioural risk monitoring',
-                  'Analyst decision logged with timestamp',
-                ].map((item) => (
-                  <div key={item} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                    <span style={{ color: C.low, fontSize: 11, flexShrink: 0, lineHeight: 1.5 }}>✓</span>
-                    <span style={{ fontSize: 11, color: C.textMuted, lineHeight: 1.5 }}>{item}</span>
-                  </div>
-                ))}
-              </div>
-              <div style={{ marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
-                <span style={{ fontSize: 10, color: C.textMuted }}>
-                  Model: XGBoost v1.0.0 · Features: 8 behavioural vectors
-                </span>
-              </div>
+              {auditLog.length === 0 ? (
+                <p style={{ fontSize: 11, color: C.textMuted }}>No actions recorded yet.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {auditLog.map((entry) => (
+                    <div key={entry.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                      <span style={{
+                        fontSize: 9, fontWeight: 700, letterSpacing: '0.05em', flexShrink: 0, marginTop: 2,
+                        color: entry.action_type === 'restrict' ? C.critical : entry.action_type === 'label' ? C.low : C.textMuted,
+                        border: `1px solid ${entry.action_type === 'restrict' ? C.critical : entry.action_type === 'label' ? C.low : C.border}`,
+                        borderRadius: 2, padding: '1px 5px', textTransform: 'uppercase',
+                      }}>
+                        {entry.action_type}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: 0, fontSize: 11, color: C.textPrimary, lineHeight: 1.4 }}>{entry.message}</p>
+                        <p style={{ margin: 0, fontSize: 10, color: C.textMuted }}>{timeAgo(entry.created_at)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
           </div>

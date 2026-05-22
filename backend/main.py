@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database import AlertModel, EventModel, ModelMetricModel, UserModel, get_db, init_db, SessionLocal
+from database import AlertModel, AuditLogModel, CaseAlertModel, CaseModel, EventModel, ModelMetricModel, UserModel, get_db, init_db, SessionLocal
 from data.feature_engineering import FeatureEngineer
 from data.synthetic_generator import SyntheticGenerator
 from models.ensemble import EnsembleModel
@@ -29,6 +29,7 @@ from schemas import (
     HealthResponse,
     IntelligenceResponse,
     DailyCount,
+    DeptRiskItem,
     LabelRequest,
     ModelScores,
     NoteRequest,
@@ -41,6 +42,7 @@ from schemas import (
     SHAPValue,
     SimulateRequest,
     StatsResponse,
+    TimelineItem,
     UserDetailResponse,
     UserEventResponse,
     UserResponse,
@@ -54,25 +56,45 @@ engineer = FeatureEngineer()
 ensemble = EnsembleModel()
 _events_processed = 0
 _initialized = False
-_feed_buffer: list[dict] = []
 _MAX_FEED = 20
 MODEL_VERSION = "v1.0.0"
 SAVED_MODEL_DIR = os.path.join(os.path.dirname(__file__), "models", "saved")
 _startup_mode = "fresh"
 ALERT_THRESHOLD = 65  # single score threshold — no ground-truth split
+MANIFEST_PATH = os.path.join(SAVED_MODEL_DIR, "manifest.json")
+
+
+def _write_manifest(total_events: int = 0) -> None:
+    import models.lstm_autoencoder as _lstm_mod
+    xgb_n_est = 150
+    if ensemble.xgb_model._model is not None:
+        xgb_n_est = int(ensemble.xgb_model._model.n_estimators)
+    manifest = {
+        "version": MODEL_VERSION,
+        "trained_at": datetime.utcnow().isoformat(),
+        "training_events": total_events,
+        "isolation_forest": {"n_estimators": 100, "contamination": 0.1},
+        "lstm": {"seq_len": _lstm_mod.SEQ_LEN, "hidden_size": _lstm_mod.HIDDEN_SIZE},
+        "xgboost": {"n_estimators": xgb_n_est, "max_depth": 3},
+        "ensemble_weights": {"isolation_forest": 0.3, "lstm": 0.4, "xgboost": 0.3},
+    }
+    os.makedirs(SAVED_MODEL_DIR, exist_ok=True)
+    with open(MANIFEST_PATH, "w") as f:
+        json.dump(manifest, f, indent=2)
+
 
 # Columns accepted by EventModel (guards against stray keys from generator)
 _EVENT_COLS = {
     "id", "user_id", "user_name", "timestamp", "event_type", "department",
     "location", "hour", "device", "download_mb", "tx_count", "features_json",
-    "fraud_type", "is_fraud", "description", "risk_score",
+    "fraud_type", "is_fraud", "description", "risk_score", "event_source",
 }
 
 
 def _risk_level(score: float) -> str:
     if score >= 80:
         return "critical"
-    if score >= 60:
+    if score >= 65:
         return "high"
     if score >= 40:
         return "medium"
@@ -102,13 +124,13 @@ def _alert_from_row(row: AlertModel) -> AlertResponse:
     )
 
 
-def _case_name(fraud_types: set[str]) -> str:
+def _case_name(fraud_types: set[str], user_count: int = 1) -> str:
     if {"bulk_download", "cross_department_access"}.issubset(fraud_types):
         return "Data Exfiltration Attempt"
     if {"privilege_escalation", "off_hours_login"}.issubset(fraud_types):
         return "Privilege Abuse Sequence"
     if len(fraud_types) >= 3:
-        return "Coordinated Insider Threat"
+        return "Coordinated Insider Threat" if user_count > 1 else "Multi-Pattern Insider Threat"
     return "Escalating Insider Risk"
 
 
@@ -128,109 +150,6 @@ def _recall_from_scores(scores: list[float], labels: list[int]) -> float:
     return round(tp / len(actual_positive), 3)
 
 
-async def _seed_demo_labels() -> None:
-    """Seed labeled alerts + retrain XGBoost so the intelligence page always shows real metrics.
-
-    Runs after every cold start. Skips if ≥10 labels already exist (local dev with
-    a persisted DB). On HuggingFace the DB is always fresh, so this always runs.
-    """
-    async with SessionLocal() as db:
-        existing = await db.scalar(
-            select(func.count()).select_from(AlertModel).where(AlertModel.label.in_(["TP", "FP"]))
-        ) or 0
-        if existing >= 10:
-            logger.info("Demo seed skipped — %d labels already in DB", existing)
-            return
-
-        fraud_rows = (await db.execute(
-            select(EventModel)
-            .where(and_(EventModel.is_fraud == 1, EventModel.features_json != '{}'))
-            .limit(10)
-        )).scalars().all()
-
-        clean_rows = (await db.execute(
-            select(EventModel)
-            .where(and_(EventModel.is_fraud == 0, EventModel.features_json != '{}'))
-            .limit(5)
-        )).scalars().all()
-
-        seed_rows = fraud_rows + clean_rows
-        if len(seed_rows) < 5:
-            logger.warning("Demo seed skipped — not enough events with features yet")
-            return
-
-        seed: list[tuple[np.ndarray, int]] = []
-        for row in seed_rows:
-            try:
-                feat = np.array(json.loads(row.features_json), dtype=np.float32)
-                if len(feat) != 8:
-                    continue
-            except Exception:
-                continue
-
-            scores = ensemble.predict(row.user_id, feat)
-            risk_score = scores["ensemble"] * 100.0
-            shap_vals = ensemble.explain(feat)
-            label = "TP" if row.is_fraud == 1 else "FP"
-
-            db.add(AlertModel(
-                id=str(uuid.uuid4()),
-                user_id=row.user_id,
-                user_name=row.user_name,
-                timestamp=row.timestamp,
-                created_at=datetime.utcnow(),
-                risk_score=round(risk_score, 2),
-                fraud_type=row.fraud_type or "anomalous_behavior",
-                model_scores_json=json.dumps(scores),
-                shap_values_json=json.dumps(shap_vals),
-                status="resolved",
-                label=label,
-                event_id=row.id,
-                notes="",
-            ))
-            seed.append((feat, 1 if label == "TP" else 0))
-
-        await db.commit()
-
-    if len(seed) < 5:
-        return
-
-    X_seed = np.array([x for x, _ in seed], dtype=np.float32)
-    y_seed = np.array([y for _, y in seed], dtype=np.int32)
-
-    # Fix 3: 80/20 split — never evaluate on training data
-    split = max(1, int(len(seed) * 0.8))
-    X_train, y_train = X_seed[:split], y_seed[:split]
-    X_val, y_val = X_seed[split:], y_seed[split:]
-
-    ensemble.xgb_model.fit(X_train, y_train)
-    ensemble.save(SAVED_MODEL_DIR)
-
-    if len(X_val) > 0:
-        val_scores = ensemble.xgb_model.score_batch(X_val)
-        prec = _precision_from_scores(val_scores, list(y_val))
-        rec = _recall_from_scores(val_scores, list(y_val))
-    else:
-        val_scores = ensemble.xgb_model.score_batch(X_train)
-        prec = _precision_from_scores(val_scores, list(y_train))
-        rec = _recall_from_scores(val_scores, list(y_train))
-    f1 = round((2 * prec * rec) / max(0.001, prec + rec), 3)
-
-    async with SessionLocal() as db:
-        db.add(ModelMetricModel(
-            id=str(uuid.uuid4()),
-            model_name="XGBoost v1.0.0",
-            precision_before=round(prec, 3),
-            precision_after=round(prec, 3),
-            recall=round(rec, 3),
-            f1=f1,
-            labels_used=len(seed),
-        ))
-        await db.commit()
-
-    logger.info("Demo seed complete: %d labels, XGBoost retrained (P=%.3f R=%.3f F1=%.3f)",
-                len(seed), prec, rec, f1)
-
 
 async def _startup() -> None:
     global _initialized, _startup_mode
@@ -247,9 +166,8 @@ async def _startup() -> None:
             ensemble.load(SAVED_MODEL_DIR)
             _startup_mode = "cached"
             _initialized = True
-            logger.info("Models loaded from disk")
-            await _seed_demo_labels()
-            await _populate_feed_from_db()
+            logger.info("Models loaded from disk — rebuilding runtime state")
+            await _rebuild_runtime_state()
             return
 
         training_events = generator.generate_batch(
@@ -267,6 +185,7 @@ async def _startup() -> None:
             y_all.append(ev["is_fraud"])
             user_events.setdefault(ev["user_id"], []).append(feat)
             ev["features_json"] = json.dumps(feat.tolist())
+            ev["event_source"] = "training"
             db.add(EventModel(**{k: v for k, v in ev.items() if k in _EVENT_COLS}))
 
         await db.commit()
@@ -278,12 +197,10 @@ async def _startup() -> None:
     ensemble.fit(X, y, user_events)
     _startup_mode = "fresh"
     logger.info("Models trained fresh — saving to disk")
-
-    await _seed_demo_labels()
     ensemble.save(SAVED_MODEL_DIR)
+    _write_manifest(total_events=len(X_all))
     _initialized = True
     logger.info("Startup complete. Starting event loop.")
-    await _populate_feed_from_db()
 
 
 async def _process_event(ev: dict) -> None:
@@ -291,6 +208,7 @@ async def _process_event(ev: dict) -> None:
     _events_processed += 1
 
     force_alert = ev.pop("_force_alert", False)
+    ev["event_source"] = ev.pop("_source", "live")
 
     try:
         feat = engineer.compute_features(ev["user_id"], ev)
@@ -306,22 +224,6 @@ async def _process_event(ev: dict) -> None:
     ev["features_json"] = json.dumps(feat.tolist())
 
     alert_id = str(uuid.uuid4()) if risk_score >= ALERT_THRESHOLD else None
-
-    feed_entry = {
-        "id": ev["id"],
-        "user_id": ev["user_id"],
-        "user_name": ev["user_name"],
-        "timestamp": ev["timestamp"].isoformat(),
-        "event_type": ev["event_type"],
-        "risk_level": _risk_level(risk_score) if risk_score >= 40 else None,
-        "risk_score": round(risk_score, 1),
-        "description": ev["description"],
-        "is_anomalous": ev["is_fraud"] == 1 or risk_score >= 60,
-        "alert_id": alert_id,
-    }
-    _feed_buffer.insert(0, feed_entry)
-    if len(_feed_buffer) > _MAX_FEED:
-        _feed_buffer.pop()
 
     async with SessionLocal() as db:
         db.add(EventModel(**{k: v for k, v in ev.items() if k in _EVENT_COLS}))
@@ -348,7 +250,8 @@ async def _process_event(ev: dict) -> None:
                 notes="",
             )
             db.add(alert)
-            await db.flush()  # make alert visible to max() query below
+            await db.flush()  # make alert visible to subsequent queries
+            await _rebuild_cases_for_user(ev["user_id"], db)
 
         await _refresh_user_risk(ev["user_id"], db)
         await db.commit()
@@ -372,44 +275,116 @@ async def _refresh_user_risk(user_id: str, db: AsyncSession) -> None:
         user.risk_score = max(0.0, round(user.risk_score - 5.0, 2))
 
 
-async def _populate_feed_from_db() -> None:
-    """Pre-populate the in-memory feed buffer from the 20 most recent persisted events.
-
-    Runs at end of _startup so the feed is never empty on a fresh boot or cache load.
-    Rows come back newest-first; we build feed entries in that order so buffer[0] is newest.
-    """
+async def _rebuild_runtime_state() -> None:
+    """On cached startup, replay the last 20 events per user to restore
+    FeatureEngineer rolling windows and LSTM sequence buffers."""
+    from models.lstm_autoencoder import SEQ_LEN
     async with SessionLocal() as db:
-        rows = (await db.execute(
-            select(EventModel)
-            .order_by(desc(EventModel.timestamp))
-            .limit(_MAX_FEED)
-        )).scalars().all()
+        user_ids = (await db.execute(select(UserModel.id))).scalars().all()
+        for user_id in user_ids:
+            event_rows = (
+                await db.execute(
+                    select(EventModel)
+                    .where(and_(
+                        EventModel.user_id == user_id,
+                        EventModel.features_json != "{}",
+                    ))
+                    .order_by(desc(EventModel.timestamp))
+                    .limit(SEQ_LEN)
+                )
+            ).scalars().all()
+            for ev_row in reversed(event_rows):
+                try:
+                    ev_dict = {
+                        "user_id": ev_row.user_id,
+                        "hour": ev_row.hour,
+                        "tx_count": ev_row.tx_count,
+                        "department": ev_row.department,
+                        "download_mb": ev_row.download_mb,
+                        "location": ev_row.location,
+                        "device": ev_row.device,
+                        "event_type": ev_row.event_type,
+                    }
+                    feat = engineer.compute_features(user_id, ev_dict)
+                    ensemble.lstm_model.update_seq(user_id, feat)
+                except Exception:
+                    continue
+    logger.info("Runtime state rebuilt for %d users", len(user_ids))
 
-    for row in rows:
-        try:
-            feat = np.array(json.loads(row.features_json), dtype=np.float32)
-            if len(feat) == 8:
-                scores = ensemble.predict(row.user_id, feat)
-                risk_score = float(scores["ensemble"]) * 100.0
-            else:
-                risk_score = float(row.risk_score)
-        except Exception:
-            risk_score = float(row.risk_score)
 
-        _feed_buffer.append({
-            "id": row.id,
-            "user_id": row.user_id,
-            "user_name": row.user_name,
-            "timestamp": row.timestamp.isoformat(),
-            "event_type": row.event_type,
-            "risk_level": _risk_level(risk_score) if risk_score >= 40 else None,
-            "risk_score": round(risk_score, 1),
-            "description": row.description,
-            "is_anomalous": row.is_fraud == 1 or risk_score >= 60,
-            "alert_id": None,
-        })
+async def _rebuild_cases_for_user(user_id: str, db: AsyncSession) -> None:
+    """Upsert case records for alert chains belonging to user_id."""
+    since = datetime.utcnow() - timedelta(days=7)
+    alert_rows = (
+        await db.execute(
+            select(AlertModel)
+            .where(and_(AlertModel.user_id == user_id, AlertModel.timestamp >= since))
+            .order_by(AlertModel.timestamp)
+        )
+    ).scalars().all()
 
-    logger.info("Feed buffer pre-populated with %d events from DB", len(_feed_buffer))
+    chains: list[list[AlertModel]] = []
+    current: list[AlertModel] = []
+    for alert in alert_rows:
+        if not current:
+            current = [alert]
+            continue
+        if alert.timestamp <= current[-1].timestamp + timedelta(hours=24):
+            current.append(alert)
+        else:
+            if len(current) >= 3:
+                chains.append(current)
+            current = [alert]
+    if len(current) >= 3:
+        chains.append(current)
+
+    for rows in chains:
+        fraud_types = {r.fraud_type for r in rows if r.fraud_type}
+        max_risk = max(r.risk_score for r in rows)
+        severity = "critical" if max_risk >= 80 else "high" if max_risk >= 65 else "medium"
+        start_time = min(r.timestamp for r in rows)
+        end_time = max(r.timestamp for r in rows)
+        users = sorted({r.user_id for r in rows})
+        names = sorted({r.user_name for r in rows})
+        status = "open" if any(r.status == "open" for r in rows) else "resolved"
+        case_id = f"case-{rows[0].user_id}-{int(start_time.timestamp())}"
+
+        existing = await db.get(CaseModel, case_id)
+        if existing:
+            existing.name = _case_name(fraud_types, len(users))
+            existing.severity = severity
+            existing.status = status
+            existing.end_time = end_time
+            existing.user_ids_json = json.dumps(users)
+            existing.user_names_json = json.dumps(names)
+            existing.alert_count = len(rows)
+            existing.updated_at = datetime.utcnow()
+        else:
+            db.add(CaseModel(
+                id=case_id,
+                name=_case_name(fraud_types, len(users)),
+                severity=severity,
+                status=status,
+                start_time=start_time,
+                end_time=end_time,
+                user_ids_json=json.dumps(users),
+                user_names_json=json.dumps(names),
+                alert_count=len(rows),
+                updated_at=datetime.utcnow(),
+            ))
+
+        existing_links: set[str] = set(
+            (await db.execute(
+                select(CaseAlertModel.alert_id).where(CaseAlertModel.case_id == case_id)
+            )).scalars().all()
+        )
+        for r in rows:
+            if r.id not in existing_links:
+                db.add(CaseAlertModel(
+                    id=str(uuid.uuid4()),
+                    case_id=case_id,
+                    alert_id=r.id,
+                ))
 
 
 _LIVE_FRAUD_PATTERNS = ["off_hours_login", "bulk_download", "cross_department_access", "privilege_escalation", "velocity_spike"]
@@ -462,6 +437,46 @@ def ping():
     return {"status": "alive"}
 
 
+@app.get("/api/model-info")
+def get_model_info():
+    import models.lstm_autoencoder as _lstm_mod
+
+    xgb_n_est, xgb_max_depth, xgb_lr = 150, 3, 0.1
+    if ensemble.xgb_model._model is not None:
+        xgb_n_est = int(ensemble.xgb_model._model.n_estimators)
+        xgb_max_depth = int(ensemble.xgb_model._model.max_depth)
+        xgb_lr = float(ensemble.xgb_model._model.learning_rate)
+
+    if_contamination = 0.1
+    if_n_est = 100
+    if hasattr(ensemble.if_model, "_model") and ensemble.if_model._model is not None:
+        if_contamination = float(ensemble.if_model._model.contamination)
+        if_n_est = int(ensemble.if_model._model.n_estimators)
+
+    return {
+        "isolation_forest": {
+            "weight": 0.3,
+            "n_estimators": if_n_est,
+            "contamination": if_contamination,
+            "fitted": ensemble.if_model.is_fitted,
+        },
+        "lstm": {
+            "weight": 0.4,
+            "seq_len": _lstm_mod.SEQ_LEN,
+            "hidden_size": _lstm_mod.HIDDEN_SIZE,
+            "n_features": _lstm_mod.N_FEATURES,
+            "fitted": ensemble.lstm_model.is_fitted,
+        },
+        "xgboost": {
+            "weight": 0.3,
+            "n_estimators": xgb_n_est,
+            "max_depth": xgb_max_depth,
+            "learning_rate": xgb_lr,
+            "fitted": ensemble.xgb_model.is_fitted,
+        },
+    }
+
+
 # ---------------------------------------------------------------------------
 # Health
 # ---------------------------------------------------------------------------
@@ -484,29 +499,30 @@ async def health():
 
 @app.get("/api/stats", response_model=StatsResponse)
 async def get_stats(db: AsyncSession = Depends(get_db)):
-    today_start = datetime.combine(date.today(), time.min)
-    yesterday_start = today_start - timedelta(days=1)
+    now = datetime.utcnow()
+    window_24h = now - timedelta(hours=24)
+    window_48h = now - timedelta(hours=48)
 
     users_monitored = await db.scalar(select(func.count()).select_from(UserModel)) or 0
     alerts_today = await db.scalar(
-        select(func.count()).select_from(AlertModel).where(AlertModel.timestamp >= today_start)
+        select(func.count()).select_from(AlertModel).where(AlertModel.timestamp >= window_24h)
     ) or 0
     alerts_yesterday = await db.scalar(
         select(func.count()).select_from(AlertModel).where(
-            and_(AlertModel.timestamp >= yesterday_start, AlertModel.timestamp < today_start)
+            and_(AlertModel.timestamp >= window_48h, AlertModel.timestamp < window_24h)
         )
     ) or 0
     high_risk_count = await db.scalar(
         select(func.count()).select_from(AlertModel).where(
-            and_(AlertModel.risk_score >= 80, AlertModel.status == "open")
+            and_(AlertModel.risk_score >= 65, AlertModel.status == "open")
         )
     ) or 0
     high_risk_yesterday = await db.scalar(
         select(func.count()).select_from(AlertModel).where(
             and_(
-                AlertModel.risk_score >= 80,
-                AlertModel.timestamp >= yesterday_start,
-                AlertModel.timestamp < today_start,
+                AlertModel.risk_score >= 65,
+                AlertModel.timestamp >= window_48h,
+                AlertModel.timestamp < window_24h,
             )
         )
     ) or 0
@@ -562,7 +578,7 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
     ]
 
     events_today = await db.scalar(
-        select(func.count()).select_from(EventModel).where(EventModel.timestamp >= today_start)
+        select(func.count()).select_from(EventModel).where(EventModel.timestamp >= window_24h)
     ) or 0
 
     return StatsResponse(
@@ -580,12 +596,47 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
-# Live feed
+# Live feed — DB-backed, excludes training data, joins alert_id from alerts table
 # ---------------------------------------------------------------------------
 
 @app.get("/api/feed", response_model=List[FeedEvent])
-async def get_feed():
-    return [FeedEvent(**e) for e in _feed_buffer[:_MAX_FEED]]
+async def get_feed(db: AsyncSession = Depends(get_db)):
+    rows = (
+        await db.execute(
+            select(EventModel)
+            .where(EventModel.event_source.in_(["live", "simulation"]))
+            .order_by(desc(EventModel.timestamp))
+            .limit(_MAX_FEED)
+        )
+    ).scalars().all()
+
+    # Resolve alert_id for each event in one query
+    event_ids = [r.id for r in rows]
+    alert_map: dict[str, str] = {}
+    if event_ids:
+        alert_rows = (
+            await db.execute(
+                select(AlertModel.event_id, AlertModel.id)
+                .where(AlertModel.event_id.in_(event_ids))
+            )
+        ).all()
+        alert_map = {eid: aid for eid, aid in alert_rows}
+
+    return [
+        FeedEvent(
+            id=r.id,
+            user_id=r.user_id,
+            user_name=r.user_name,
+            timestamp=r.timestamp,
+            event_type=r.event_type,
+            risk_level=_risk_level(r.risk_score) if r.risk_score >= 40 else None,
+            risk_score=round(r.risk_score, 1),
+            description=r.description,
+            is_anomalous=r.is_fraud == 1 or r.risk_score >= 65,
+            alert_id=alert_map.get(r.id),
+        )
+        for r in rows
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -597,18 +648,21 @@ async def get_alerts(
     risk_level: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     time_range: Optional[str] = Query(None),
+    min_score: Optional[float] = Query(None, ge=0, le=100),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
     filters = []
+    if min_score is not None:
+        filters.append(AlertModel.risk_score >= min_score)
     if risk_level and risk_level != "all":
         if risk_level == "critical":
             filters.append(AlertModel.risk_score >= 80)
         elif risk_level == "high":
-            filters.append(and_(AlertModel.risk_score >= 60, AlertModel.risk_score < 80))
+            filters.append(and_(AlertModel.risk_score >= 65, AlertModel.risk_score < 80))
         elif risk_level == "medium":
-            filters.append(and_(AlertModel.risk_score >= 40, AlertModel.risk_score < 60))
+            filters.append(and_(AlertModel.risk_score >= 40, AlertModel.risk_score < 65))
         elif risk_level == "low":
             filters.append(AlertModel.risk_score < 40)
 
@@ -660,6 +714,9 @@ async def resolve_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
     if not row:
         raise HTTPException(404, "Alert not found")
     row.status = "resolved"
+    db.add(AuditLogModel(id=str(uuid.uuid4()), action_type="resolve", entity_type="alert",
+                         entity_id=alert_id, user_id=row.user_id, alert_id=alert_id,
+                         message=f"Alert resolved by investigator"))
     await db.commit()
     return {"status": "resolved"}
 
@@ -670,6 +727,9 @@ async def dismiss_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
     if not row:
         raise HTTPException(404, "Alert not found")
     row.status = "dismissed"
+    db.add(AuditLogModel(id=str(uuid.uuid4()), action_type="dismiss", entity_type="alert",
+                         entity_id=alert_id, user_id=row.user_id, alert_id=alert_id,
+                         message=f"Alert dismissed by investigator"))
     await db.commit()
     return {"status": "dismissed"}
 
@@ -683,6 +743,9 @@ async def label_alert(alert_id: str, body: LabelRequest, db: AsyncSession = Depe
         raise HTTPException(404, "Alert not found")
     row.label = body.label
     row.label_updated_at = datetime.utcnow()
+    db.add(AuditLogModel(id=str(uuid.uuid4()), action_type="label", entity_type="alert",
+                         entity_id=alert_id, user_id=row.user_id, alert_id=alert_id,
+                         message=f"Labeled as {body.label} by investigator"))
     await db.commit()
     return {"status": "labeled", "label": body.label}
 
@@ -693,6 +756,9 @@ async def note_alert(alert_id: str, body: NoteRequest, db: AsyncSession = Depend
     if not row:
         raise HTTPException(404, "Alert not found")
     row.notes = body.text
+    db.add(AuditLogModel(id=str(uuid.uuid4()), action_type="note", entity_type="alert",
+                         entity_id=alert_id, user_id=row.user_id, alert_id=alert_id,
+                         message=f"Note added: {body.text[:120]}"))
     await db.commit()
     return {"status": "ok"}
 
@@ -828,6 +894,75 @@ async def peer_comparison(alert_id: str, db: AsyncSession = Depends(get_db)):
     )
 
 
+@app.get("/api/alerts/{alert_id}/timeline", response_model=List[TimelineItem])
+async def get_alert_timeline(alert_id: str, db: AsyncSession = Depends(get_db)):
+    alert = await db.get(AlertModel, alert_id)
+    if not alert:
+        raise HTTPException(404, "Alert not found")
+
+    items: list[TimelineItem] = []
+
+    # 1. Preceding events (up to 8, before alert timestamp)
+    window_start = alert.timestamp - timedelta(hours=4)
+    event_rows = (
+        await db.execute(
+            select(EventModel)
+            .where(and_(
+                EventModel.user_id == alert.user_id,
+                EventModel.timestamp >= window_start,
+                EventModel.timestamp <= alert.timestamp,
+            ))
+            .order_by(EventModel.timestamp)
+            .limit(10)
+        )
+    ).scalars().all()
+
+    # Baseline: events more than 30min before alert
+    cutoff = alert.timestamp - timedelta(minutes=30)
+    for ev in event_rows:
+        kind = "baseline" if ev.timestamp < cutoff else "suspicious"
+        items.append(TimelineItem(
+            id=ev.id,
+            timestamp=ev.timestamp,
+            kind=kind,
+            title=ev.event_type.replace("_", " ").title(),
+            explanation=ev.description,
+            risk_delta=f"+{int(ev.risk_score)}" if ev.risk_score >= 40 else None,
+            source="event",
+        ))
+
+    # 2. Alert trigger itself
+    items.append(TimelineItem(
+        id=alert.id,
+        timestamp=alert.timestamp,
+        kind="trigger",
+        title=f"Alert triggered — {alert.fraud_type.replace('_', ' ').title()}",
+        explanation=f"Ensemble risk score: {int(alert.risk_score)}. Threshold: {ALERT_THRESHOLD}.",
+        risk_delta=f"+{int(alert.risk_score)}",
+        source="alert",
+    ))
+
+    # 3. Audit log entries after alert
+    audit_rows = (
+        await db.execute(
+            select(AuditLogModel)
+            .where(AuditLogModel.alert_id == alert_id)
+            .order_by(AuditLogModel.created_at)
+        )
+    ).scalars().all()
+    for entry in audit_rows:
+        items.append(TimelineItem(
+            id=entry.id,
+            timestamp=entry.created_at,
+            kind="analyst_action",
+            title=entry.action_type.replace("_", " ").title(),
+            explanation=entry.message,
+            source="audit_log",
+        ))
+
+    return sorted(items, key=lambda x: x.timestamp)
+
+
 # ---------------------------------------------------------------------------
 # Users
 # ---------------------------------------------------------------------------
@@ -892,6 +1027,9 @@ async def restrict_user(user_id: str, db: AsyncSession = Depends(get_db)):
     if not row:
         raise HTTPException(404, "User not found")
     row.restricted = 1
+    db.add(AuditLogModel(id=str(uuid.uuid4()), action_type="restrict", entity_type="user",
+                         entity_id=user_id, user_id=user_id,
+                         message=f"Access restricted for {row.name}"))
     await db.commit()
     return {"status": "restricted", "user_id": user_id}
 
@@ -902,72 +1040,130 @@ async def escalate_user(user_id: str, db: AsyncSession = Depends(get_db)):
     if not row:
         raise HTTPException(404, "User not found")
     row.escalated = 1
+    db.add(AuditLogModel(id=str(uuid.uuid4()), action_type="escalate", entity_type="user",
+                         entity_id=user_id, user_id=user_id,
+                         message=f"Case escalated for {row.name}"))
     await db.commit()
     return {"status": "escalated", "user_id": user_id}
 
 
 @app.get("/api/cases", response_model=List[CaseResponse])
 async def get_cases(db: AsyncSession = Depends(get_db)):
-    since = datetime.utcnow() - timedelta(days=7)
-    alerts = (
+    case_rows = (
         await db.execute(
-            select(AlertModel)
-            .where(AlertModel.timestamp >= since)
-            .order_by(AlertModel.user_id, AlertModel.timestamp)
-            .limit(2000)
+            select(CaseModel).order_by(CaseModel.updated_at.desc()).limit(20)
         )
     ).scalars().all()
 
-    grouped: list[list[AlertModel]] = []
-    by_user: dict[str, list[AlertModel]] = {}
-    for alert in alerts:
-        by_user.setdefault(alert.user_id, []).append(alert)
-
-    for rows in by_user.values():
-        current: list[AlertModel] = []
-        for alert in rows:
-            if not current:
-                current = [alert]
-                continue
-            # Fix 4: sliding window — anchored to last alert in chain, not first
-            if alert.timestamp <= current[-1].timestamp + timedelta(hours=24):
-                current.append(alert)
-            else:
-                if len(current) >= 3:
-                    grouped.append(current)
-                current = [alert]
-        if len(current) >= 3:
-            grouped.append(current)
-
     cases: list[CaseResponse] = []
-    for rows in grouped:
-        fraud_types = {r.fraud_type for r in rows if r.fraud_type}
-        max_risk = max(r.risk_score for r in rows)
-        severity = "critical" if max_risk >= 80 else "high" if max_risk >= 60 else "medium"
-        start_time = min(r.timestamp for r in rows)
-        end_time = max(r.timestamp for r in rows)
-        users = sorted({r.user_id for r in rows})
-        names = sorted({r.user_name for r in rows})
-        status = "open" if any(r.status == "open" for r in rows) else "resolved"
-        case_id = f"case-{rows[0].user_id}-{int(start_time.timestamp())}"
-        cases.append(
-            CaseResponse(
-                id=case_id,
-                name=_case_name(fraud_types),
-                severity=severity,
-                users_involved=users,
-                user_names=names,
-                start_time=start_time,
-                end_time=end_time,
-                linked_alerts_count=len(rows),
-                status=status,
-                alerts=[_alert_from_row(r) for r in rows],
+    for row in case_rows:
+        alert_ids = (
+            await db.execute(
+                select(CaseAlertModel.alert_id).where(CaseAlertModel.case_id == row.id)
             )
-        )
+        ).scalars().all()
+        if not alert_ids:
+            continue
+        alert_rows = (
+            await db.execute(
+                select(AlertModel).where(AlertModel.id.in_(alert_ids))
+                .order_by(AlertModel.timestamp)
+            )
+        ).scalars().all()
+        if not alert_rows:
+            continue
+        cases.append(CaseResponse(
+            id=row.id,
+            name=row.name,
+            severity=row.severity,
+            users_involved=json.loads(row.user_ids_json),
+            user_names=json.loads(row.user_names_json),
+            start_time=row.start_time,
+            end_time=row.end_time,
+            linked_alerts_count=row.alert_count,
+            status=row.status,
+            alerts=[_alert_from_row(r) for r in alert_rows],
+        ))
 
     _sev = {"critical": 0, "high": 1, "medium": 2}
     cases.sort(key=lambda c: (_sev.get(c.severity, 3), -c.start_time.timestamp()))
     return cases[:10]
+
+
+@app.get("/api/cases/{case_id}/timeline", response_model=List[TimelineItem])
+async def get_case_timeline(case_id: str, db: AsyncSession = Depends(get_db)):
+    case_row = await db.get(CaseModel, case_id)
+    if not case_row:
+        raise HTTPException(404, "Case not found")
+
+    alert_ids = (
+        await db.execute(
+            select(CaseAlertModel.alert_id).where(CaseAlertModel.case_id == case_id)
+        )
+    ).scalars().all()
+    target_chain = (
+        await db.execute(
+            select(AlertModel).where(AlertModel.id.in_(alert_ids))
+            .order_by(AlertModel.timestamp)
+        )
+    ).scalars().all()
+
+    if not target_chain:
+        return []
+
+    items: list[TimelineItem] = []
+    chain_start = min(a.timestamp for a in target_chain)
+    chain_end = max(a.timestamp for a in target_chain)
+    chain_user_ids = list({a.user_id for a in target_chain})
+
+    # Real events from DB in the case window
+    event_rows = (
+        await db.execute(
+            select(EventModel)
+            .where(and_(
+                EventModel.user_id.in_(chain_user_ids),
+                EventModel.timestamp >= chain_start - timedelta(minutes=30),
+                EventModel.timestamp <= chain_end + timedelta(minutes=30),
+            ))
+            .order_by(EventModel.timestamp)
+            .limit(50)
+        )
+    ).scalars().all()
+
+    alert_timestamps = {a.timestamp for a in target_chain}
+    for ev in event_rows:
+        is_alert_event = any(abs((ev.timestamp - at).total_seconds()) < 5 for at in alert_timestamps)
+        kind = "trigger" if is_alert_event else ("suspicious" if ev.is_fraud else "baseline")
+        items.append(TimelineItem(
+            id=ev.id,
+            timestamp=ev.timestamp,
+            kind=kind,
+            title=ev.event_type.replace("_", " ").title(),
+            explanation=ev.description,
+            risk_delta=f"+{int(ev.risk_score)}" if ev.risk_score >= 40 else None,
+            source="event",
+        ))
+
+    # Audit log entries for all alerts in the chain
+    chain_alert_ids = [a.id for a in target_chain]
+    audit_rows = (
+        await db.execute(
+            select(AuditLogModel)
+            .where(AuditLogModel.alert_id.in_(chain_alert_ids))
+            .order_by(AuditLogModel.created_at)
+        )
+    ).scalars().all()
+    for entry in audit_rows:
+        items.append(TimelineItem(
+            id=entry.id,
+            timestamp=entry.created_at,
+            kind="analyst_action",
+            title=entry.action_type.replace("_", " ").title(),
+            explanation=entry.message,
+            source="audit_log",
+        ))
+
+    return sorted(items, key=lambda x: x.timestamp)
 
 
 @app.get("/api/users/{user_id}", response_model=UserDetailResponse)
@@ -1070,6 +1266,39 @@ async def get_user_events(
     ]
 
 
+@app.get("/api/audit-log")
+async def get_audit_log(
+    user_id: Optional[str] = Query(None),
+    alert_id: Optional[str] = Query(None),
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    filters = []
+    if user_id:
+        filters.append(AuditLogModel.user_id == user_id)
+    if alert_id:
+        filters.append(AuditLogModel.alert_id == alert_id)
+    where = and_(*filters) if filters else True
+    rows = (
+        await db.execute(
+            select(AuditLogModel).where(where).order_by(desc(AuditLogModel.created_at)).limit(limit)
+        )
+    ).scalars().all()
+    return [
+        {
+            "id": r.id,
+            "created_at": r.created_at.isoformat(),
+            "action_type": r.action_type,
+            "entity_type": r.entity_type,
+            "entity_id": r.entity_id,
+            "user_id": r.user_id,
+            "alert_id": r.alert_id,
+            "message": r.message,
+        }
+        for r in rows
+    ]
+
+
 @app.get("/api/intelligence", response_model=IntelligenceResponse)
 async def get_intelligence(db: AsyncSession = Depends(get_db)):
     now = datetime.utcnow()
@@ -1167,6 +1396,25 @@ async def get_intelligence(db: AsyncSession = Depends(get_db)):
     ) or 0
     anomaly_rate = round((alerts_24h / max(1, events_24h)) * 100, 1)
 
+    dept_rows = (
+        await db.execute(
+            select(
+                UserModel.department,
+                func.avg(AlertModel.risk_score).label("avg_risk"),
+                func.count(AlertModel.id).label("alert_count"),
+            )
+            .join(UserModel, AlertModel.user_id == UserModel.id)
+            .where(AlertModel.timestamp >= seven_days_ago)
+            .group_by(UserModel.department)
+            .order_by(desc("avg_risk"))
+            .limit(8)
+        )
+    ).all()
+    dept_risk = [
+        DeptRiskItem(department=r.department, avg_risk=round(float(r.avg_risk), 1), alert_count=r.alert_count)
+        for r in dept_rows
+    ]
+
     return IntelligenceResponse(
         precision=precision,
         recall=recall,
@@ -1180,6 +1428,7 @@ async def get_intelligence(db: AsyncSession = Depends(get_db)):
         last_retrain_ts=last_retrain_ts,
         training_events=total_events,
         anomaly_rate=anomaly_rate,
+        department_risk_breakdown=dept_risk,
     )
 
 
@@ -1200,6 +1449,7 @@ async def simulate(body: SimulateRequest = None):
     pattern = _SCENARIO_PATTERNS.get(body.scenario or "") if body.scenario else None
     ev = generator.generate_forced_fraud(pattern) if pattern else generator.generate_one()
     ev["_force_alert"] = True
+    ev["_source"] = "simulation"
     await _process_event(ev)  # await so alert is in DB before response returns
     return {"status": "ok", "event_id": ev["id"], "scenario": body.scenario}
 
@@ -1239,10 +1489,19 @@ async def retrain(db: AsyncSession = Depends(get_db)):
 
     X_arr = np.array(X)
     y_arr = np.array(y)
+
+    tp_count = int(y_arr.sum())
+    fp_count = int(len(y_arr) - tp_count)
+    if tp_count == 0 or fp_count == 0:
+        return RetrainResponse(
+            status="skipped",
+            message=f"Need both TP and FP labels (have {tp_count} TP, {fp_count} FP)",
+            labels_used=len(X),
+        )
+
     precision_before = _precision_from_scores(ensemble.xgb_model.score_batch(X_arr), list(y_arr))
 
     ensemble.xgb_model.fit(X_arr, y_arr)
-    ensemble.save(SAVED_MODEL_DIR)
 
     # Compute metrics on held-out validation set: last 400 events with feature vectors
     val_event_rows = (
@@ -1275,6 +1534,22 @@ async def retrain(db: AsyncSession = Depends(get_db)):
         recall_after = _recall_from_scores(after_scores, list(y_arr))
 
     f1_after = round((2 * precision_after * recall_after) / max(0.001, precision_after + recall_after), 3)
+
+    # Rollback if new model is significantly worse than baseline
+    if precision_after < precision_before - 0.1:
+        ensemble.load(SAVED_MODEL_DIR)
+        return RetrainResponse(
+            status="skipped",
+            message=f"Retrain rejected — precision dropped {precision_before:.3f}→{precision_after:.3f} (>0.1). Old model restored.",
+            precision_before=precision_before,
+            precision_after=round(precision_after, 3),
+            recall_after=recall_after,
+            f1_after=f1_after,
+            labels_used=len(X),
+        )
+
+    ensemble.save(SAVED_MODEL_DIR)
+    _write_manifest()
 
     db.add(ModelMetricModel(
         id=str(uuid.uuid4()),

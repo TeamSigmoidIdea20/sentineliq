@@ -9,18 +9,10 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import type { Intelligence } from '@/lib/api'
+import type { Intelligence, DeptRiskItem } from '@/lib/api'
 import { formatFraudType } from '@/lib/api'
 import { C } from '@/lib/tokens'
 
-const DEPT_DATA = [
-  { d: 'Treasury',   risk: 78, alerts: 11 },
-  { d: 'Corporate',  risk: 54, alerts: 6  },
-  { d: 'Risk',       risk: 41, alerts: 4  },
-  { d: 'Audit',      risk: 32, alerts: 2  },
-  { d: 'Retail',     risk: 28, alerts: 7  },
-  { d: 'Operations', risk: 24, alerts: 3  },
-]
 
 function Panel({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
   return (
@@ -35,17 +27,7 @@ function Panel({ title, sub, children }: { title: string; sub?: string; children
 }
 
 export default function IntelligenceCharts({ data }: { data: Intelligence }) {
-  const anomDist = data.anomaly_type_breakdown.length > 0
-    ? data.anomaly_type_breakdown
-    : [
-        { fraud_type: 'off_hours_login',         count: 142 },
-        { fraud_type: 'bulk_download',           count: 98  },
-        { fraud_type: 'cross_department_access', count: 76  },
-        { fraud_type: 'velocity_spike',          count: 53  },
-        { fraud_type: 'privilege_escalation',    count: 24  },
-      ]
-
-  const sortedAnom = [...anomDist].sort((a, b) => b.count - a.count)
+  const sortedAnom = [...data.anomaly_type_breakdown].sort((a, b) => b.count - a.count)
   const maxCount = Math.max(...sortedAnom.map(a => a.count), 1)
   const totalAnom = sortedAnom.reduce((s, a) => s + a.count, 0)
 
@@ -80,6 +62,9 @@ export default function IntelligenceCharts({ data }: { data: Intelligence }) {
 
         {/* Anomaly distribution */}
         <Panel title="Anomaly distribution" sub={`Last 7 days · ${totalAnom} total`}>
+          {sortedAnom.length === 0 ? (
+            <p style={{ color: C.textMuted, fontSize: 11, margin: 0 }}>No anomalies detected yet.</p>
+          ) : null}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {sortedAnom.map((a, i) => {
               const w = (a.count / maxCount * 100).toFixed(1)
@@ -103,21 +88,25 @@ export default function IntelligenceCharts({ data }: { data: Intelligence }) {
 
         {/* Department risk */}
         <Panel title="Department risk" sub="7-day average">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {DEPT_DATA.map((d, i) => {
-              const barColor = d.risk > 70 ? C.critical : d.risk > 50 ? C.medium : C.low
-              return (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 72, fontSize: 11.5, color: C.textPrimary, flexShrink: 0 }}>{d.d}</div>
-                  <div style={{ flex: 1, position: 'relative', height: 18, background: C.bg, borderRadius: 3 }}>
-                    <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${d.risk}%`, background: barColor, opacity: 0.85, borderRadius: 3 }} />
-                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', paddingLeft: 7, fontFamily: 'monospace', fontSize: 11, color: C.textPrimary, fontWeight: 600 }}>{d.risk}</div>
+          {data.department_risk_breakdown.length === 0 ? (
+            <p style={{ color: C.textMuted, fontSize: 11, margin: 0 }}>No alert data yet.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {data.department_risk_breakdown.map((d: DeptRiskItem, i: number) => {
+                const barColor = d.avg_risk > 70 ? C.critical : d.avg_risk > 50 ? C.medium : C.low
+                return (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 72, fontSize: 11.5, color: C.textPrimary, flexShrink: 0 }}>{d.department}</div>
+                    <div style={{ flex: 1, position: 'relative', height: 18, background: C.bg, borderRadius: 3 }}>
+                      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.min(100, d.avg_risk)}%`, background: barColor, opacity: 0.85, borderRadius: 3 }} />
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', paddingLeft: 7, fontFamily: 'monospace', fontSize: 11, color: C.textPrimary, fontWeight: 600 }}>{d.avg_risk.toFixed(0)}</div>
+                    </div>
+                    <div style={{ width: 52, textAlign: 'right', fontSize: 10, color: C.textMuted, flexShrink: 0 }}>{d.alert_count} alerts</div>
                   </div>
-                  <div style={{ width: 52, textAlign: 'right', fontSize: 10, color: C.textMuted, flexShrink: 0 }}>{d.alerts} alerts</div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          )}
         </Panel>
 
       </div>

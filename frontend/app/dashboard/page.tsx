@@ -57,7 +57,7 @@ export default function DashboardPage() {
 
   const fetchAlerts = useCallback(async () => {
     try {
-      const res = await api.alerts({ page: 1 })
+      const res = await api.alerts({ page: 1, status: 'open' })
       const incoming = res.alerts
       if (prevAlertIds.current.size > 0) {
         const fresh = incoming.filter((a) => !prevAlertIds.current.has(a.id))
@@ -284,10 +284,10 @@ export default function DashboardPage() {
               loading={statsLoading}
             />
             <StatCard
-              label="Alerts Today"
+              label="Alerts 24h"
               value={stats?.alerts_today ?? '—'}
               change={stats?.alerts_change}
-              sub="vs yesterday"
+              sub="vs prior 24h"
               loading={statsLoading}
               accent="red"
             />
@@ -295,14 +295,14 @@ export default function DashboardPage() {
               label="High Risk"
               value={stats?.high_risk_count ?? '—'}
               change={stats?.high_risk_change}
-              sub="open alerts ≥80"
+              sub="open alerts ≥65"
               loading={statsLoading}
               accent="red"
             />
             <StatCard
               label="False Positive Rate"
               value={stats ? `${stats.false_positive_rate}%` : '—'}
-              sub={stats ? `${stats.labels_collected} labels collected · next retrain in ${stats.next_retrain_in}` : 'from labeled alerts'}
+              sub={stats ? `${stats.labels_collected} labels collected · last retrain ${stats.next_retrain_in}` : 'from labeled alerts'}
               loading={statsLoading}
               accent="green"
             />
@@ -316,7 +316,7 @@ export default function DashboardPage() {
             }}>
               <span style={{ fontSize: 11, color: C.textMuted }}>
                 <span style={{ color: C.textPrimary, fontWeight: 700 }}>{stats.labels_collected}</span>
-                {' '}analyst labels collected — next retrain in{' '}
+                {' '}analyst labels collected — last retrain{' '}
                 <span style={{ color: C.textPrimary, fontWeight: 700 }}>{stats.next_retrain_in}</span>
               </span>
               <span style={{ fontSize: 10, padding: '2px 7px', border: `1px solid ${C.border}`, borderRadius: 2, color: C.textMuted, marginLeft: 'auto' }}>
@@ -349,7 +349,7 @@ export default function DashboardPage() {
                         <div style={{ width: 40, height: 10, background: '#30363D', borderRadius: 2 }} />
                       </div>
                     ))
-                  : alerts.filter(a => a.risk_score >= 50).slice(0, 10).map((alert) => {
+                  : alerts.slice(0, 10).map((alert) => {
                       const color =
                         alert.risk_level === 'critical' || alert.risk_level === 'high'
                           ? C.critical

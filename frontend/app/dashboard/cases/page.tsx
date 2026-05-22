@@ -3,87 +3,18 @@
 import { useEffect, useState } from 'react'
 import Sidebar from '@/components/Sidebar'
 import AlertPanel from '@/components/AlertPanel'
-import { api, type Alert, type CaseItem, formatFraudType, timeAgo, normaliseIso } from '@/lib/api'
+import { api, type Alert, type CaseItem, type TimelineItem, formatFraudType, timeAgo, normaliseIso } from '@/lib/api'
 import { C } from '@/lib/tokens'
 
 const CASE_EXPLANATIONS: Record<string, string> = {
-  'Coordinated Insider Threat': 'Multiple distinct fraud patterns detected from the same user within a 24-hour window — suggesting deliberate insider activity.',
+  'Coordinated Insider Threat': 'Multiple fraud patterns detected across several users in a 24-hour window — suggesting coordinated insider activity.',
+  'Multi-Pattern Insider Threat': 'Three or more distinct fraud patterns detected from a single user within a 24-hour window — indicating deliberate, multi-vector insider activity.',
   'Data Exfiltration Attempt': 'Bulk downloads combined with cross-department access — consistent with data aggregation before extraction.',
   'Privilege Abuse Sequence': 'Repeated privilege escalation combined with off-hours access — indicates active boundary probing.',
   'Treasury Manipulation': 'Velocity spikes combined with account modifications in treasury — consistent with financial manipulation.',
   'Escalating Insider Risk': 'Risk score trending upward across multiple sessions — cumulative pattern warrants heightened monitoring.',
 }
 
-interface TLEntry {
-  time: string
-  relMin: number
-  tag: string
-  tagColor: string
-  dotColor: string
-  text: string
-  bold?: boolean
-}
-
-const FRAUD_TO_TAG: Record<string, { tag: string; color: string }> = {
-  off_hours_login:         { tag: 'Auth',    color: C.critical },
-  bulk_download:           { tag: 'Export',  color: C.medium },
-  cross_department_access: { tag: 'Anomaly', color: C.critical },
-  privilege_escalation:    { tag: 'Perm Δ', color: C.critical },
-  velocity_spike:          { tag: 'Anomaly', color: C.critical },
-  anomalous_behavior:      { tag: 'Alert',   color: C.critical },
-}
-
-function buildTimeline(alerts: Alert[]): TLEntry[] {
-  if (!alerts.length) return []
-  const sorted = [...alerts].sort((a, b) => new Date(normaliseIso(a.timestamp)).getTime() - new Date(normaliseIso(b.timestamp)).getTime())
-  const refTime = new Date(normaliseIso(sorted[sorted.length - 1].timestamp)).getTime()
-
-  const entries: TLEntry[] = []
-
-  sorted.forEach(alert => {
-    const alertMs = new Date(normaliseIso(alert.timestamp)).getTime()
-    const fraudInfo = FRAUD_TO_TAG[alert.fraud_type] ?? { tag: 'Alert', color: C.critical }
-
-    // Precursor event 4 minutes before the alert
-    const preMs = alertMs - 4 * 60000
-    entries.push({
-      time: new Date(preMs).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      relMin: Math.round((preMs - refTime) / 60000),
-      tag: fraudInfo.tag === 'Auth' ? 'Auth' : fraudInfo.tag === 'Perm Δ' ? 'Perm Δ' : 'Data',
-      tagColor: fraudInfo.tag === 'Perm Δ' ? C.critical : C.textMuted,
-      dotColor: C.textMuted,
-      text: fraudInfo.tag === 'Auth'
-        ? `${alert.user_name.split(' ')[0]} logged in from corporate device`
-        : fraudInfo.tag === 'Perm Δ'
-        ? `${alert.user_name.split(' ')[0]} invoked elevated permissions`
-        : `${alert.user_name.split(' ')[0]} performed ${formatFraudType(alert.fraud_type).toLowerCase()}`,
-    })
-
-    // The alert event itself
-    entries.push({
-      time: new Date(alertMs).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      relMin: Math.round((alertMs - refTime) / 60000),
-      tag: 'Alert',
-      tagColor: C.critical,
-      dotColor: C.critical,
-      text: `${alert.id.slice(0, 8).toUpperCase()} — ${formatFraudType(alert.fraud_type)} flagged · ensemble ${(alert.model_scores.isolation_forest * 0.3 + alert.model_scores.lstm * 0.4 + alert.model_scores.xgboost * 0.3).toFixed(2)}`,
-      bold: true,
-    })
-  })
-
-  // Final action entry
-  const lastMs = new Date(normaliseIso(sorted[sorted.length - 1].timestamp)).getTime() + 2 * 60000
-  entries.push({
-    time: new Date(lastMs).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-    relMin: 0,
-    tag: 'Action',
-    tagColor: C.low,
-    dotColor: C.low,
-    text: 'Case queued for analyst review',
-  })
-
-  return entries.sort((a, b) => a.relMin - b.relMin)
-}
 
 function CaseCard({ item, active, onClick }: { item: CaseItem; active: boolean; onClick: () => void }) {
   const [hov, setHov] = useState(false)
@@ -130,37 +61,69 @@ function CaseCard({ item, active, onClick }: { item: CaseItem; active: boolean; 
   )
 }
 
-function StitchedTimeline({ alerts }: { alerts: Alert[] }) {
-  const entries = buildTimeline(alerts)
-  if (!entries.length) return <p style={{ color: C.textMuted, fontSize: 12, padding: '12px 0' }}>No timeline data.</p>
+const KIND_TAG: Record<TimelineItem['kind'], { tag: string; color: string }> = {
+  baseline:       { tag: 'BASE',   color: C.textMuted },
+  suspicious:     { tag: 'WARN',   color: C.medium },
+  trigger:        { tag: 'ALERT',  color: C.critical },
+  analyst_action: { tag: 'ACTION', color: C.low },
+}
+
+function CaseTimeline({ caseId }: { caseId: string }) {
+  const [items, setItems] = useState<TimelineItem[]>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!caseId) return
+    setLoading(true)
+    api.caseTimeline(caseId)
+      .then(setItems)
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false))
+  }, [caseId])
+
+  if (loading) return <p style={{ color: C.textMuted, fontSize: 12, padding: '12px 0' }}>Loading timeline…</p>
+  if (!items.length) return <p style={{ color: C.textMuted, fontSize: 12, padding: '12px 0' }}>No timeline data.</p>
 
   return (
     <div style={{ position: 'relative', paddingLeft: 22 }}>
       <div style={{ position: 'absolute', left: 5, top: 8, bottom: 8, width: 1, background: C.border }} />
-      {entries.map((e, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: i < entries.length - 1 ? 14 : 0, position: 'relative' }}>
-          <div style={{
-            position: 'absolute', left: -17, top: 4,
-            width: 9, height: 9, borderRadius: '50%',
-            background: e.dotColor, border: `2px solid ${C.card}`,
-          }} />
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flex: 1, minWidth: 0 }}>
-            <div style={{ flexShrink: 0, lineHeight: 1 }}>
-              <div style={{ fontSize: 10, color: C.textMuted, fontFamily: 'monospace' }}>{e.time}</div>
+      {items.map((item, i) => {
+        const { tag, color } = KIND_TAG[item.kind] ?? { tag: 'EVENT', color: C.textMuted }
+        const bold = item.kind === 'trigger'
+        const ts = new Date(normaliseIso(item.timestamp)).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        return (
+          <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: i < items.length - 1 ? 14 : 0, position: 'relative' }}>
+            <div style={{
+              position: 'absolute', left: -17, top: 4,
+              width: 9, height: 9, borderRadius: '50%',
+              background: color, border: `2px solid ${C.card}`,
+            }} />
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, flex: 1, minWidth: 0 }}>
+              <div style={{ flexShrink: 0, lineHeight: 1, paddingTop: 1 }}>
+                <div style={{ fontSize: 10, color: C.textMuted, fontFamily: 'monospace' }}>{ts}</div>
+              </div>
+              <span style={{
+                fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 3,
+                border: `1px solid ${color}`, color,
+                flexShrink: 0, letterSpacing: '0.04em', lineHeight: 1.4,
+              }}>{tag}</span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{
+                  fontSize: 11, color: bold ? color : C.textPrimary,
+                  fontWeight: bold ? 600 : 400,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>{item.title}</div>
+                {item.explanation && (
+                  <div style={{ fontSize: 10, color: C.textMuted, marginTop: 2 }}>{item.explanation}</div>
+                )}
+                {item.risk_delta && (
+                  <div style={{ fontSize: 10, color: C.medium, marginTop: 1 }}>{item.risk_delta}</div>
+                )}
+              </div>
             </div>
-            <span style={{
-              fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 3,
-              border: `1px solid ${e.tagColor}`, color: e.tagColor,
-              flexShrink: 0, letterSpacing: '0.04em', lineHeight: 1.4,
-            }}>{e.tag}</span>
-            <span style={{
-              fontSize: 11, color: e.bold ? e.tagColor : C.textPrimary,
-              fontWeight: e.bold ? 600 : 400,
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>{e.text}</span>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -244,9 +207,9 @@ export default function CasesPage() {
                 {view === 'timeline' ? (
                   <div>
                     <p style={{ margin: '0 0 16px', fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
-                      Stitched timeline <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>· {selectedCase.linked_alerts_count * 2 + 1} events</span>
+                      Investigation Timeline
                     </p>
-                    <StitchedTimeline alerts={selectedCase.alerts} />
+                    <CaseTimeline caseId={selectedCase.id} />
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>

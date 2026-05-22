@@ -89,6 +89,16 @@ class UserEventResponse(BaseModel):
     fraud_type: Optional[str] = None
 
 
+class TimelineItem(BaseModel):
+    id: str
+    timestamp: datetime
+    kind: str          # baseline | suspicious | trigger | analyst_action
+    title: str
+    explanation: str
+    risk_delta: Optional[str] = None
+    source: str        # event | alert | audit_log
+
+
 class PeerComparisonMetric(BaseModel):
     metric: str
     user_value: float
@@ -121,6 +131,12 @@ class DailyCount(BaseModel):
     count: int
 
 
+class DeptRiskItem(BaseModel):
+    department: str
+    avg_risk: float
+    alert_count: int
+
+
 class BreakdownItem(BaseModel):
     fraud_type: str
     count: int
@@ -146,6 +162,7 @@ class IntelligenceResponse(BaseModel):
     last_retrain_ts: Optional[str] = None
     training_events: int = 0
     anomaly_rate: float = 0.0
+    department_risk_breakdown: List[DeptRiskItem] = []
 
 
 class CoordinatedPattern(BaseModel):

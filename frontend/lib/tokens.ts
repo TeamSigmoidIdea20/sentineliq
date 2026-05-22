@@ -12,15 +12,14 @@ export const C = {
 } as const
 
 export function riskColor(score: number): string {
-  if (score >= 80) return C.critical
-  if (score >= 60) return C.critical
+  if (score >= 65) return C.critical
   if (score >= 40) return C.medium
   return C.low
 }
 
 export function riskLevel(score: number): 'critical' | 'high' | 'medium' | 'low' {
   if (score >= 80) return 'critical'
-  if (score >= 60) return 'high'
+  if (score >= 65) return 'high'
   if (score >= 40) return 'medium'
   return 'low'
 }

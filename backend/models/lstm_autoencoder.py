@@ -97,6 +97,13 @@ class LSTMAutoencoderModel:
         self._net = net
         self.is_fitted = True
 
+    def update_seq(self, user_id: str, features: np.ndarray) -> None:
+        """Append features to the user's sequence buffer without scoring."""
+        if user_id not in self._user_seqs:
+            self._user_seqs[user_id] = deque(maxlen=SEQ_LEN)
+        scaled = self._scale(features) if self._scaler_mean is not None else features
+        self._user_seqs[user_id].append(scaled.astype(np.float32))
+
     def _get_seq(self, user_id: str, features: np.ndarray) -> np.ndarray:
         if user_id not in self._user_seqs:
             self._user_seqs[user_id] = deque(maxlen=SEQ_LEN)
@@ -111,12 +118,9 @@ class LSTMAutoencoderModel:
             seq = pad + seq
         return np.array(seq, dtype=np.float32)
 
-    def score(self, user_id: str, features: np.ndarray) -> float:
-        """Returns anomaly score [0, 1]. Higher = more anomalous."""
-        seq = self._get_seq(user_id, features)
+    def _score_seq(self, seq: np.ndarray) -> float:
         if not self.is_fitted or self._net is None or not TORCH_AVAILABLE:
             return 0.5
-
         import torch
         with torch.no_grad():
             x = torch.tensor(seq[None], dtype=torch.float32)
@@ -124,6 +128,11 @@ class LSTMAutoencoderModel:
             error = float(((out - x) ** 2).mean().item())
         normalized = error / (self._threshold + 1e-8)
         return float(np.clip(normalized, 0.0, 1.0))
+
+    def score(self, user_id: str, features: np.ndarray) -> float:
+        """Update sequence buffer, then return anomaly score [0, 1]."""
+        seq = self._get_seq(user_id, features)
+        return self._score_seq(seq)
 
     def save(self, path: str) -> None:
         if not TORCH_AVAILABLE or self._net is None:

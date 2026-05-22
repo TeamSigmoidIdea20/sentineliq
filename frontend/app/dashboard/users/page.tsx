@@ -5,7 +5,7 @@ import Sidebar from '@/components/Sidebar'
 import UserTable from '@/components/UserTable'
 import SHAPChart from '@/components/SHAPChart'
 import RiskBadge from '@/components/RiskBadge'
-import { api, type User, type UserDetail, timeAgo } from '@/lib/api'
+import { api, type User, type UserDetail, type AuditEntry, timeAgo } from '@/lib/api'
 import { C, riskColor, riskLevel } from '@/lib/tokens'
 
 function RiskHistoryChart({ history }: { history: { date: string; score: number }[] }) {
@@ -47,12 +47,14 @@ function UserProfilePanel({
   const [restricted, setRestricted] = useState(false)
   const [escalated, setEscalated] = useState(false)
   const [banner, setBanner] = useState<{ text: string; color: string } | null>(null)
+  const [auditLog, setAuditLog] = useState<AuditEntry[]>([])
 
   useEffect(() => {
     setLoading(true)
     setRestricted(false)
     setEscalated(false)
     setBanner(null)
+    setAuditLog([])
     api.user(userId)
       .then((d) => {
         setDetail(d)
@@ -61,6 +63,7 @@ function UserProfilePanel({
       })
       .catch(() => setDetail(null))
       .finally(() => setLoading(false))
+    api.auditLog({ user_id: userId, limit: 10 }).then(setAuditLog).catch(() => setAuditLog([]))
   }, [userId])
 
   const handleRestrict = async () => {
@@ -192,6 +195,33 @@ function UserProfilePanel({
                 Top Risk Factors (Latest Alert)
               </p>
               <SHAPChart values={detail.recent_alerts[0].shap_values} />
+            </div>
+          )}
+
+          {/* Action history */}
+          {auditLog.length > 0 && (
+            <div>
+              <p style={{ margin: '0 0 8px', fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
+                Action History
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {auditLog.map((entry) => (
+                  <div key={entry.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '6px 0', borderBottom: `1px solid ${C.border}` }}>
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, letterSpacing: '0.05em', flexShrink: 0, marginTop: 2,
+                      color: entry.action_type === 'restrict' ? C.critical : entry.action_type === 'label' ? C.low : C.textMuted,
+                      border: `1px solid ${entry.action_type === 'restrict' ? C.critical : entry.action_type === 'label' ? C.low : C.border}`,
+                      borderRadius: 2, padding: '1px 5px', textTransform: 'uppercase',
+                    }}>
+                      {entry.action_type}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: 0, fontSize: 11, color: C.textPrimary, lineHeight: 1.4 }}>{entry.message}</p>
+                      <p style={{ margin: 0, fontSize: 10, color: C.textMuted }}>{timeAgo(entry.created_at)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
