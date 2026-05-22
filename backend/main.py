@@ -59,6 +59,7 @@ _MAX_FEED = 20
 MODEL_VERSION = "v1.0.0"
 SAVED_MODEL_DIR = os.path.join(os.path.dirname(__file__), "models", "saved")
 _startup_mode = "fresh"
+ALERT_THRESHOLD = 65  # single score threshold — no ground-truth split
 
 # Columns accepted by EventModel (guards against stray keys from generator)
 _EVENT_COLS = {
@@ -237,6 +238,7 @@ async def _startup() -> None:
             _initialized = True
             logger.info("Models loaded from disk")
             await _seed_demo_labels()
+            await _populate_feed_from_db()
             return
 
         training_events = generator.generate_batch(
@@ -270,6 +272,7 @@ async def _startup() -> None:
     ensemble.save(SAVED_MODEL_DIR)
     _initialized = True
     logger.info("Startup complete. Starting event loop.")
+    await _populate_feed_from_db()
 
 
 async def _process_event(ev: dict) -> None:
@@ -291,10 +294,7 @@ async def _process_event(ev: dict) -> None:
         return
     ev["features_json"] = json.dumps(feat.tolist())
 
-    # Alert only for explicit fraud events (score >= 50) or very high scoring normal events (>= 80)
-    # This prevents "anomalous_behavior" label spam from borderline normal events
-    is_fraud_event = ev.get("is_fraud") == 1
-    alert_id = str(uuid.uuid4()) if (is_fraud_event and risk_score >= 50) or (not is_fraud_event and risk_score >= 80) else None
+    alert_id = str(uuid.uuid4()) if risk_score >= ALERT_THRESHOLD else None
 
     feed_entry = {
         "id": ev["id"],
@@ -317,7 +317,8 @@ async def _process_event(ev: dict) -> None:
 
         user = await db.get(UserModel, ev["user_id"])
         if user:
-            user.risk_score = round(risk_score, 2)
+            if risk_score > user.risk_score:
+                user.risk_score = round(risk_score, 2)
             user.last_seen = ev["timestamp"]
 
         if alert_id:
@@ -341,6 +342,46 @@ async def _process_event(ev: dict) -> None:
         await db.commit()
 
 
+async def _populate_feed_from_db() -> None:
+    """Pre-populate the in-memory feed buffer from the 20 most recent persisted events.
+
+    Runs at end of _startup so the feed is never empty on a fresh boot or cache load.
+    Rows come back newest-first; we build feed entries in that order so buffer[0] is newest.
+    """
+    async with SessionLocal() as db:
+        rows = (await db.execute(
+            select(EventModel)
+            .order_by(desc(EventModel.timestamp))
+            .limit(_MAX_FEED)
+        )).scalars().all()
+
+    for row in rows:
+        try:
+            feat = np.array(json.loads(row.features_json), dtype=np.float32)
+            if len(feat) == 8:
+                scores = ensemble.predict(row.user_id, feat)
+                risk_score = float(scores["ensemble"]) * 100.0
+            else:
+                risk_score = float(row.risk_score)
+        except Exception:
+            risk_score = float(row.risk_score)
+
+        _feed_buffer.append({
+            "id": row.id,
+            "user_id": row.user_id,
+            "user_name": row.user_name,
+            "timestamp": row.timestamp.isoformat(),
+            "event_type": row.event_type,
+            "risk_level": _risk_level(risk_score) if risk_score >= 40 else None,
+            "risk_score": round(risk_score, 1),
+            "description": row.description,
+            "is_anomalous": row.is_fraud == 1 or risk_score >= 60,
+            "alert_id": None,
+        })
+
+    logger.info("Feed buffer pre-populated with %d events from DB", len(_feed_buffer))
+
+
 _LIVE_FRAUD_PATTERNS = ["off_hours_login", "bulk_download", "cross_department_access", "privilege_escalation", "velocity_spike"]
 
 async def _event_loop() -> None:
@@ -349,9 +390,9 @@ async def _event_loop() -> None:
         await asyncio.sleep(180)  # 1 live event per 3 minutes
         try:
             live_count += 1
-            # Every 3rd live event is an explicit fraud, cycling evenly through all patterns
-            if live_count % 3 == 0:
-                pattern = _LIVE_FRAUD_PATTERNS[((live_count // 3) - 1) % len(_LIVE_FRAUD_PATTERNS)]
+            # Every 15th live event is an explicit fraud (~7% rate, matches training distribution)
+            if live_count % 15 == 0:
+                pattern = _LIVE_FRAUD_PATTERNS[((live_count // 15) - 1) % len(_LIVE_FRAUD_PATTERNS)]
                 ev = generator.generate_forced_fraud(pattern)
                 ev["_force_alert"] = True
             else:
