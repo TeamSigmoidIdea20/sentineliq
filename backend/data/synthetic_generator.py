@@ -210,4 +210,5 @@ class SyntheticGenerator:
         spec = random.choice(list(self._specs.values()))
         ts = datetime.utcnow()
         ev = self._fraud_event(spec, ts, pattern)
+        ev["timestamp"] = ts  # pin to exact current UTC so simulated alerts sort to top
         return ev

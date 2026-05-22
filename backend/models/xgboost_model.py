@@ -104,7 +104,7 @@ class XGBoostModel:
             # Use fallback if all zero OR fewer than 2 features contribute meaningfully
             # (catches single-feature dominance where model ignores most inputs)
             non_trivial = int(np.sum(np.abs(shap_row) > 1e-3))
-            if np.all(np.abs(shap_row) < 1e-9) or non_trivial < 2:
+            if np.all(np.abs(shap_row) < 1e-9) or non_trivial < 3:
                 logger.warning("[SHAP] Degenerate SHAP (%d non-trivial) — using fallback", non_trivial)
                 return _fallback_shap(features)
 

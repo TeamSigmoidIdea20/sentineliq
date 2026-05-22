@@ -25,11 +25,11 @@ interface TLEntry {
 }
 
 const FRAUD_TO_TAG: Record<string, { tag: string; color: string }> = {
-  off_hours_login:         { tag: 'Auth',    color: '#4B9EF5' },
+  off_hours_login:         { tag: 'Auth',    color: C.critical },
   bulk_download:           { tag: 'Export',  color: C.medium },
-  cross_department_access: { tag: 'Anomaly', color: C.medium },
+  cross_department_access: { tag: 'Anomaly', color: C.critical },
   privilege_escalation:    { tag: 'Perm Δ', color: C.critical },
-  velocity_spike:          { tag: 'Anomaly', color: C.medium },
+  velocity_spike:          { tag: 'Anomaly', color: C.critical },
   anomalous_behavior:      { tag: 'Alert',   color: C.critical },
 }
 
@@ -50,8 +50,8 @@ function buildTimeline(alerts: Alert[]): TLEntry[] {
       time: new Date(preMs).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
       relMin: Math.round((preMs - refTime) / 60000),
       tag: fraudInfo.tag === 'Auth' ? 'Auth' : fraudInfo.tag === 'Perm Δ' ? 'Perm Δ' : 'Data',
-      tagColor: fraudInfo.tag === 'Auth' ? '#4B9EF5' : fraudInfo.tag === 'Perm Δ' ? C.critical : C.textMuted,
-      dotColor: fraudInfo.tag === 'Auth' ? '#4B9EF5' : C.textMuted,
+      tagColor: fraudInfo.tag === 'Perm Δ' ? C.critical : C.textMuted,
+      dotColor: C.textMuted,
       text: fraudInfo.tag === 'Auth'
         ? `${alert.user_name.split(' ')[0]} logged in from corporate device`
         : fraudInfo.tag === 'Perm Δ'
@@ -146,10 +146,7 @@ function StitchedTimeline({ alerts }: { alerts: Alert[] }) {
           }} />
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flex: 1, minWidth: 0 }}>
             <div style={{ flexShrink: 0, lineHeight: 1 }}>
-              <div style={{ fontSize: 10, color: C.textMuted, fontFamily: 'monospace', marginBottom: 2 }}>
-                T{e.relMin <= 0 ? `+${Math.abs(e.relMin)}m` : `${e.relMin}m`}
-              </div>
-              <div style={{ fontSize: 9, color: C.textMuted }}>{e.time}</div>
+              <div style={{ fontSize: 10, color: C.textMuted, fontFamily: 'monospace' }}>{e.time}</div>
             </div>
             <span style={{
               fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 3,

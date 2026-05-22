@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { api, type FeedEvent, timeAgo } from '@/lib/api'
+import { api, type FeedEvent } from '@/lib/api'
 import { C } from '@/lib/tokens'
 
 const RISK_COLORS: Record<string, string> = {
@@ -46,11 +46,10 @@ function FeedRow({ event, isNew, onAlertClick }: { event: FeedEvent; isNew: bool
         }}
       />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline' }}>
           <span style={{ fontSize: 12, color: C.textPrimary, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {event.description}
           </span>
-          <span style={{ fontSize: 10, color: C.textMuted, flexShrink: 0 }}>{timeAgo(event.timestamp)}</span>
         </div>
         <div style={{ marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 10, color: C.textMuted }}>{event.user_id}</span>
@@ -122,7 +121,6 @@ export default function LiveFeed({ onAlertClick }: { onAlertClick?: (alertId: st
             Live Intelligence Feed
           </span>
         </div>
-        <span style={{ fontSize: 10, color: C.textMuted }}>Polling every 3s</span>
       </div>
 
       {events.length === 0 ? (
