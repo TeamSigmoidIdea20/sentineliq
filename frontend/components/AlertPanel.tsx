@@ -59,43 +59,33 @@ const FRAUD_BEHAVIOR: Record<string, string> = {
   anomalous_behavior: 'exhibited multiple behavioural deviations from their established baseline',
 }
 
-function generateExplanation(alert: Alert, peerData?: PeerComparison | null): string {
+function generatePlainExplanation(alert: Alert, peerData?: PeerComparison | null): string {
   const firstName = alert.user_name.split(' ')[0]
-  const fraudDesc = formatFraudType(alert.fraud_type)
   const behavior = FRAUD_BEHAVIOR[alert.fraud_type] ?? 'exhibited unusual behavioural patterns'
 
-  const ifPct = Math.round(alert.model_scores.isolation_forest * 100)
-  const lstmPct = Math.round(alert.model_scores.lstm * 100)
-  const xgbPct = Math.round(alert.model_scores.xgboost * 100)
+  let text = `${firstName} ${behavior}.`
+
+  if (peerData && peerData.metrics.length > 0) {
+    const top = [...peerData.metrics].sort((a, b) => b.multiplier - a.multiplier)[0]
+    if (top.multiplier > 1.5) {
+      text += ` Their ${top.metric.toLowerCase()} is ${top.multiplier.toFixed(1)}× the ${peerData.role.replace(/_/g, ' ')} peer average — a significant deviation from colleagues in the same role.`
+    }
+  }
 
   const topShap = [...alert.shap_values]
     .filter((v) => v.contribution > 0)
     .sort((a, b) => b.contribution - a.contribution)
     .slice(0, 2)
 
-  // Sentence 1: what they did
-  let text = `${firstName} ${behavior}.`
-
-  // Sentence 2: top SHAP signals with peer context if available
   if (topShap.length >= 1) {
-    const f1label = FEATURE_DESC[topShap[0].feature] ?? topShap[0].feature.replace(/_/g, ' ')
-    text += ` The dominant signal was ${f1label}`
+    const f1 = FEATURE_DESC[topShap[0].feature] ?? topShap[0].feature.replace(/_/g, ' ')
+    text += ` The clearest sign was ${f1}`
     if (topShap.length >= 2) {
-      const f2label = FEATURE_DESC[topShap[1].feature] ?? topShap[1].feature.replace(/_/g, ' ')
-      text += `, reinforced by ${f2label}`
+      const f2 = FEATURE_DESC[topShap[1].feature] ?? topShap[1].feature.replace(/_/g, ' ')
+      text += `, combined with ${f2}`
     }
-    // Add peer comparison if available
-    if (peerData && peerData.metrics.length > 0) {
-      const top = [...peerData.metrics].sort((a, b) => b.multiplier - a.multiplier)[0]
-      if (top.multiplier > 1.5) {
-        text += ` — ${firstName}'s ${top.metric.toLowerCase()} is ${top.multiplier.toFixed(1)}x the ${peerData.role.replace(/_/g, ' ')} peer average`
-      }
-    }
-    text += '.'
+    text += ' — both outside normal operating parameters for this user.'
   }
-
-  // Sentence 3: all three model verdicts
-  text += ` All three models flagged this event: Isolation Forest placed it in the top ${100 - ifPct}% most anomalous (${ifPct}% score), LSTM Autoencoder detected ${lstmPct}% reconstruction error against ${firstName}'s recent behavioural sequence, and XGBoost classified it as ${fraudDesc} with ${xgbPct}% confidence.`
 
   return text
 }
@@ -366,14 +356,56 @@ export default function AlertPanel({ alertId, onClose, onResolved, inline = fals
               <SHAPChart values={alert.shap_values} />
             </div>
 
-            {/* AI Analysis — uses Grok narrative when available, falls back to template */}
-            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 4, padding: '12px 14px' }}>
-              <p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span>✦</span> {alert.ai_narrative ? 'AI Analysis' : 'Why This Alert Fired'}
-              </p>
-              <p style={{ margin: 0, fontSize: 12, color: C.textPrimary, lineHeight: 1.7 }}>
-                {alert.ai_narrative || generateExplanation(alert, peerData)}
-              </p>
+            {/* Analysis — two-part: ML signals + plain English */}
+            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 4, overflow: 'hidden' }}>
+              {/* Header */}
+              <div style={{ padding: '10px 14px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ fontSize: 11, color: C.amber }}>✦</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  {alert.ai_narrative ? 'AI Analysis' : 'Alert Analysis'}
+                </span>
+              </div>
+
+              {/* Part 1: ML model signals */}
+              <div style={{ padding: '10px 14px', borderBottom: `1px solid ${C.border}` }}>
+                <p style={{ margin: '0 0 8px', fontSize: 9, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  ML Detection
+                </p>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                  {([
+                    { label: 'Isolation Forest', score: alert.model_scores.isolation_forest, desc: 'point anomaly' },
+                    { label: 'LSTM', score: alert.model_scores.lstm, desc: 'behavioural drift' },
+                    { label: 'XGBoost', score: alert.model_scores.xgboost, desc: 'fraud pattern' },
+                  ] as const).map(({ label, score, desc }) => {
+                    const pct = Math.round(score * 100)
+                    const color = pct >= 65 ? C.critical : pct >= 40 ? C.medium : C.low
+                    return (
+                      <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5, background: C.card, border: `1px solid ${C.border}`, borderRadius: 3, padding: '4px 8px' }}>
+                        <span style={{ fontSize: 10, color: C.textMuted }}>{label}</span>
+                        <span style={{ fontSize: 11, fontWeight: 800, color }}>{pct}%</span>
+                        <span style={{ fontSize: 9, color: C.textMuted }}>{desc}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+                {alert.shap_values.filter(v => v.contribution > 0).sort((a, b) => b.contribution - a.contribution).slice(0, 2).map((v, i) => (
+                  <div key={v.feature} style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: i === 0 ? 0 : 4 }}>
+                    <span style={{ fontSize: 9, color: C.critical, fontWeight: 700 }}>↑</span>
+                    <span style={{ fontSize: 10, color: C.textMuted, fontFamily: 'monospace' }}>{v.feature}</span>
+                    <span style={{ fontSize: 10, color: C.textPrimary, fontWeight: 600 }}>+{v.contribution.toFixed(3)}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Part 2: Plain English */}
+              <div style={{ padding: '10px 14px' }}>
+                <p style={{ margin: '0 0 6px', fontSize: 9, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  In Plain Terms
+                </p>
+                <p style={{ margin: 0, fontSize: 12, color: C.textPrimary, lineHeight: 1.7 }}>
+                  {alert.ai_narrative || generatePlainExplanation(alert, peerData)}
+                </p>
+              </div>
             </div>
 
             {/* Investigation Timeline */}
