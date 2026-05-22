@@ -58,7 +58,8 @@ class AlertModel(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)
     user_id: Mapped[str] = mapped_column(String)
     user_name: Mapped[str] = mapped_column(String)
-    timestamp: Mapped[datetime.datetime] = mapped_column(DateTime)
+    timestamp: Mapped[datetime.datetime] = mapped_column(DateTime)       # event time
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)  # alert creation time
     risk_score: Mapped[float] = mapped_column(Float)
     fraud_type: Mapped[str] = mapped_column(String)
     model_scores_json: Mapped[str] = mapped_column(Text, default="{}")
@@ -94,6 +95,7 @@ async def init_db():
             "ALTER TABLE events ADD COLUMN download_mb REAL DEFAULT 0.0",
             "ALTER TABLE events ADD COLUMN tx_count INTEGER DEFAULT 0",
             "ALTER TABLE alerts ADD COLUMN label_updated_at DATETIME",
+            "ALTER TABLE alerts ADD COLUMN created_at DATETIME",
             "ALTER TABLE users ADD COLUMN restricted INTEGER DEFAULT 0",
             "ALTER TABLE users ADD COLUMN escalated INTEGER DEFAULT 0",
             "ALTER TABLE model_metrics ADD COLUMN recall REAL DEFAULT 0.0",

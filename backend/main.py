@@ -178,6 +178,7 @@ async def _seed_demo_labels() -> None:
                 user_id=row.user_id,
                 user_name=row.user_name,
                 timestamp=row.timestamp,
+                created_at=datetime.utcnow(),
                 risk_score=round(risk_score, 2),
                 fraud_type=row.fraud_type or "anomalous_behavior",
                 model_scores_json=json.dumps(scores),
@@ -197,12 +198,22 @@ async def _seed_demo_labels() -> None:
     X_seed = np.array([x for x, _ in seed], dtype=np.float32)
     y_seed = np.array([y for _, y in seed], dtype=np.int32)
 
-    ensemble.xgb_model.fit(X_seed, y_seed)
+    # Fix 3: 80/20 split — never evaluate on training data
+    split = max(1, int(len(seed) * 0.8))
+    X_train, y_train = X_seed[:split], y_seed[:split]
+    X_val, y_val = X_seed[split:], y_seed[split:]
+
+    ensemble.xgb_model.fit(X_train, y_train)
     ensemble.save(SAVED_MODEL_DIR)
 
-    val_scores = ensemble.xgb_model.score_batch(X_seed)
-    prec = _precision_from_scores(val_scores, list(y_seed))
-    rec = _recall_from_scores(val_scores, list(y_seed))
+    if len(X_val) > 0:
+        val_scores = ensemble.xgb_model.score_batch(X_val)
+        prec = _precision_from_scores(val_scores, list(y_val))
+        rec = _recall_from_scores(val_scores, list(y_val))
+    else:
+        val_scores = ensemble.xgb_model.score_batch(X_train)
+        prec = _precision_from_scores(val_scores, list(y_train))
+        rec = _recall_from_scores(val_scores, list(y_train))
     f1 = round((2 * prec * rec) / max(0.001, prec + rec), 3)
 
     async with SessionLocal() as db:
@@ -317,8 +328,6 @@ async def _process_event(ev: dict) -> None:
 
         user = await db.get(UserModel, ev["user_id"])
         if user:
-            if risk_score > user.risk_score:
-                user.risk_score = round(risk_score, 2)
             user.last_seen = ev["timestamp"]
 
         if alert_id:
@@ -328,6 +337,7 @@ async def _process_event(ev: dict) -> None:
                 user_id=ev["user_id"],
                 user_name=ev["user_name"],
                 timestamp=ev["timestamp"],
+                created_at=datetime.utcnow(),
                 risk_score=round(risk_score, 2),
                 fraud_type=ev.get("fraud_type") or "anomalous_behavior",
                 model_scores_json=json.dumps(scores),
@@ -338,8 +348,28 @@ async def _process_event(ev: dict) -> None:
                 notes="",
             )
             db.add(alert)
+            await db.flush()  # make alert visible to max() query below
 
+        await _refresh_user_risk(ev["user_id"], db)
         await db.commit()
+
+
+async def _refresh_user_risk(user_id: str, db: AsyncSession) -> None:
+    """Recalculate user.risk_score as the max alert score in the last 7 days.
+    Decays by 5 if no recent alerts exist (natural cool-down over time).
+    """
+    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+    max_recent = await db.scalar(
+        select(func.max(AlertModel.risk_score))
+        .where(and_(AlertModel.user_id == user_id, AlertModel.timestamp >= seven_days_ago))
+    )
+    user = await db.get(UserModel, user_id)
+    if user is None:
+        return
+    if max_recent is not None:
+        user.risk_score = round(float(max_recent), 2)
+    else:
+        user.risk_score = max(0.0, round(user.risk_score - 5.0, 2))
 
 
 async def _populate_feed_from_db() -> None:
@@ -895,19 +925,17 @@ async def get_cases(db: AsyncSession = Depends(get_db)):
 
     for rows in by_user.values():
         current: list[AlertModel] = []
-        window_start: Optional[datetime] = None
         for alert in rows:
             if not current:
                 current = [alert]
-                window_start = alert.timestamp
                 continue
-            if window_start and alert.timestamp <= window_start + timedelta(hours=24):
+            # Fix 4: sliding window — anchored to last alert in chain, not first
+            if alert.timestamp <= current[-1].timestamp + timedelta(hours=24):
                 current.append(alert)
             else:
                 if len(current) >= 3:
                     grouped.append(current)
                 current = [alert]
-                window_start = alert.timestamp
         if len(current) >= 3:
             grouped.append(current)
 
@@ -1055,31 +1083,29 @@ async def get_intelligence(db: AsyncSession = Depends(get_db)):
         )
     ).scalars().all()
 
-    event_ids = [r.event_id for r in alert_rows if r.event_id]
-    event_rows = []
-    if event_ids:
-        event_rows = (
-            await db.execute(select(EventModel).where(EventModel.id.in_(event_ids)))
-        ).scalars().all()
-    event_by_id = {e.id: e for e in event_rows}
+    # P/R/F1 computed from analyst labels only — never from generator is_fraud ground truth
+    labeled_alerts = [a for a in alert_rows if a.label in ("TP", "FP")]
+    label_tp = sum(1 for a in labeled_alerts if a.label == "TP")
+    label_fp = sum(1 for a in labeled_alerts if a.label == "FP")
 
-    tp = sum(1 for a in alert_rows if event_by_id.get(a.event_id) and event_by_id[a.event_id].is_fraud == 1)
-    fp = max(0, len(alert_rows) - tp)
-    total_fraud_events = await db.scalar(
-        select(func.count()).select_from(EventModel).where(
-            and_(EventModel.timestamp >= seven_days_ago, EventModel.is_fraud == 1)
-        )
-    ) or 0
+    if len(labeled_alerts) < 10:
+        # Not enough human-reviewed alerts to produce meaningful metrics
+        precision = 0.0
+        recall = 0.0
+        f1 = 0.0
+    else:
+        precision = round(label_tp / max(1, label_tp + label_fp), 3)
+        # Recall proxy: fraction of reviewed alerts confirmed as real threats
+        recall = round(label_tp / max(1, len(labeled_alerts)), 3)
+        f1 = round((2 * precision * recall) / max(0.001, precision + recall), 3)
 
-    precision = round(tp / max(1, tp + fp), 3)
-    recall = round(tp / max(1, total_fraud_events), 3)
-    f1 = round((2 * precision * recall) / max(0.001, precision + recall), 3)
-
+    # Fix 5: MTTD = created_at (processing time) - timestamp (event time)
     detect_deltas = []
     for alert in alert_rows:
-        ev = event_by_id.get(alert.event_id)
-        if ev:
-            detect_deltas.append(max(0.0, (alert.timestamp - ev.timestamp).total_seconds()))
+        if alert.created_at and alert.timestamp:
+            delta = (alert.created_at - alert.timestamp).total_seconds()
+            if delta >= 0:
+                detect_deltas.append(delta)
     mean_detect = round(sum(detect_deltas) / max(1, len(detect_deltas)), 1)
 
     daily_counts: list[DailyCount] = []
@@ -1094,8 +1120,10 @@ async def get_intelligence(db: AsyncSession = Depends(get_db)):
         day_fp = sum(1 for a in day_labeled if a.label == "FP")
         fp_trend.append(FPTrendPoint(date=day.isoformat(), rate=round((day_fp / max(1, len(day_labeled))) * 100, 1)))
 
+    # Fix 2: agreement = all 3 models agree HIGH; denominator = at least 1 flagged
     type_counts: dict[str, int] = {}
     agreement_count = 0
+    flagged_count = 0
     for alert in alert_rows:
         type_counts[alert.fraud_type or "anomalous_behavior"] = type_counts.get(alert.fraud_type or "anomalous_behavior", 0) + 1
         scores = json.loads(alert.model_scores_json or "{}")
@@ -1104,14 +1132,16 @@ async def get_intelligence(db: AsyncSession = Depends(get_db)):
             float(scores.get("lstm", 0.0)) >= 0.5,
             float(scores.get("xgboost", 0.0)) >= 0.5,
         ]
-        if all(flags) or not any(flags):
-            agreement_count += 1
+        if any(flags):
+            flagged_count += 1
+            if all(flags):
+                agreement_count += 1
 
     breakdown = [
         BreakdownItem(fraud_type=ft, count=count)
         for ft, count in sorted(type_counts.items(), key=lambda item: item[1], reverse=True)
     ]
-    agreement_rate = round((agreement_count / max(1, len(alert_rows))) * 100, 1)
+    agreement_rate = round((agreement_count / max(1, flagged_count)) * 100, 1)
 
     labeled_count = await db.scalar(
         select(func.count()).select_from(AlertModel).where(AlertModel.label.in_(["TP", "FP"]))
@@ -1131,15 +1161,11 @@ async def get_intelligence(db: AsyncSession = Depends(get_db)):
             AlertModel.timestamp >= twenty_four_hours_ago
         )
     ) or 0
-    fraud_alerts_24h = await db.scalar(
-        select(func.count()).select_from(AlertModel).where(
-            and_(
-                AlertModel.timestamp >= twenty_four_hours_ago,
-                AlertModel.fraud_type.notin_(["", "anomalous_behavior"]),
-            )
-        )
+    # Fix 6: anomaly rate = alerts fired / total events processed in last 24h
+    events_24h = await db.scalar(
+        select(func.count()).select_from(EventModel).where(EventModel.timestamp >= twenty_four_hours_ago)
     ) or 0
-    anomaly_rate = round((fraud_alerts_24h / max(1, alerts_24h)) * 100, 1)
+    anomaly_rate = round((alerts_24h / max(1, events_24h)) * 100, 1)
 
     return IntelligenceResponse(
         precision=precision,

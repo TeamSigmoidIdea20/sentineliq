@@ -146,12 +146,14 @@ class SyntheticGenerator:
             ev["event_type"] = "login"
             ev["tx_count"] = baseline_tx
             ev["download_mb"] = baseline_dl
+            ev["location"] = "external"          # location_mismatch signal
             ev["description"] = f"{name} logged in at {hour:02d}:00 — outside normal hours"
 
         elif pattern == "bulk_download":
             ev["event_type"] = "data_export"
             ev["download_mb"] = random.uniform(50, 200)
             ev["tx_count"] = baseline_tx
+            ev["location"] = "external"          # location_mismatch signal
             ev["description"] = f"{name} exported {ev['download_mb']:.0f} MB — anomalous volume"
 
         elif pattern == "cross_department_access":
@@ -161,10 +163,14 @@ class SyntheticGenerator:
             ev["event_type"] = "department_access"
             ev["tx_count"] = baseline_tx
             ev["download_mb"] = baseline_dl
+            ev["location"] = "external"          # location_mismatch signal
             ev["description"] = f"{name} accessed {foreign} — outside normal scope"
 
         elif pattern == "privilege_escalation":
+            hour = random.choice([0, 1, 2, 3, 4, 5, 22, 23])  # off-hours adds second signal
             ev["event_type"] = "privilege_use"
+            ev["hour"] = hour
+            ev["timestamp"] = ev["timestamp"].replace(hour=hour)
             ev["tx_count"] = baseline_tx
             ev["download_mb"] = baseline_dl
             ev["description"] = f"{name} invoked elevated privileges — not typical for {role}"
@@ -173,9 +179,11 @@ class SyntheticGenerator:
             ev["tx_count"] = int(avg_tx * random.uniform(8, 15))
             ev["event_type"] = "transaction"
             ev["department"] = random.choice(typ_depts)
-            ev["download_mb"] = baseline_dl
+            ev["download_mb"] = random.uniform(20, 80)  # elevated download adds second signal
             ev["description"] = f"{name} processed {ev['tx_count']} transactions — {ev['tx_count'] // max(1, avg_tx)}x normal rate"
 
+        # All fraud patterns use an anomalous device — gives device_change_frequency signal
+        ev["device"] = random.choice(["mobile_vpn", "tablet_remote"])
         ev["fraud_type"] = pattern
         ev["is_fraud"] = 1
         return ev
@@ -193,7 +201,7 @@ class SyntheticGenerator:
             spec = self._specs[uid]
             ts = base_ts + timedelta(seconds=i * random.randint(10, 60))
 
-            if self._event_counter % 30 == 0:
+            if self._event_counter % 15 == 0:
                 pattern = random.choice(fraud_patterns)
                 ev = self._fraud_event(spec, ts, pattern)
             else:
