@@ -66,6 +66,7 @@ const KIND_TAG: Record<TimelineItem['kind'], { tag: string; color: string }> = {
   suspicious:     { tag: 'WARN',   color: C.medium },
   trigger:        { tag: 'ALERT',  color: C.critical },
   analyst_action: { tag: 'ACTION', color: C.low },
+  case_opened:    { tag: 'CASE',   color: C.amber },
 }
 
 function CaseTimeline({ caseId }: { caseId: string }) {
