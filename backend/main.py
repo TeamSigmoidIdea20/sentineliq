@@ -567,6 +567,10 @@ async def seed_demo_state() -> None:
                           "privilege_escalation", "velocity_spike", "bulk_download", "off_hours_login"]
         user_pool = ["usr_011", "usr_013", "usr_021", "usr_031", "usr_041",
                      "usr_022", "usr_032", "usr_042", "usr_023", "usr_033", "usr_043", "usr_014"]
+        # Label distribution for 12 standalone alerts: 8 TP + 4 FP = 12 labels
+        # Combined with 3 chain TPs = 15 labeled. Add extra via the label pattern below.
+        # Pattern: 0=TP, 1=FP, 2=TP, 3=FP, 4=TP, 5=TP, 6=FP, 7=TP, 8=FP, 9=TP, 10=TP, 11=TP
+        standalone_labels = ["TP", "FP", "TP", "FP", "TP", "TP", "FP", "TP", "FP", "TP", "TP", "TP"]
         for i, (target_risk, pattern, uid) in enumerate(zip(standalone_risks, patterns_cycle, user_pool)):
             spec = generator._specs.get(uid)
             if not spec:
@@ -601,7 +605,7 @@ async def seed_demo_state() -> None:
                 model_scores_json=json.dumps(scores),
                 shap_values_json=json.dumps(shap_vals),
                 status="open",
-                label="TP" if i % 3 == 0 else ("FP" if i % 3 == 1 else ""),
+                label=standalone_labels[i],
                 event_id=ev["id"],
                 notes="",
             ))
@@ -871,7 +875,7 @@ async def get_feed(db: AsyncSession = Depends(get_db)):
 @app.get("/api/alerts", response_model=AlertListResponse)
 async def get_alerts(
     risk_level: Optional[str] = Query(None),
-    status: Optional[str] = Query(None),
+    status: Optional[str] = Query("open"),
     time_range: Optional[str] = Query(None),
     min_score: Optional[float] = Query(None, ge=0, le=100),
     page: int = Query(1, ge=1),
@@ -1703,7 +1707,7 @@ async def simulate(body: SimulateRequest = None):
         ev["_source"] = "simulation"
         await _process_event(ev)
 
-    # Find the alert created for this scenario
+    # Find the alert and case created for this scenario
     async with SessionLocal() as db:
         recent_alert = (
             await db.execute(
@@ -1714,6 +1718,18 @@ async def simulate(body: SimulateRequest = None):
             )
         ).scalars().first()
         alert_id = recent_alert.id if recent_alert else None
+        risk_score = round(recent_alert.risk_score, 1) if recent_alert else None
+
+        case_id = None
+        if recent_alert:
+            ca = (
+                await db.execute(
+                    select(CaseAlertModel.case_id)
+                    .where(CaseAlertModel.alert_id == recent_alert.id)
+                    .limit(1)
+                )
+            ).scalars().first()
+            case_id = ca
 
     return {
         "status": "ok",
@@ -1721,6 +1737,8 @@ async def simulate(body: SimulateRequest = None):
         "scenario_id": scenario_id,
         "events_created": len(events),
         "alert_id": alert_id,
+        "case_id": case_id,
+        "risk_score": risk_score,
     }
 
 

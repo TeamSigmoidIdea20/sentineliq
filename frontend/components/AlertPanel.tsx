@@ -290,7 +290,7 @@ export default function AlertPanel({ alertId, onClose, onResolved, inline = fals
                 </div>
                 <div>
                   <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: C.textPrimary }}>{alert.user_name}</p>
-                  <p style={{ margin: 0, fontSize: 11, color: C.textMuted }}>{alert.user_id} · {timeAgo(alert.timestamp)}</p>
+                  <p style={{ margin: 0, fontSize: 11, color: C.textMuted }}>{alert.user_id} · {timeAgo(alert.ingested_at ?? alert.timestamp)}</p>
                 </div>
                 <div style={{ marginLeft: 'auto' }}>
                   <RiskBadge level={alert.risk_level} score={alert.risk_score} />
