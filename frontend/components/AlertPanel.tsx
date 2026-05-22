@@ -50,33 +50,53 @@ function formatTs(iso: string): string {
   return rem > 0 ? `${h}h ${rem}m ago` : `${h}h ago`
 }
 
-function generateExplanation(alert: Alert): string {
-  const topPositive = [...alert.shap_values]
+const FRAUD_BEHAVIOR: Record<string, string> = {
+  off_hours_login: 'logged into core banking systems outside their normal working hours',
+  bulk_download: 'performed a high-volume data download atypical for their role',
+  cross_department_access: 'accessed systems and records across departments outside their normal scope',
+  privilege_escalation: 'attempted to use elevated privileges or access restricted system functions',
+  velocity_spike: 'executed an abnormal surge of transactions in a compressed time window',
+  anomalous_behavior: 'exhibited multiple behavioural deviations from their established baseline',
+}
+
+function generateExplanation(alert: Alert, peerData?: PeerComparison | null): string {
+  const firstName = alert.user_name.split(' ')[0]
+  const fraudDesc = formatFraudType(alert.fraud_type)
+  const behavior = FRAUD_BEHAVIOR[alert.fraud_type] ?? 'exhibited unusual behavioural patterns'
+
+  const ifPct = Math.round(alert.model_scores.isolation_forest * 100)
+  const lstmPct = Math.round(alert.model_scores.lstm * 100)
+  const xgbPct = Math.round(alert.model_scores.xgboost * 100)
+
+  const topShap = [...alert.shap_values]
     .filter((v) => v.contribution > 0)
     .sort((a, b) => b.contribution - a.contribution)
     .slice(0, 2)
 
-  const firstName = alert.user_name.split(' ')[0]
-  const fraudDesc = formatFraudType(alert.fraud_type)
-  const xgbConf = Math.round(alert.model_scores.xgboost * 100)
-  const anchorModel =
-    alert.model_scores.lstm >= alert.model_scores.isolation_forest
-      ? 'LSTM Autoencoder flagged sustained behavioural drift'
-      : 'Isolation Forest detected a statistical point anomaly'
+  // Sentence 1: what they did
+  let text = `${firstName} ${behavior}.`
 
-  let text = `${firstName} triggered this alert`
-  if (topPositive.length >= 1) {
-    const f1 = FEATURE_DESC[topPositive[0].feature] ?? topPositive[0].feature.replace(/_/g, ' ')
-    text += ` primarily due to abnormal ${f1}`
-    if (topPositive.length >= 2) {
-      const f2 = FEATURE_DESC[topPositive[1].feature] ?? topPositive[1].feature.replace(/_/g, ' ')
-      text += `, combined with elevated ${f2}`
+  // Sentence 2: top SHAP signals with peer context if available
+  if (topShap.length >= 1) {
+    const f1label = FEATURE_DESC[topShap[0].feature] ?? topShap[0].feature.replace(/_/g, ' ')
+    text += ` The dominant signal was ${f1label}`
+    if (topShap.length >= 2) {
+      const f2label = FEATURE_DESC[topShap[1].feature] ?? topShap[1].feature.replace(/_/g, ' ')
+      text += `, reinforced by ${f2label}`
+    }
+    // Add peer comparison if available
+    if (peerData && peerData.metrics.length > 0) {
+      const top = [...peerData.metrics].sort((a, b) => b.multiplier - a.multiplier)[0]
+      if (top.multiplier > 1.5) {
+        text += ` — ${firstName}'s ${top.metric.toLowerCase()} is ${top.multiplier.toFixed(1)}x the ${peerData.role.replace(/_/g, ' ')} peer average`
+      }
     }
     text += '.'
-  } else {
-    text += ' due to anomalous behavioural patterns.'
   }
-  text += ` The ${anchorModel}, while XGBoost classified this pattern with ${xgbConf}% confidence as ${fraudDesc}.`
+
+  // Sentence 3: all three model verdicts
+  text += ` All three models flagged this event: Isolation Forest placed it in the top ${100 - ifPct}% most anomalous (${ifPct}% score), LSTM Autoencoder detected ${lstmPct}% reconstruction error against ${firstName}'s recent behavioural sequence, and XGBoost classified it as ${fraudDesc} with ${xgbPct}% confidence.`
+
   return text
 }
 
@@ -352,7 +372,7 @@ export default function AlertPanel({ alertId, onClose, onResolved, inline = fals
                 <span>✦</span> {alert.ai_narrative ? 'AI Analysis' : 'Why This Alert Fired'}
               </p>
               <p style={{ margin: 0, fontSize: 12, color: C.textPrimary, lineHeight: 1.7 }}>
-                {alert.ai_narrative || generateExplanation(alert)}
+                {alert.ai_narrative || generateExplanation(alert, peerData)}
               </p>
             </div>
 

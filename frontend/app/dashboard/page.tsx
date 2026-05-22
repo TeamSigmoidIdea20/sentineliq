@@ -25,6 +25,7 @@ export default function DashboardPage() {
   const [alertsLoading, setAlertsLoading] = useState(true)
   const [users, setUsers] = useState<User[]>([])
   const [usersLoading, setUsersLoading] = useState(true)
+  const [backendStatus, setBackendStatus] = useState<'ok' | 'initializing' | 'offline'>('ok')
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [newAlertNotif, setNewAlertNotif] = useState<Alert | null>(null)
@@ -48,8 +49,11 @@ export default function DashboardPage() {
       const s = await api.stats()
       setStats(s)
       setLastUpdated(new Date())
+      setBackendStatus('ok')
     } catch {
-      // backend starting up
+      api.health()
+        .then((h) => setBackendStatus(h.status === 'initializing' ? 'initializing' : 'offline'))
+        .catch(() => setBackendStatus('offline'))
     } finally {
       setStatsLoading(false)
     }
@@ -164,8 +168,14 @@ export default function DashboardPage() {
               <span style={{ fontSize: 10, color: C.textMuted }}>Updated {lastUpdated.toLocaleTimeString()}</span>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: C.low, display: 'inline-block' }} />
-              <span style={{ fontSize: 11, color: C.low, fontWeight: 600 }}>OPERATIONAL</span>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', display: 'inline-block',
+                background: backendStatus === 'ok' ? C.low : backendStatus === 'initializing' ? C.amber : C.critical,
+              }} />
+              <span style={{ fontSize: 11, fontWeight: 600,
+                color: backendStatus === 'ok' ? C.low : backendStatus === 'initializing' ? C.amber : C.critical,
+              }}>
+                {backendStatus === 'ok' ? 'OPERATIONAL' : backendStatus === 'initializing' ? 'INITIALIZING' : 'OFFLINE'}
+              </span>
             </div>
           </div>
         </div>
