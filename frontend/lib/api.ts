@@ -275,7 +275,7 @@ export const api = {
 export interface TimelineItem {
   id: string
   timestamp: string
-  kind: 'baseline' | 'suspicious' | 'trigger' | 'analyst_action'
+  kind: 'baseline' | 'suspicious' | 'trigger' | 'analyst_action' | 'case_opened'
   title: string
   explanation: string
   risk_delta?: string | null
