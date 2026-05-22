@@ -77,6 +77,8 @@ class FeedEvent(BaseModel):
     description: str
     is_anomalous: bool
     alert_id: Optional[str] = None
+    occurred_at: Optional[datetime] = None
+    ingested_at: Optional[datetime] = None
 
 
 class UserEventResponse(BaseModel):
@@ -176,7 +178,7 @@ class CoordinatedPattern(BaseModel):
 
 class StatsResponse(BaseModel):
     users_monitored: int
-    alerts_today: int
+    alerts_24h: int
     high_risk_count: int
     false_positive_rate: float
     alerts_change: int
@@ -184,7 +186,7 @@ class StatsResponse(BaseModel):
     labels_collected: int = 0
     next_retrain_in: str = "3h"
     coordinated_patterns: List[CoordinatedPattern] = []
-    events_today: int = 0
+    events_24h: int = 0
 
 
 class HealthResponse(BaseModel):

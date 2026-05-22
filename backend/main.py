@@ -287,16 +287,39 @@ async def _process_event(ev: dict) -> None:
                 source_record_id=alert_id,
             ))
 
-            await _rebuild_cases_for_user(ev["user_id"], db)
+            # Write preceding 4h events as baseline/suspicious timeline items
+            window_start = ev["occurred_at"] - timedelta(hours=4)
+            cutoff = ev["occurred_at"] - timedelta(minutes=30)
+            prev_events = (
+                await db.execute(
+                    select(EventModel)
+                    .where(and_(
+                        EventModel.user_id == ev["user_id"],
+                        EventModel.timestamp >= window_start,
+                        EventModel.timestamp < ev["occurred_at"],
+                    ))
+                    .order_by(EventModel.timestamp)
+                    .limit(10)
+                )
+            ).scalars().all()
+            for prev_ev in prev_events:
+                kind = "baseline" if prev_ev.timestamp < cutoff else "suspicious"
+                db.add(TimelineItemModel(
+                    id=str(uuid.uuid4()),
+                    entity_type="alert",
+                    entity_id=alert_id,
+                    user_id=ev["user_id"],
+                    alert_id=alert_id,
+                    occurred_at=prev_ev.timestamp,
+                    ingested_at=now,
+                    kind=kind,
+                    title=prev_ev.event_type.replace("_", " ").title(),
+                    explanation=prev_ev.description,
+                    severity=_risk_level(prev_ev.risk_score),
+                    source_record_id=prev_ev.id,
+                ))
 
-            # Generate AI narrative (non-blocking best-effort, uses cached GROK_API_KEY)
-            if user:
-                try:
-                    narrative = generate_alert_narrative(alert, shap_vals, user)
-                    if narrative:
-                        alert.ai_narrative = narrative
-                except Exception:
-                    pass
+            await _rebuild_cases_for_user(ev["user_id"], db)
 
         await _refresh_user_risk(ev["user_id"], db)
         await db.commit()
@@ -318,6 +341,7 @@ async def _refresh_user_risk(user_id: str, db: AsyncSession) -> None:
         user.risk_score = round(float(max_recent), 2)
     else:
         user.risk_score = max(0.0, round(user.risk_score - 5.0, 2))
+    user.risk_updated_at = datetime.utcnow()
 
 
 async def _rebuild_runtime_state() -> None:
@@ -484,7 +508,7 @@ async def seed_demo_state() -> None:
             ev["event_source"] = "seed"
             ev["source"] = "seed"
             ev["occurred_at"] = ev.get("timestamp", now)
-            ev["ingested_at"] = now
+            ev["ingested_at"] = ev["occurred_at"] + timedelta(seconds=random.randint(1, 10))
             db.add(EventModel(**{k: v for k, v in ev.items() if k in _EVENT_COLS}))
 
         await db.commit()
@@ -496,6 +520,7 @@ async def seed_demo_state() -> None:
                 continue
             chain_scenario_id = str(uuid.uuid4())
             chain_alert_ids = []
+            pending_non_alert_items: list[dict] = []
 
             for i, offset in enumerate(chain["offsets_minutes"]):
                 ev = generator._fraud_event(spec, now - timedelta(minutes=offset), chain["pattern"])
@@ -503,7 +528,7 @@ async def seed_demo_state() -> None:
                 ev["event_source"] = "seed"
                 ev["scenario_id"] = chain_scenario_id
                 ev["occurred_at"] = ev["timestamp"]
-                ev["ingested_at"] = now
+                ev["ingested_at"] = ev["occurred_at"] + timedelta(seconds=random.randint(1, 10))
 
                 feat = engineer.compute_features(ev["user_id"], ev)
                 scores = ensemble.predict(ev["user_id"], feat)
@@ -524,9 +549,9 @@ async def seed_demo_state() -> None:
                         user_id=ev["user_id"],
                         user_name=ev["user_name"],
                         timestamp=ev["timestamp"],
-                        created_at=now,
+                        created_at=ev["ingested_at"],
                         occurred_at=ev["timestamp"],
-                        ingested_at=now,
+                        ingested_at=ev["ingested_at"],
                         risk_score=round(risk_score, 2),
                         fraud_type=ev.get("fraud_type") or "anomalous_behavior",
                         model_scores_json=json.dumps(scores),
@@ -545,13 +570,41 @@ async def seed_demo_state() -> None:
                         entity_id=alert_id,
                         user_id=ev["user_id"],
                         alert_id=alert_id,
-                        occurred_at=ev["timestamp"],
-                        ingested_at=now,
+                        occurred_at=ev["occurred_at"],
+                        ingested_at=ev["ingested_at"],
                         kind="trigger",
                         title=f"Alert triggered — {chain['pattern'].replace('_', ' ').title()}",
                         explanation=f"Risk score: {int(risk_score)}",
                         severity=_risk_level(risk_score),
                         source_record_id=alert_id,
+                    ))
+                else:
+                    pending_non_alert_items.append({
+                        "occurred_at": ev["occurred_at"],
+                        "ingested_at": ev["ingested_at"],
+                        "user_id": ev["user_id"],
+                        "description": ev.get("description", "Suspicious activity preceding alert"),
+                        "risk_score": risk_score,
+                        "event_id": ev["id"],
+                    })
+
+            # Link non-alert chain events to the first alert in the chain
+            if chain_alert_ids and pending_non_alert_items:
+                main_alert_id = chain_alert_ids[0]
+                for item in pending_non_alert_items:
+                    db.add(TimelineItemModel(
+                        id=str(uuid.uuid4()),
+                        entity_type="alert",
+                        entity_id=main_alert_id,
+                        user_id=item["user_id"],
+                        alert_id=main_alert_id,
+                        occurred_at=item["occurred_at"],
+                        ingested_at=item["ingested_at"],
+                        kind="suspicious",
+                        title=f"{chain['pattern'].replace('_', ' ').title()} activity",
+                        explanation=item["description"],
+                        severity=_risk_level(item["risk_score"]),
+                        source_record_id=item["event_id"],
                     ))
 
             await db.commit()
@@ -581,7 +634,7 @@ async def seed_demo_state() -> None:
             ev["source"] = "seed"
             ev["event_source"] = "seed"
             ev["occurred_at"] = ev["timestamp"]
-            ev["ingested_at"] = now
+            ev["ingested_at"] = ev["occurred_at"] + timedelta(seconds=random.randint(1, 10))
 
             feat = engineer.compute_features(ev["user_id"], ev)
             scores = ensemble.predict(ev["user_id"], feat)
@@ -597,9 +650,9 @@ async def seed_demo_state() -> None:
                 user_id=ev["user_id"],
                 user_name=ev["user_name"],
                 timestamp=ev["timestamp"],
-                created_at=now,
+                created_at=ev["ingested_at"],
                 occurred_at=ev["timestamp"],
-                ingested_at=now,
+                ingested_at=ev["ingested_at"],
                 risk_score=float(target_risk),
                 fraud_type=ev.get("fraud_type") or "anomalous_behavior",
                 model_scores_json=json.dumps(scores),
@@ -608,6 +661,20 @@ async def seed_demo_state() -> None:
                 label=standalone_labels[i],
                 event_id=ev["id"],
                 notes="",
+            ))
+            db.add(TimelineItemModel(
+                id=str(uuid.uuid4()),
+                entity_type="alert",
+                entity_id=alert_id,
+                user_id=ev["user_id"],
+                alert_id=alert_id,
+                occurred_at=ev["occurred_at"],
+                ingested_at=ev["ingested_at"],
+                kind="trigger",
+                title=f"Alert triggered — {pattern.replace('_', ' ').title()}",
+                explanation=f"Risk score: {int(target_risk)}",
+                severity=_risk_level(float(target_risk)),
+                source_record_id=alert_id,
             ))
 
         await db.commit()
@@ -811,7 +878,7 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
 
     return StatsResponse(
         users_monitored=users_monitored,
-        alerts_today=alerts_today,
+        alerts_24h=alerts_today,
         high_risk_count=high_risk_count,
         false_positive_rate=fpr,
         alerts_change=alerts_today - alerts_yesterday,
@@ -819,7 +886,7 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
         labels_collected=labels_collected,
         next_retrain_in=next_retrain_in,
         coordinated_patterns=coordinated,
-        events_today=events_today,
+        events_24h=events_today,
     )
 
 
@@ -863,6 +930,8 @@ async def get_feed(db: AsyncSession = Depends(get_db)):
             description=r.description,
             is_anomalous=r.is_fraud == 1 or r.risk_score >= 65,
             alert_id=alert_map.get(r.id),
+            occurred_at=getattr(r, "occurred_at", None),
+            ingested_at=getattr(r, "ingested_at", None),
         )
         for r in rows
     ]
@@ -1143,42 +1212,63 @@ async def get_alert_timeline(alert_id: str, db: AsyncSession = Depends(get_db)):
 
     items: list[TimelineItem] = []
 
-    window_start = alert.timestamp - timedelta(hours=4)
-    event_rows = (
+    stored_rows = (
         await db.execute(
-            select(EventModel)
-            .where(and_(
-                EventModel.user_id == alert.user_id,
-                EventModel.timestamp >= window_start,
-                EventModel.timestamp <= alert.timestamp,
-            ))
-            .order_by(EventModel.timestamp)
-            .limit(10)
+            select(TimelineItemModel)
+            .where(TimelineItemModel.alert_id == alert_id)
+            .order_by(TimelineItemModel.occurred_at)
         )
     ).scalars().all()
 
-    cutoff = alert.timestamp - timedelta(minutes=30)
-    for ev in event_rows:
-        kind = "baseline" if ev.timestamp < cutoff else "suspicious"
-        items.append(TimelineItem(
-            id=ev.id,
-            timestamp=ev.timestamp,
-            kind=kind,
-            title=ev.event_type.replace("_", " ").title(),
-            explanation=ev.description,
-            risk_delta=f"+{int(ev.risk_score)}" if ev.risk_score >= 40 else None,
-            source="event",
-        ))
+    if stored_rows:
+        for si in stored_rows:
+            src = "audit_log" if si.kind == "analyst_action" else ("alert" if si.kind == "trigger" else "event")
+            items.append(TimelineItem(
+                id=si.id,
+                timestamp=si.occurred_at,
+                kind=si.kind,
+                title=si.title,
+                explanation=si.explanation,
+                source=src,
+            ))
+    else:
+        # Fallback: runtime computation from events table
+        window_start = alert.timestamp - timedelta(hours=4)
+        event_rows = (
+            await db.execute(
+                select(EventModel)
+                .where(and_(
+                    EventModel.user_id == alert.user_id,
+                    EventModel.timestamp >= window_start,
+                    EventModel.timestamp <= alert.timestamp,
+                ))
+                .order_by(EventModel.timestamp)
+                .limit(10)
+            )
+        ).scalars().all()
 
-    items.append(TimelineItem(
-        id=alert.id,
-        timestamp=alert.timestamp,
-        kind="trigger",
-        title=f"Alert triggered — {alert.fraud_type.replace('_', ' ').title()}",
-        explanation=f"Ensemble risk score: {int(alert.risk_score)}. Threshold: {ALERT_THRESHOLD}.",
-        risk_delta=f"+{int(alert.risk_score)}",
-        source="alert",
-    ))
+        cutoff = alert.timestamp - timedelta(minutes=30)
+        for ev in event_rows:
+            kind = "baseline" if ev.timestamp < cutoff else "suspicious"
+            items.append(TimelineItem(
+                id=ev.id,
+                timestamp=ev.timestamp,
+                kind=kind,
+                title=ev.event_type.replace("_", " ").title(),
+                explanation=ev.description,
+                risk_delta=f"+{int(ev.risk_score)}" if ev.risk_score >= 40 else None,
+                source="event",
+            ))
+
+        items.append(TimelineItem(
+            id=alert.id,
+            timestamp=alert.timestamp,
+            kind="trigger",
+            title=f"Alert triggered — {alert.fraud_type.replace('_', ' ').title()}",
+            explanation=f"Ensemble risk score: {int(alert.risk_score)}. Threshold: {ALERT_THRESHOLD}.",
+            risk_delta=f"+{int(alert.risk_score)}",
+            source="alert",
+        ))
 
     audit_rows = (
         await db.execute(
@@ -1338,53 +1428,84 @@ async def get_case_timeline(case_id: str, db: AsyncSession = Depends(get_db)):
             select(CaseAlertModel.alert_id).where(CaseAlertModel.case_id == case_id)
         )
     ).scalars().all()
-    target_chain = (
-        await db.execute(
-            select(AlertModel).where(AlertModel.id.in_(alert_ids))
-            .order_by(AlertModel.timestamp)
-        )
-    ).scalars().all()
 
-    if not target_chain:
+    if not alert_ids:
         return []
 
     items: list[TimelineItem] = []
-    chain_start = min(a.timestamp for a in target_chain)
-    chain_end = max(a.timestamp for a in target_chain)
-    chain_user_ids = list({a.user_id for a in target_chain})
 
-    event_rows = (
+    # Try stored TimelineItemModel entries for all alerts in this case
+    stored_rows = (
         await db.execute(
-            select(EventModel)
-            .where(and_(
-                EventModel.user_id.in_(chain_user_ids),
-                EventModel.timestamp >= chain_start - timedelta(minutes=30),
-                EventModel.timestamp <= chain_end + timedelta(minutes=30),
-            ))
-            .order_by(EventModel.timestamp)
-            .limit(50)
+            select(TimelineItemModel)
+            .where(TimelineItemModel.alert_id.in_(alert_ids))
+            .order_by(TimelineItemModel.occurred_at)
         )
     ).scalars().all()
 
-    alert_timestamps = {a.timestamp for a in target_chain}
-    for ev in event_rows:
-        is_alert_event = any(abs((ev.timestamp - at).total_seconds()) < 5 for at in alert_timestamps)
-        kind = "trigger" if is_alert_event else ("suspicious" if ev.is_fraud else "baseline")
-        items.append(TimelineItem(
-            id=ev.id,
-            timestamp=ev.timestamp,
-            kind=kind,
-            title=ev.event_type.replace("_", " ").title(),
-            explanation=ev.description,
-            risk_delta=f"+{int(ev.risk_score)}" if ev.risk_score >= 40 else None,
-            source="event",
-        ))
+    if stored_rows:
+        seen_ids: set[str] = set()
+        for si in stored_rows:
+            if si.id in seen_ids:
+                continue
+            seen_ids.add(si.id)
+            src = "audit_log" if si.kind == "analyst_action" else ("alert" if si.kind == "trigger" else "event")
+            items.append(TimelineItem(
+                id=si.id,
+                timestamp=si.occurred_at,
+                kind=si.kind,
+                title=si.title,
+                explanation=si.explanation,
+                source=src,
+            ))
+    else:
+        # Fallback: runtime computation
+        target_chain = (
+            await db.execute(
+                select(AlertModel).where(AlertModel.id.in_(alert_ids))
+                .order_by(AlertModel.timestamp)
+            )
+        ).scalars().all()
 
-    chain_alert_ids = [a.id for a in target_chain]
+        if not target_chain:
+            return []
+
+        chain_start = min(a.timestamp for a in target_chain)
+        chain_end = max(a.timestamp for a in target_chain)
+        chain_user_ids = list({a.user_id for a in target_chain})
+
+        event_rows = (
+            await db.execute(
+                select(EventModel)
+                .where(and_(
+                    EventModel.user_id.in_(chain_user_ids),
+                    EventModel.timestamp >= chain_start - timedelta(minutes=30),
+                    EventModel.timestamp <= chain_end + timedelta(minutes=30),
+                ))
+                .order_by(EventModel.timestamp)
+                .limit(50)
+            )
+        ).scalars().all()
+
+        alert_timestamps = {a.timestamp for a in target_chain}
+        for ev in event_rows:
+            is_alert_event = any(abs((ev.timestamp - at).total_seconds()) < 5 for at in alert_timestamps)
+            kind = "trigger" if is_alert_event else ("suspicious" if ev.is_fraud else "baseline")
+            items.append(TimelineItem(
+                id=ev.id,
+                timestamp=ev.timestamp,
+                kind=kind,
+                title=ev.event_type.replace("_", " ").title(),
+                explanation=ev.description,
+                risk_delta=f"+{int(ev.risk_score)}" if ev.risk_score >= 40 else None,
+                source="event",
+            ))
+
+    # Always append audit log entries for all case alerts
     audit_rows = (
         await db.execute(
             select(AuditLogModel)
-            .where(AuditLogModel.alert_id.in_(chain_alert_ids))
+            .where(AuditLogModel.alert_id.in_(alert_ids))
             .order_by(AuditLogModel.created_at)
         )
     ).scalars().all()
@@ -1582,10 +1703,9 @@ async def get_intelligence(db: AsyncSession = Depends(get_db)):
         day_fp = sum(1 for a in day_labeled if a.label == "FP")
         fp_trend.append(FPTrendPoint(date=day.isoformat(), rate=round((day_fp / max(1, len(day_labeled))) * 100, 1)))
 
-    # Fix 2: agreement = all 3 models agree HIGH; denominator = at least 1 flagged
+    # agreement = all 3 models agree HIGH; denominator = total alert count
     type_counts: dict[str, int] = {}
     agreement_count = 0
-    flagged_count = 0
     for alert in alert_rows:
         type_counts[alert.fraud_type or "anomalous_behavior"] = type_counts.get(alert.fraud_type or "anomalous_behavior", 0) + 1
         scores = json.loads(alert.model_scores_json or "{}")
@@ -1594,16 +1714,14 @@ async def get_intelligence(db: AsyncSession = Depends(get_db)):
             float(scores.get("lstm", 0.0)) >= 0.5,
             float(scores.get("xgboost", 0.0)) >= 0.5,
         ]
-        if any(flags):
-            flagged_count += 1
-            if all(flags):
-                agreement_count += 1
+        if all(flags):
+            agreement_count += 1
 
     breakdown = [
         BreakdownItem(fraud_type=ft, count=count)
         for ft, count in sorted(type_counts.items(), key=lambda item: item[1], reverse=True)
     ]
-    agreement_rate = round((agreement_count / max(1, flagged_count)) * 100, 1)
+    agreement_rate = round((agreement_count / max(1, len(alert_rows))) * 100, 1)
 
     labeled_count = await db.scalar(
         select(func.count()).select_from(AlertModel).where(AlertModel.label.in_(["TP", "FP"]))
@@ -1616,7 +1734,6 @@ async def get_intelligence(db: AsyncSession = Depends(get_db)):
     ).scalars().first()
     last_retrain_ts = last_metric.created_at.isoformat() if last_metric else None
 
-    total_events = await db.scalar(select(func.count()).select_from(EventModel)) or 0
     twenty_four_hours_ago = datetime.utcnow() - timedelta(hours=24)
     alerts_24h = await db.scalar(
         select(func.count()).select_from(AlertModel).where(
@@ -1659,7 +1776,7 @@ async def get_intelligence(db: AsyncSession = Depends(get_db)):
         false_positive_rate_trend=fp_trend,
         labeled_count=labeled_count,
         last_retrain_ts=last_retrain_ts,
-        training_events=total_events,
+        training_events=2000,
         anomaly_rate=anomaly_rate,
         department_risk_breakdown=dept_risk,
     )
