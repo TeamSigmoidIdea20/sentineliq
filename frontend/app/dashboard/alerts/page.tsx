@@ -67,7 +67,7 @@ function AlertRow({ alert, selected, onClick }: { alert: Alert; selected: boolea
       </div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 10, color: C.textMuted }}>{formatFraudType(alert.fraud_type)}</span>
-        <span style={{ fontSize: 10, color: C.textMuted }}>{timeAgo(alert.timestamp)}</span>
+        <span style={{ fontSize: 10, color: C.textMuted }}>{timeAgo(alert.ingested_at ?? alert.timestamp)}</span>
       </div>
     </div>
   )

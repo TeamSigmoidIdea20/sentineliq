@@ -127,7 +127,7 @@ export default function AlertTable({ alerts, loading, onSelectAlert, onResolved 
                     ))}
                   </div>
                 </td>
-                <td style={{ padding: '12px', color: C.textMuted }}>{timeAgo(alert.timestamp)}</td>
+                <td style={{ padding: '12px', color: C.textMuted }}>{timeAgo(alert.ingested_at ?? alert.timestamp)}</td>
                 <td style={{ padding: '12px' }}>
                   <span style={{
                     fontSize: 10, padding: '2px 7px', borderRadius: 2, fontWeight: 600,

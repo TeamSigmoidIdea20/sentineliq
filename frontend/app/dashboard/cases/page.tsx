@@ -229,7 +229,7 @@ export default function CasesPage() {
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: C.textMuted }}>
                           <span>{formatFraudType(alert.fraud_type)}</span>
-                          <span>{timeAgo(alert.timestamp)}</span>
+                          <span>{timeAgo(alert.ingested_at ?? alert.timestamp)}</span>
                         </div>
                       </div>
                     ))}

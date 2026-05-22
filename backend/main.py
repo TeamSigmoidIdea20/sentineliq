@@ -13,7 +13,7 @@ from typing import List, Optional
 import numpy as np
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import and_, desc, func, select
+from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import AlertModel, AuditLogModel, CaseAlertModel, CaseModel, EventModel, ModelMetricModel, TimelineItemModel, UserModel, get_db, init_db, SessionLocal
@@ -319,7 +319,7 @@ async def _process_event(ev: dict) -> None:
                     source_record_id=prev_ev.id,
                 ))
 
-            await _rebuild_cases_for_user(ev["user_id"], db)
+            await _update_or_create_case(ev["user_id"], alert, db)
 
         await _refresh_user_risk(ev["user_id"], db)
         await db.commit()
@@ -381,79 +381,118 @@ async def _rebuild_runtime_state() -> None:
     logger.info("Runtime state rebuilt for %d users", len(user_ids))
 
 
-async def _rebuild_cases_for_user(user_id: str, db: AsyncSession) -> None:
-    """Upsert case records for alert chains belonging to user_id."""
-    since = datetime.utcnow() - timedelta(days=7)
-    alert_rows = (
+async def _update_or_create_case(user_id: str, alert: AlertModel, db: AsyncSession) -> Optional[str]:
+    """Create a case on 2nd alert within 24h; append to open case if one exists."""
+    alert_time = getattr(alert, "occurred_at", None) or alert.timestamp
+    alert_ingested = getattr(alert, "ingested_at", None) or datetime.utcnow()
+    since_24h = alert_time - timedelta(hours=24)
+    now = datetime.utcnow()
+
+    # Check for existing open case for this user within 24h
+    existing_case = (
+        await db.execute(
+            select(CaseModel)
+            .where(and_(
+                CaseModel.user_id == user_id,
+                CaseModel.status == "open",
+                CaseModel.last_seen >= since_24h,
+            ))
+            .order_by(desc(CaseModel.last_seen))
+            .limit(1)
+        )
+    ).scalars().first()
+
+    if existing_case:
+        existing_case.last_seen = alert_time
+        existing_case.end_time = alert_time
+        existing_case.alert_count = (existing_case.alert_count or 0) + 1
+        existing_case.updated_at = now
+        new_risk = max(
+            80 if existing_case.severity == "critical" else 65 if existing_case.severity == "high" else 40,
+            alert.risk_score,
+        )
+        existing_case.severity = "critical" if new_risk >= 80 else "high" if new_risk >= 65 else "medium"
+        db.add(CaseAlertModel(id=str(uuid.uuid4()), case_id=existing_case.id, alert_id=alert.id))
+        db.add(TimelineItemModel(
+            id=str(uuid.uuid4()),
+            entity_type="case",
+            entity_id=existing_case.id,
+            user_id=user_id,
+            case_id=existing_case.id,
+            alert_id=alert.id,
+            occurred_at=alert_time,
+            ingested_at=alert_ingested,
+            kind="trigger",
+            title=f"Alert added — {(alert.fraud_type or 'anomalous_behavior').replace('_', ' ').title()}",
+            explanation=f"Risk score: {int(alert.risk_score)}. Case now has {existing_case.alert_count} alerts.",
+            severity=_risk_level(alert.risk_score),
+            source_record_id=alert.id,
+        ))
+        return existing_case.id
+
+    # No existing open case — check if this is the 2nd+ alert in 24h
+    prior_alerts = (
         await db.execute(
             select(AlertModel)
-            .where(and_(AlertModel.user_id == user_id, AlertModel.timestamp >= since))
+            .where(and_(
+                AlertModel.user_id == user_id,
+                AlertModel.timestamp >= since_24h,
+                AlertModel.id != alert.id,
+            ))
             .order_by(AlertModel.timestamp)
         )
     ).scalars().all()
 
-    chains: list[list[AlertModel]] = []
-    current: list[AlertModel] = []
-    for alert in alert_rows:
-        if not current:
-            current = [alert]
-            continue
-        if alert.timestamp <= current[-1].timestamp + timedelta(hours=24):
-            current.append(alert)
-        else:
-            if len(current) >= 3:
-                chains.append(current)
-            current = [alert]
-    if len(current) >= 3:
-        chains.append(current)
+    if not prior_alerts:
+        return None  # first alert — no case yet
 
-    for rows in chains:
-        fraud_types = {r.fraud_type for r in rows if r.fraud_type}
-        max_risk = max(r.risk_score for r in rows)
-        severity = "critical" if max_risk >= 80 else "high" if max_risk >= 65 else "medium"
-        start_time = min(r.timestamp for r in rows)
-        end_time = max(r.timestamp for r in rows)
-        users = sorted({r.user_id for r in rows})
-        names = sorted({r.user_name for r in rows})
-        status = "open" if any(r.status == "open" for r in rows) else "resolved"
-        case_id = f"case-{rows[0].user_id}-{int(start_time.timestamp())}"
+    all_alerts = list(prior_alerts) + [alert]
+    fraud_types = {a.fraud_type for a in all_alerts if a.fraud_type}
+    max_risk = max(a.risk_score for a in all_alerts)
+    severity = "critical" if max_risk >= 80 else "high" if max_risk >= 65 else "medium"
+    first_seen = min(getattr(a, "occurred_at", None) or a.timestamp for a in all_alerts)
+    user_row = await db.get(UserModel, user_id)
+    user_name = user_row.name if user_row else alert.user_name
+    case_title = _case_name(fraud_types, 1)
+    case_id = f"case-{user_id}-{int(first_seen.timestamp())}"
 
-        existing = await db.get(CaseModel, case_id)
-        if existing:
-            existing.name = _case_name(fraud_types, len(users))
-            existing.severity = severity
-            existing.status = status
-            existing.end_time = end_time
-            existing.user_ids_json = json.dumps(users)
-            existing.user_names_json = json.dumps(names)
-            existing.alert_count = len(rows)
-            existing.updated_at = datetime.utcnow()
-        else:
-            db.add(CaseModel(
-                id=case_id,
-                name=_case_name(fraud_types, len(users)),
-                severity=severity,
-                status=status,
-                start_time=start_time,
-                end_time=end_time,
-                user_ids_json=json.dumps(users),
-                user_names_json=json.dumps(names),
-                alert_count=len(rows),
-                updated_at=datetime.utcnow(),
-            ))
-
-        existing_links: set[str] = set(
-            (await db.execute(
-                select(CaseAlertModel.alert_id).where(CaseAlertModel.case_id == case_id)
-            )).scalars().all()
-        )
-        for r in rows:
-            if r.id not in existing_links:
-                db.add(CaseAlertModel(
-                    id=str(uuid.uuid4()),
-                    case_id=case_id,
-                    alert_id=r.id,
-                ))
+    db.add(CaseModel(
+        id=case_id,
+        name=case_title,
+        title=case_title,
+        severity=severity,
+        status="open",
+        start_time=first_seen,
+        end_time=alert_time,
+        first_seen=first_seen,
+        last_seen=alert_time,
+        user_id=user_id,
+        user_name=user_name,
+        user_ids_json=json.dumps([user_id]),
+        user_names_json=json.dumps([user_name]),
+        alert_count=len(all_alerts),
+        scenario_id="",
+        updated_at=now,
+        created_at=now,
+    ))
+    for a in all_alerts:
+        db.add(CaseAlertModel(id=str(uuid.uuid4()), case_id=case_id, alert_id=a.id))
+    db.add(TimelineItemModel(
+        id=str(uuid.uuid4()),
+        entity_type="case",
+        entity_id=case_id,
+        user_id=user_id,
+        case_id=case_id,
+        alert_id=alert.id,
+        occurred_at=now,
+        ingested_at=now,
+        kind="trigger",
+        title=f"Case opened — {case_title}",
+        explanation=f"{len(all_alerts)} alerts in 24h window. Max risk: {int(max_risk)}.",
+        severity=severity,
+        source_record_id=case_id,
+    ))
+    return case_id
 
 
 async def seed_demo_state() -> None:
@@ -468,6 +507,7 @@ async def seed_demo_state() -> None:
 
     logger.info("seed_demo_state: seeding demo data…")
     now = datetime.utcnow()
+    rng = random.Random(42)  # fixed seed for ingested_at offsets — reproducible structure
 
     # --- 300 normal background events over last 24h ---
     normal_events = generator.generate_batch(
@@ -475,26 +515,29 @@ async def seed_demo_state() -> None:
         base_ts=now - timedelta(hours=24),
     )
 
-    # --- Fraud chains ---
+    # --- Fraud chains: events spread across the day for realistic demo timeline ---
+    # Chain 1: bulk download — activity at now-6h, now-2h, now-20min
+    # Chain 2: privilege escalation — now-7h, now-3h, now-45min
+    # Chain 3: velocity spike — now-8h, now-4h, now-30min
     chains = [
         {
             "user_id": "usr_003",  # Robert Chen — teller
             "pattern": "bulk_download",
-            "offsets_minutes": [90, 60, 30, 5],
+            "offsets_minutes": [360, 120, 20],
             "target_risk": 84,
             "label": "TP",
         },
         {
             "user_id": "usr_007",  # Michael Torres — teller
             "pattern": "privilege_escalation",
-            "offsets_minutes": [120, 70, 20],
+            "offsets_minutes": [420, 180, 45],
             "target_risk": 79,
             "label": "TP",
         },
         {
             "user_id": "usr_012",  # Jennifer Kim — analyst
             "pattern": "velocity_spike",
-            "offsets_minutes": [180, 100, 40],
+            "offsets_minutes": [480, 240, 30],
             "target_risk": 88,
             "label": "TP",
         },
@@ -508,7 +551,7 @@ async def seed_demo_state() -> None:
             ev["event_source"] = "seed"
             ev["source"] = "seed"
             ev["occurred_at"] = ev.get("timestamp", now)
-            ev["ingested_at"] = ev["occurred_at"] + timedelta(seconds=random.randint(1, 10))
+            ev["ingested_at"] = ev["occurred_at"] + timedelta(seconds=rng.randint(1, 10))
             db.add(EventModel(**{k: v for k, v in ev.items() if k in _EVENT_COLS}))
 
         await db.commit()
@@ -518,8 +561,8 @@ async def seed_demo_state() -> None:
             spec = generator._specs.get(chain["user_id"])
             if not spec:
                 continue
-            chain_scenario_id = str(uuid.uuid4())
-            chain_alert_ids = []
+            chain_scenario_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"seed-scenario-{chain['user_id']}"))
+            chain_alert_objs: list[AlertModel] = []
             pending_non_alert_items: list[dict] = []
 
             for i, offset in enumerate(chain["offsets_minutes"]):
@@ -528,12 +571,11 @@ async def seed_demo_state() -> None:
                 ev["event_source"] = "seed"
                 ev["scenario_id"] = chain_scenario_id
                 ev["occurred_at"] = ev["timestamp"]
-                ev["ingested_at"] = ev["occurred_at"] + timedelta(seconds=random.randint(1, 10))
+                ev["ingested_at"] = ev["occurred_at"] + timedelta(seconds=rng.randint(1, 10))
 
                 feat = engineer.compute_features(ev["user_id"], ev)
                 scores = ensemble.predict(ev["user_id"], feat)
                 risk_score = float(scores["ensemble"]) * 100.0
-                # Force the last event to hit the target risk
                 if i == len(chain["offsets_minutes"]) - 1:
                     risk_score = float(chain["target_risk"])
                 ev["risk_score"] = risk_score
@@ -543,8 +585,8 @@ async def seed_demo_state() -> None:
 
                 if risk_score >= ALERT_THRESHOLD:
                     shap_vals = ensemble.explain(feat)
-                    alert_id = str(uuid.uuid4())
-                    alert = AlertModel(
+                    alert_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"seed-alert-{chain['user_id']}-{i}"))
+                    alert_obj = AlertModel(
                         id=alert_id,
                         user_id=ev["user_id"],
                         user_name=ev["user_name"],
@@ -561,11 +603,11 @@ async def seed_demo_state() -> None:
                         event_id=ev["id"],
                         notes="",
                     )
-                    db.add(alert)
-                    chain_alert_ids.append(alert_id)
+                    db.add(alert_obj)
+                    chain_alert_objs.append(alert_obj)
 
                     db.add(TimelineItemModel(
-                        id=str(uuid.uuid4()),
+                        id=str(uuid.uuid5(uuid.NAMESPACE_DNS, f"seed-tl-alert-{chain['user_id']}-{i}")),
                         entity_type="alert",
                         entity_id=alert_id,
                         user_id=ev["user_id"],
@@ -586,14 +628,15 @@ async def seed_demo_state() -> None:
                         "description": ev.get("description", "Suspicious activity preceding alert"),
                         "risk_score": risk_score,
                         "event_id": ev["id"],
+                        "idx": i,
                     })
 
             # Link non-alert chain events to the first alert in the chain
-            if chain_alert_ids and pending_non_alert_items:
-                main_alert_id = chain_alert_ids[0]
+            if chain_alert_objs and pending_non_alert_items:
+                main_alert_id = chain_alert_objs[0].id
                 for item in pending_non_alert_items:
                     db.add(TimelineItemModel(
-                        id=str(uuid.uuid4()),
+                        id=str(uuid.uuid5(uuid.NAMESPACE_DNS, f"seed-tl-sus-{chain['user_id']}-{item['idx']}")),
                         entity_type="alert",
                         entity_id=main_alert_id,
                         user_id=item["user_id"],
@@ -607,10 +650,11 @@ async def seed_demo_state() -> None:
                         source_record_id=item["event_id"],
                     ))
 
-            await db.commit()
+            # Flush so _update_or_create_case can query the inserted alerts
+            await db.flush()
+            for alert_obj in chain_alert_objs:
+                await _update_or_create_case(chain["user_id"], alert_obj, db)
 
-            # Rebuild cases for each user in chain
-            await _rebuild_cases_for_user(chain["user_id"], db)
             await db.commit()
 
         # 12 standalone alerts spread over last 20h
@@ -620,21 +664,20 @@ async def seed_demo_state() -> None:
                           "privilege_escalation", "velocity_spike", "bulk_download", "off_hours_login"]
         user_pool = ["usr_011", "usr_013", "usr_021", "usr_031", "usr_041",
                      "usr_022", "usr_032", "usr_042", "usr_023", "usr_033", "usr_043", "usr_014"]
-        # Label distribution for 12 standalone alerts: 8 TP + 4 FP = 12 labels
-        # Combined with 3 chain TPs = 15 labeled. Add extra via the label pattern below.
-        # Pattern: 0=TP, 1=FP, 2=TP, 3=FP, 4=TP, 5=TP, 6=FP, 7=TP, 8=FP, 9=TP, 10=TP, 11=TP
         standalone_labels = ["TP", "FP", "TP", "FP", "TP", "TP", "FP", "TP", "FP", "TP", "TP", "TP"]
+        standalone_alert_objs: list[tuple[str, AlertModel]] = []
+
         for i, (target_risk, pattern, uid) in enumerate(zip(standalone_risks, patterns_cycle, user_pool)):
             spec = generator._specs.get(uid)
             if not spec:
                 continue
-            offset_minutes = int(20 * 60 * (i + 1) / 13)  # spread over 20h
+            offset_minutes = int(20 * 60 * (i + 1) / 13)
             ev_ts = now - timedelta(minutes=max(30, offset_minutes))
             ev = generator._fraud_event(spec, ev_ts, pattern)
             ev["source"] = "seed"
             ev["event_source"] = "seed"
             ev["occurred_at"] = ev["timestamp"]
-            ev["ingested_at"] = ev["occurred_at"] + timedelta(seconds=random.randint(1, 10))
+            ev["ingested_at"] = ev["occurred_at"] + timedelta(seconds=rng.randint(1, 10))
 
             feat = engineer.compute_features(ev["user_id"], ev)
             scores = ensemble.predict(ev["user_id"], feat)
@@ -644,8 +687,8 @@ async def seed_demo_state() -> None:
             db.add(EventModel(**{k: v for k, v in ev.items() if k in _EVENT_COLS}))
 
             shap_vals = ensemble.explain(feat)
-            alert_id = str(uuid.uuid4())
-            db.add(AlertModel(
+            alert_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"seed-standalone-alert-{uid}-{i}"))
+            alert_obj = AlertModel(
                 id=alert_id,
                 user_id=ev["user_id"],
                 user_name=ev["user_name"],
@@ -661,9 +704,10 @@ async def seed_demo_state() -> None:
                 label=standalone_labels[i],
                 event_id=ev["id"],
                 notes="",
-            ))
+            )
+            db.add(alert_obj)
             db.add(TimelineItemModel(
-                id=str(uuid.uuid4()),
+                id=str(uuid.uuid5(uuid.NAMESPACE_DNS, f"seed-tl-standalone-{uid}-{i}")),
                 entity_type="alert",
                 entity_id=alert_id,
                 user_id=ev["user_id"],
@@ -676,6 +720,11 @@ async def seed_demo_state() -> None:
                 severity=_risk_level(float(target_risk)),
                 source_record_id=alert_id,
             ))
+            standalone_alert_objs.append((ev["user_id"], alert_obj))
+
+        await db.flush()
+        for uid, alert_obj in standalone_alert_objs:
+            await _update_or_create_case(uid, alert_obj, db)
 
         await db.commit()
 
@@ -798,13 +847,14 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
     window_24h = now - timedelta(hours=24)
     window_48h = now - timedelta(hours=48)
 
+    _alert_seen = func.coalesce(AlertModel.ingested_at, AlertModel.timestamp)
     users_monitored = await db.scalar(select(func.count()).select_from(UserModel)) or 0
     alerts_today = await db.scalar(
-        select(func.count()).select_from(AlertModel).where(AlertModel.timestamp >= window_24h)
+        select(func.count()).select_from(AlertModel).where(_alert_seen >= window_24h)
     ) or 0
     alerts_yesterday = await db.scalar(
         select(func.count()).select_from(AlertModel).where(
-            and_(AlertModel.timestamp >= window_48h, AlertModel.timestamp < window_24h)
+            and_(_alert_seen >= window_48h, _alert_seen < window_24h)
         )
     ) or 0
     high_risk_count = await db.scalar(
@@ -816,8 +866,8 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
         select(func.count()).select_from(AlertModel).where(
             and_(
                 AlertModel.risk_score >= 65,
-                AlertModel.timestamp >= window_48h,
-                AlertModel.timestamp < window_24h,
+                _alert_seen >= window_48h,
+                _alert_seen < window_24h,
             )
         )
     ) or 0
@@ -872,8 +922,9 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
         if len(uids) >= 3
     ]
 
+    _ev_seen = func.coalesce(EventModel.ingested_at, EventModel.timestamp)
     events_today = await db.scalar(
-        select(func.count()).select_from(EventModel).where(EventModel.timestamp >= window_24h)
+        select(func.count()).select_from(EventModel).where(_ev_seen >= window_24h)
     ) or 0
 
     return StatsResponse(
@@ -1434,11 +1485,14 @@ async def get_case_timeline(case_id: str, db: AsyncSession = Depends(get_db)):
 
     items: list[TimelineItem] = []
 
-    # Try stored TimelineItemModel entries for all alerts in this case
+    # Try stored TimelineItemModel entries: case-level rows OR alert-level rows
     stored_rows = (
         await db.execute(
             select(TimelineItemModel)
-            .where(TimelineItemModel.alert_id.in_(alert_ids))
+            .where(or_(
+                TimelineItemModel.case_id == case_id,
+                and_(TimelineItemModel.alert_id != "", TimelineItemModel.alert_id.in_(alert_ids)),
+            ))
             .order_by(TimelineItemModel.occurred_at)
         )
     ).scalars().all()

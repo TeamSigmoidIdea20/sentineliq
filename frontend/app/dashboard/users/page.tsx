@@ -180,7 +180,7 @@ function UserProfilePanel({
                     <p style={{ margin: 0, fontSize: 11, color: C.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {alert.fraud_type.replace(/_/g, ' ')}
                     </p>
-                    <p style={{ margin: 0, fontSize: 10, color: C.textMuted }}>{timeAgo(alert.timestamp)}</p>
+                    <p style={{ margin: 0, fontSize: 10, color: C.textMuted }}>{timeAgo(alert.ingested_at ?? alert.timestamp)}</p>
                   </div>
                   <span style={{ fontSize: 12, fontWeight: 800, color, flexShrink: 0 }}>{Math.round(alert.risk_score)}</span>
                 </div>

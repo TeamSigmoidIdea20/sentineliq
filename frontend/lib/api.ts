@@ -312,7 +312,13 @@ export function normaliseIso(iso: string): string {
 export function timeAgo(iso: string): string {
   const normalised = normaliseIso(iso)
   const diff = Date.now() - new Date(normalised).getTime()
-  const s = Math.floor(Math.max(0, diff) / 1000)
+  if (diff < -5000) {
+    const futureS = Math.floor(-diff / 1000)
+    if (futureS < 60) return `in ${futureS}s`
+    const futureM = Math.floor(futureS / 60)
+    return `in ${futureM}m`
+  }
+  const s = Math.floor(diff / 1000)
   if (s <= 5) return 'Just now'
   if (s < 60) return `${s} seconds ago`
   const m = Math.floor(s / 60)
