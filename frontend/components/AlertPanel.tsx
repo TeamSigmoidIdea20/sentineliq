@@ -346,6 +346,16 @@ export default function AlertPanel({ alertId, onClose, onResolved, inline = fals
               <SHAPChart values={alert.shap_values} />
             </div>
 
+            {/* AI Analysis */}
+            {alert.ai_narrative && (
+              <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 4, padding: '12px 14px' }}>
+                <p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <span>✦</span> AI Analysis
+                </p>
+                <p style={{ margin: 0, fontSize: 12, color: C.textPrimary, lineHeight: 1.7 }}>{alert.ai_narrative}</p>
+              </div>
+            )}
+
             {/* Why This Alert Fired */}
             <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
               <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: C.textPrimary }}>Why This Alert Fired</p>

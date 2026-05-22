@@ -57,7 +57,7 @@ export default function DashboardPage() {
 
   const fetchAlerts = useCallback(async () => {
     try {
-      const res = await api.alerts({ page: 1, status: 'open' })
+      const res = await api.alerts({ page: 1, status: 'open', min_score: 65 })
       const incoming = res.alerts
       if (prevAlertIds.current.size > 0) {
         const fresh = incoming.filter((a) => !prevAlertIds.current.has(a.id))

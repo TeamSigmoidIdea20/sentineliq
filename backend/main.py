@@ -16,7 +16,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database import AlertModel, AuditLogModel, CaseAlertModel, CaseModel, EventModel, ModelMetricModel, UserModel, get_db, init_db, SessionLocal
+from database import AlertModel, AuditLogModel, CaseAlertModel, CaseModel, EventModel, ModelMetricModel, TimelineItemModel, UserModel, get_db, init_db, SessionLocal
+from llm_narrative import generate_alert_narrative
 from data.feature_engineering import FeatureEngineer
 from data.synthetic_generator import SyntheticGenerator
 from models.ensemble import EnsembleModel
@@ -88,6 +89,7 @@ _EVENT_COLS = {
     "id", "user_id", "user_name", "timestamp", "event_type", "department",
     "location", "hour", "device", "download_mb", "tx_count", "features_json",
     "fraud_type", "is_fraud", "description", "risk_score", "event_source",
+    "occurred_at", "ingested_at", "source", "scenario_id", "system",
 }
 
 
@@ -121,6 +123,9 @@ def _alert_from_row(row: AlertModel) -> AlertResponse:
         status=row.status,
         label=row.label or None,
         notes=row.notes or None,
+        occurred_at=getattr(row, "occurred_at", None),
+        ingested_at=getattr(row, "ingested_at", None),
+        ai_narrative=getattr(row, "ai_narrative", None) or None,
     )
 
 
@@ -168,6 +173,7 @@ async def _startup() -> None:
             _initialized = True
             logger.info("Models loaded from disk — rebuilding runtime state")
             await _rebuild_runtime_state()
+            await seed_demo_state()
             return
 
         training_events = generator.generate_batch(
@@ -179,6 +185,7 @@ async def _startup() -> None:
         y_all: list[int] = []
         user_events: dict[str, list[np.ndarray]] = {}
 
+        startup_now = datetime.utcnow()
         for ev in training_events:
             feat = engineer.compute_features(ev["user_id"], ev)
             X_all.append(feat)
@@ -186,6 +193,9 @@ async def _startup() -> None:
             user_events.setdefault(ev["user_id"], []).append(feat)
             ev["features_json"] = json.dumps(feat.tolist())
             ev["event_source"] = "training"
+            ev["source"] = "training"
+            ev["occurred_at"] = ev.get("timestamp", startup_now)
+            ev["ingested_at"] = startup_now
             db.add(EventModel(**{k: v for k, v in ev.items() if k in _EVENT_COLS}))
 
         await db.commit()
@@ -200,7 +210,8 @@ async def _startup() -> None:
     ensemble.save(SAVED_MODEL_DIR)
     _write_manifest(total_events=len(X_all))
     _initialized = True
-    logger.info("Startup complete. Starting event loop.")
+    logger.info("Startup complete. Seeding demo state.")
+    await seed_demo_state()
 
 
 async def _process_event(ev: dict) -> None:
@@ -208,7 +219,13 @@ async def _process_event(ev: dict) -> None:
     _events_processed += 1
 
     force_alert = ev.pop("_force_alert", False)
-    ev["event_source"] = ev.pop("_source", "live")
+    ev_source = ev.pop("_source", "live")
+    ev["event_source"] = ev_source
+    ev["source"] = ev_source
+
+    now = datetime.utcnow()
+    ev["occurred_at"] = ev.get("timestamp", now)
+    ev["ingested_at"] = now
 
     try:
         feat = engineer.compute_features(ev["user_id"], ev)
@@ -239,7 +256,9 @@ async def _process_event(ev: dict) -> None:
                 user_id=ev["user_id"],
                 user_name=ev["user_name"],
                 timestamp=ev["timestamp"],
-                created_at=datetime.utcnow(),
+                created_at=now,
+                occurred_at=ev["occurred_at"],
+                ingested_at=now,
                 risk_score=round(risk_score, 2),
                 fraud_type=ev.get("fraud_type") or "anomalous_behavior",
                 model_scores_json=json.dumps(scores),
@@ -250,8 +269,34 @@ async def _process_event(ev: dict) -> None:
                 notes="",
             )
             db.add(alert)
-            await db.flush()  # make alert visible to subsequent queries
+            await db.flush()
+
+            # Write trigger timeline item
+            db.add(TimelineItemModel(
+                id=str(uuid.uuid4()),
+                entity_type="alert",
+                entity_id=alert_id,
+                user_id=ev["user_id"],
+                alert_id=alert_id,
+                occurred_at=ev["occurred_at"],
+                ingested_at=now,
+                kind="trigger",
+                title=f"Alert triggered — {(ev.get('fraud_type') or 'anomalous_behavior').replace('_', ' ').title()}",
+                explanation=f"Ensemble risk score: {int(risk_score)}. Threshold: {ALERT_THRESHOLD}.",
+                severity=_risk_level(risk_score),
+                source_record_id=alert_id,
+            ))
+
             await _rebuild_cases_for_user(ev["user_id"], db)
+
+            # Generate AI narrative (non-blocking best-effort, uses cached GROK_API_KEY)
+            if user:
+                try:
+                    narrative = generate_alert_narrative(alert, shap_vals, user)
+                    if narrative:
+                        alert.ai_narrative = narrative
+                except Exception:
+                    pass
 
         await _refresh_user_risk(ev["user_id"], db)
         await db.commit()
@@ -385,6 +430,185 @@ async def _rebuild_cases_for_user(user_id: str, db: AsyncSession) -> None:
                     case_id=case_id,
                     alert_id=r.id,
                 ))
+
+
+async def seed_demo_state() -> None:
+    """Seed deterministic demo data once. Idempotency: skip if seed events already exist."""
+    async with SessionLocal() as db:
+        seed_count = await db.scalar(
+            select(func.count()).select_from(EventModel).where(EventModel.source == "seed")
+        ) or 0
+        if seed_count > 0:
+            logger.info("seed_demo_state: already seeded (%d events), skipping", seed_count)
+            return
+
+    logger.info("seed_demo_state: seeding demo data…")
+    now = datetime.utcnow()
+
+    # --- 300 normal background events over last 24h ---
+    normal_events = generator.generate_batch(
+        n=300,
+        base_ts=now - timedelta(hours=24),
+    )
+
+    # --- Fraud chains ---
+    chains = [
+        {
+            "user_id": "usr_003",  # Robert Chen — teller
+            "pattern": "bulk_download",
+            "offsets_minutes": [90, 60, 30, 5],
+            "target_risk": 84,
+            "label": "TP",
+        },
+        {
+            "user_id": "usr_007",  # Michael Torres — teller
+            "pattern": "privilege_escalation",
+            "offsets_minutes": [120, 70, 20],
+            "target_risk": 79,
+            "label": "TP",
+        },
+        {
+            "user_id": "usr_012",  # Jennifer Kim — analyst
+            "pattern": "velocity_spike",
+            "offsets_minutes": [180, 100, 40],
+            "target_risk": 88,
+            "label": "TP",
+        },
+    ]
+
+    async with SessionLocal() as db:
+        # Insert normal events
+        for ev in normal_events:
+            feat = engineer.compute_features(ev["user_id"], ev)
+            ev["features_json"] = json.dumps(feat.tolist())
+            ev["event_source"] = "seed"
+            ev["source"] = "seed"
+            ev["occurred_at"] = ev.get("timestamp", now)
+            ev["ingested_at"] = now
+            db.add(EventModel(**{k: v for k, v in ev.items() if k in _EVENT_COLS}))
+
+        await db.commit()
+
+        # Insert fraud chains and create alerts
+        for chain in chains:
+            spec = generator._specs.get(chain["user_id"])
+            if not spec:
+                continue
+            chain_scenario_id = str(uuid.uuid4())
+            chain_alert_ids = []
+
+            for i, offset in enumerate(chain["offsets_minutes"]):
+                ev = generator._fraud_event(spec, now - timedelta(minutes=offset), chain["pattern"])
+                ev["source"] = "seed"
+                ev["event_source"] = "seed"
+                ev["scenario_id"] = chain_scenario_id
+                ev["occurred_at"] = ev["timestamp"]
+                ev["ingested_at"] = now
+
+                feat = engineer.compute_features(ev["user_id"], ev)
+                scores = ensemble.predict(ev["user_id"], feat)
+                risk_score = float(scores["ensemble"]) * 100.0
+                # Force the last event to hit the target risk
+                if i == len(chain["offsets_minutes"]) - 1:
+                    risk_score = float(chain["target_risk"])
+                ev["risk_score"] = risk_score
+                ev["features_json"] = json.dumps(feat.tolist())
+
+                db.add(EventModel(**{k: v for k, v in ev.items() if k in _EVENT_COLS}))
+
+                if risk_score >= ALERT_THRESHOLD:
+                    shap_vals = ensemble.explain(feat)
+                    alert_id = str(uuid.uuid4())
+                    alert = AlertModel(
+                        id=alert_id,
+                        user_id=ev["user_id"],
+                        user_name=ev["user_name"],
+                        timestamp=ev["timestamp"],
+                        created_at=now,
+                        occurred_at=ev["timestamp"],
+                        ingested_at=now,
+                        risk_score=round(risk_score, 2),
+                        fraud_type=ev.get("fraud_type") or "anomalous_behavior",
+                        model_scores_json=json.dumps(scores),
+                        shap_values_json=json.dumps(shap_vals),
+                        status="open",
+                        label=chain["label"] if i == len(chain["offsets_minutes"]) - 1 else "",
+                        event_id=ev["id"],
+                        notes="",
+                    )
+                    db.add(alert)
+                    chain_alert_ids.append(alert_id)
+
+                    db.add(TimelineItemModel(
+                        id=str(uuid.uuid4()),
+                        entity_type="alert",
+                        entity_id=alert_id,
+                        user_id=ev["user_id"],
+                        alert_id=alert_id,
+                        occurred_at=ev["timestamp"],
+                        ingested_at=now,
+                        kind="trigger",
+                        title=f"Alert triggered — {chain['pattern'].replace('_', ' ').title()}",
+                        explanation=f"Risk score: {int(risk_score)}",
+                        severity=_risk_level(risk_score),
+                        source_record_id=alert_id,
+                    ))
+
+            await db.commit()
+
+            # Rebuild cases for each user in chain
+            await _rebuild_cases_for_user(chain["user_id"], db)
+            await db.commit()
+
+        # 12 standalone alerts spread over last 20h
+        standalone_risks = [65, 72, 76, 80, 68, 84, 71, 88, 66, 79, 91, 70]
+        patterns_cycle = ["off_hours_login", "bulk_download", "cross_department_access", "privilege_escalation",
+                          "velocity_spike", "off_hours_login", "bulk_download", "cross_department_access",
+                          "privilege_escalation", "velocity_spike", "bulk_download", "off_hours_login"]
+        user_pool = ["usr_011", "usr_013", "usr_021", "usr_031", "usr_041",
+                     "usr_022", "usr_032", "usr_042", "usr_023", "usr_033", "usr_043", "usr_014"]
+        for i, (target_risk, pattern, uid) in enumerate(zip(standalone_risks, patterns_cycle, user_pool)):
+            spec = generator._specs.get(uid)
+            if not spec:
+                continue
+            offset_minutes = int(20 * 60 * (i + 1) / 13)  # spread over 20h
+            ev_ts = now - timedelta(minutes=max(30, offset_minutes))
+            ev = generator._fraud_event(spec, ev_ts, pattern)
+            ev["source"] = "seed"
+            ev["event_source"] = "seed"
+            ev["occurred_at"] = ev["timestamp"]
+            ev["ingested_at"] = now
+
+            feat = engineer.compute_features(ev["user_id"], ev)
+            scores = ensemble.predict(ev["user_id"], feat)
+            ev["risk_score"] = float(target_risk)
+            ev["features_json"] = json.dumps(feat.tolist())
+
+            db.add(EventModel(**{k: v for k, v in ev.items() if k in _EVENT_COLS}))
+
+            shap_vals = ensemble.explain(feat)
+            alert_id = str(uuid.uuid4())
+            db.add(AlertModel(
+                id=alert_id,
+                user_id=ev["user_id"],
+                user_name=ev["user_name"],
+                timestamp=ev["timestamp"],
+                created_at=now,
+                occurred_at=ev["timestamp"],
+                ingested_at=now,
+                risk_score=float(target_risk),
+                fraud_type=ev.get("fraud_type") or "anomalous_behavior",
+                model_scores_json=json.dumps(scores),
+                shap_values_json=json.dumps(shap_vals),
+                status="open",
+                label="TP" if i % 3 == 0 else ("FP" if i % 3 == 1 else ""),
+                event_id=ev["id"],
+                notes="",
+            ))
+
+        await db.commit()
+
+    logger.info("seed_demo_state: done — seeded 300 normal events, 3 fraud chains, 12 standalone alerts")
 
 
 _LIVE_FRAUD_PATTERNS = ["off_hours_login", "bulk_download", "cross_department_access", "privilege_escalation", "velocity_spike"]
@@ -601,11 +825,12 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
 
 @app.get("/api/feed", response_model=List[FeedEvent])
 async def get_feed(db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import func as sqlfunc
     rows = (
         await db.execute(
             select(EventModel)
             .where(EventModel.event_source.in_(["live", "simulation"]))
-            .order_by(desc(EventModel.timestamp))
+            .order_by(desc(sqlfunc.coalesce(EventModel.ingested_at, EventModel.timestamp)))
             .limit(_MAX_FEED)
         )
     ).scalars().all()
@@ -705,6 +930,18 @@ async def get_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
     row = await db.get(AlertModel, alert_id)
     if not row:
         raise HTTPException(404, "Alert not found")
+    # Generate and cache ai_narrative on first fetch
+    if not getattr(row, "ai_narrative", None):
+        user = await db.get(UserModel, row.user_id)
+        if user:
+            try:
+                shap_vals = json.loads(row.shap_values_json or "[]")
+                narrative = generate_alert_narrative(row, shap_vals, user)
+                if narrative:
+                    row.ai_narrative = narrative
+                    await db.commit()
+            except Exception:
+                pass
     return _alert_from_row(row)
 
 
@@ -902,7 +1139,6 @@ async def get_alert_timeline(alert_id: str, db: AsyncSession = Depends(get_db)):
 
     items: list[TimelineItem] = []
 
-    # 1. Preceding events (up to 8, before alert timestamp)
     window_start = alert.timestamp - timedelta(hours=4)
     event_rows = (
         await db.execute(
@@ -917,7 +1153,6 @@ async def get_alert_timeline(alert_id: str, db: AsyncSession = Depends(get_db)):
         )
     ).scalars().all()
 
-    # Baseline: events more than 30min before alert
     cutoff = alert.timestamp - timedelta(minutes=30)
     for ev in event_rows:
         kind = "baseline" if ev.timestamp < cutoff else "suspicious"
@@ -931,7 +1166,6 @@ async def get_alert_timeline(alert_id: str, db: AsyncSession = Depends(get_db)):
             source="event",
         ))
 
-    # 2. Alert trigger itself
     items.append(TimelineItem(
         id=alert.id,
         timestamp=alert.timestamp,
@@ -942,7 +1176,6 @@ async def get_alert_timeline(alert_id: str, db: AsyncSession = Depends(get_db)):
         source="alert",
     ))
 
-    # 3. Audit log entries after alert
     audit_rows = (
         await db.execute(
             select(AuditLogModel)
@@ -1116,7 +1349,6 @@ async def get_case_timeline(case_id: str, db: AsyncSession = Depends(get_db)):
     chain_end = max(a.timestamp for a in target_chain)
     chain_user_ids = list({a.user_id for a in target_chain})
 
-    # Real events from DB in the case window
     event_rows = (
         await db.execute(
             select(EventModel)
@@ -1144,7 +1376,6 @@ async def get_case_timeline(case_id: str, db: AsyncSession = Depends(get_db)):
             source="event",
         ))
 
-    # Audit log entries for all alerts in the chain
     chain_alert_ids = [a.id for a in target_chain]
     audit_rows = (
         await db.execute(
@@ -1318,13 +1549,11 @@ async def get_intelligence(db: AsyncSession = Depends(get_db)):
     label_fp = sum(1 for a in labeled_alerts if a.label == "FP")
 
     if len(labeled_alerts) < 10:
-        # Not enough human-reviewed alerts to produce meaningful metrics
-        precision = 0.0
-        recall = 0.0
-        f1 = 0.0
+        precision = None
+        recall = None
+        f1 = None
     else:
         precision = round(label_tp / max(1, label_tp + label_fp), 3)
-        # Recall proxy: fraction of reviewed alerts confirmed as real threats
         recall = round(label_tp / max(1, len(labeled_alerts)), 3)
         f1 = round((2 * precision * recall) / max(0.001, precision + recall), 3)
 
@@ -1447,11 +1676,52 @@ async def simulate(body: SimulateRequest = None):
     if body is None:
         body = SimulateRequest()
     pattern = _SCENARIO_PATTERNS.get(body.scenario or "") if body.scenario else None
-    ev = generator.generate_forced_fraud(pattern) if pattern else generator.generate_one()
-    ev["_force_alert"] = True
-    ev["_source"] = "simulation"
-    await _process_event(ev)  # await so alert is in DB before response returns
-    return {"status": "ok", "event_id": ev["id"], "scenario": body.scenario}
+    scenario_id = str(uuid.uuid4())
+    now = datetime.utcnow()
+
+    # Generate 4-event chain spread across last 90 minutes
+    events = []
+    for i in range(4):
+        if pattern:
+            ev = generator.generate_forced_fraud(pattern)
+        else:
+            ev = generator.generate_one()
+        offset_minutes = random.randint(0, 85) + i * 5
+        ev["timestamp"] = now - timedelta(minutes=offset_minutes)
+        ev["scenario_id"] = scenario_id
+        ev["source"] = "simulation"
+        ev["event_source"] = "simulation"
+        events.append(ev)
+
+    # Sort oldest-first and mark the last one as force_alert
+    events.sort(key=lambda e: e["timestamp"])
+    events[-1]["_force_alert"] = True
+    events[-1]["timestamp"] = now  # most recent event triggers the alert
+
+    alert_id = None
+    for ev in events:
+        ev["_source"] = "simulation"
+        await _process_event(ev)
+
+    # Find the alert created for this scenario
+    async with SessionLocal() as db:
+        recent_alert = (
+            await db.execute(
+                select(AlertModel)
+                .where(AlertModel.user_id == events[-1].get("user_id", ""))
+                .order_by(desc(AlertModel.timestamp))
+                .limit(1)
+            )
+        ).scalars().first()
+        alert_id = recent_alert.id if recent_alert else None
+
+    return {
+        "status": "ok",
+        "scenario": body.scenario,
+        "scenario_id": scenario_id,
+        "events_created": len(events),
+        "alert_id": alert_id,
+    }
 
 
 @app.post("/api/retrain", response_model=RetrainResponse)

@@ -31,6 +31,9 @@ class AlertResponse(BaseModel):
     status: str
     label: Optional[str] = None
     notes: Optional[str] = None
+    occurred_at: Optional[datetime] = None
+    ingested_at: Optional[datetime] = None
+    ai_narrative: Optional[str] = None
 
 
 class AlertListResponse(BaseModel):
@@ -150,9 +153,9 @@ class FPTrendPoint(BaseModel):
 class IntelligenceResponse(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
-    precision: float
-    recall: float
-    f1: float
+    precision: Optional[float] = None
+    recall: Optional[float] = None
+    f1: Optional[float] = None
     mean_time_to_detect: float
     alert_volume_last_7_days: List[DailyCount]
     anomaly_type_breakdown: List[BreakdownItem]

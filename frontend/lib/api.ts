@@ -26,6 +26,9 @@ export interface Alert {
   status: 'open' | 'resolved' | 'dismissed'
   label?: string
   notes?: string
+  occurred_at?: string | null
+  ingested_at?: string | null
+  ai_narrative?: string | null
 }
 
 export interface AlertListResponse {
@@ -64,6 +67,8 @@ export interface FeedEvent {
   description: string
   is_anomalous: boolean
   alert_id?: string | null
+  occurred_at?: string | null
+  ingested_at?: string | null
 }
 
 export interface UserEvent {
@@ -132,9 +137,9 @@ export interface CaseItem {
 }
 
 export interface Intelligence {
-  precision: number
-  recall: number
-  f1: number
+  precision: number | null
+  recall: number | null
+  f1: number | null
   mean_time_to_detect: number
   alert_volume_last_7_days: { date: string; count: number }[]
   anomaly_type_breakdown: { fraud_type: string; count: number }[]
@@ -188,6 +193,7 @@ export const api = {
     time_range?: string
     page?: number
     page_size?: number
+    min_score?: number
   }) => {
     const q = new URLSearchParams()
     if (params?.risk_level) q.set('risk_level', params.risk_level)
@@ -195,6 +201,7 @@ export const api = {
     if (params?.time_range) q.set('time_range', params.time_range)
     if (params?.page) q.set('page', String(params.page))
     if (params?.page_size) q.set('page_size', String(params.page_size))
+    if (params?.min_score != null) q.set('min_score', String(params.min_score))
     return fetchApi<AlertListResponse>(`/api/alerts?${q}`)
   },
 

@@ -244,9 +244,9 @@ export default function IntelligencePage() {
                   Precision and recall computed from analyst-labeled alerts (TP/FP) · {data.training_events || 0} total events processed
                 </p>
                 <div className="stat-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
-                  <Stat label="Precision" value={`${(data.precision * 100).toFixed(1)}%`} />
-                  <Stat label="Recall" value={`${(data.recall * 100).toFixed(1)}%`} />
-                  <Stat label="F1 Score" value={`${(data.f1 * 100).toFixed(1)}%`} />
+                  <Stat label="Precision" value={data.precision != null ? `${(data.precision * 100).toFixed(1)}%` : '—'} sub={data.precision == null ? 'need ≥10 labels' : undefined} />
+                  <Stat label="Recall" value={data.recall != null ? `${(data.recall * 100).toFixed(1)}%` : '—'} sub={data.recall == null ? 'need ≥10 labels' : undefined} />
+                  <Stat label="F1 Score" value={data.f1 != null ? `${(data.f1 * 100).toFixed(1)}%` : '—'} sub={data.f1 == null ? 'need ≥10 labels' : undefined} />
                   <Stat label="Mean Detect Time" value={detectDisplay} sub="event scored to alert created" />
                 </div>
               </div>

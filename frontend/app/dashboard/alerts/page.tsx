@@ -85,6 +85,7 @@ export default function AlertsPage() {
   const [riskLevel, setRiskLevel] = useState('all')
   const [status, setStatus] = useState('open')
   const [timeRange, setTimeRange] = useState('all')
+  const [minScore, setMinScore] = useState(65)
   const [page, setPage] = useState(1)
   const [simOpen, setSimOpen] = useState(false)
   const [simToast, setSimToast] = useState('')
@@ -110,16 +111,17 @@ export default function AlertsPage() {
         time_range: timeRange === 'all' ? undefined : timeRange,
         page,
         page_size: PAGE_SIZE,
+        min_score: minScore,
       })
       setAlerts(res.alerts)
       setTotal(res.total)
       api.stats().then(setStats).catch(() => null)
     } catch { /* backend starting */ }
     finally { setLoading(false) }
-  }, [riskLevel, status, timeRange, page])
+  }, [riskLevel, status, timeRange, page, minScore])
 
   useEffect(() => { fetch() }, [fetch])
-  useEffect(() => { setPage(1) }, [riskLevel, status, timeRange])
+  useEffect(() => { setPage(1) }, [riskLevel, status, timeRange, minScore])
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
@@ -169,10 +171,23 @@ export default function AlertsPage() {
           </div>
 
           {/* Filters */}
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
             <Select value={riskLevel} onChange={setRiskLevel} options={RISK_LEVELS.map(v => ({ value: v }))} label="Risk level" />
             <Select value={status} onChange={setStatus} options={STATUSES.map(v => ({ value: v }))} label="Status" />
             <Select value={timeRange} onChange={setTimeRange} options={TIME_RANGES} label="Time range" />
+          </div>
+          {/* Min score threshold slider */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 10, color: C.textMuted, flexShrink: 0 }}>Min score</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={minScore}
+              onChange={(e) => setMinScore(Number(e.target.value))}
+              style={{ flex: 1, accentColor: C.critical, cursor: 'pointer' }}
+            />
+            <span style={{ fontSize: 11, fontWeight: 700, color: C.textPrimary, width: 24, textAlign: 'right', flexShrink: 0 }}>{minScore}</span>
           </div>
         </div>
 
