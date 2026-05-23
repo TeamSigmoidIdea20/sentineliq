@@ -39,15 +39,11 @@ class XGBoostModel:
             self.is_fitted = True
             return
 
-        pos = int(y.sum())
-        neg = int(len(y) - pos)
-        scale = neg / max(1, pos)
-
         self._model = xgb.XGBClassifier(
             n_estimators=150,
             max_depth=3,
             learning_rate=0.1,
-            scale_pos_weight=scale,
+            scale_pos_weight=2,
             subsample=0.8,
             colsample_bytree=0.6,
             min_child_weight=2,
