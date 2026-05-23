@@ -124,11 +124,13 @@ export default function AlertsPage() {
   useEffect(() => { fetch() }, [fetch])
   useEffect(() => { setPage(1) }, [riskLevel, status, timeRange, minScore])
 
-  // Read fraud_type URL param on mount (from "View pattern" link on dashboard)
+  // Read URL params on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const ft = params.get('fraud_type')
     if (ft) setFraudTypeFilter(ft)
+    const id = params.get('id')
+    if (id) setSelectedId(id)
   }, [])
 
   // Auto-open first alert matching the fraud_type param once alerts load

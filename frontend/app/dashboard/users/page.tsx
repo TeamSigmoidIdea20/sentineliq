@@ -400,6 +400,12 @@ export default function UsersPage() {
     return () => clearInterval(interval)
   }, [fetchUsers])
 
+  // Auto-open user from ?id= param (e.g. from command palette)
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('id')
+    if (id) setSelectedUserId(id)
+  }, [])
+
   // Sort: watchlisted first, then by risk_score descending
   const q = searchQuery.trim().toLowerCase()
   const displayedUsers = users

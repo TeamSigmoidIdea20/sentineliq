@@ -3,13 +3,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import CommandPalette from '@/components/CommandPalette'
-import { api, type Alert } from '@/lib/api'
+import { api, type Alert, type User } from '@/lib/api'
 import { C } from '@/lib/tokens'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const [cmdkOpen, setCmdkOpen] = useState(false)
   const [alerts, setAlerts] = useState<Alert[]>([])
+  const [users, setUsers] = useState<User[]>([])
   const [backendStatus, setBackendStatus] = useState<'ok' | 'initializing' | 'offline'>('ok')
   const gMode = useRef(false)
 
@@ -23,10 +24,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [])
 
   useEffect(() => {
-    const load = () => api.alerts({ status: 'open', page_size: 20 }).then(r => setAlerts(r.alerts)).catch(() => null)
+    const load = () => api.alerts({ status: 'open', page_size: 50 }).then(r => setAlerts(r.alerts)).catch(() => null)
     load()
     const id = setInterval(load, 10000)
     return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    api.users().then(setUsers).catch(() => null)
   }, [])
 
   useEffect(() => {
@@ -82,7 +87,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       )}
       {children}
-      <CommandPalette open={cmdkOpen} onClose={() => setCmdkOpen(false)} alerts={alerts} />
+      <CommandPalette open={cmdkOpen} onClose={() => setCmdkOpen(false)} alerts={alerts} users={users} />
     </>
   )
 }
