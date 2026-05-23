@@ -262,6 +262,8 @@ export const api = {
   alertTimeline: (id: string) => fetchApi<TimelineItem[]>(`/api/alerts/${id}/timeline`),
 
   caseTimeline: (id: string) => fetchApi<TimelineItem[]>(`/api/cases/${id}/timeline`),
+  resolveCase: (id: string) => fetchApi<{ status: string }>(`/api/cases/${id}/resolve`, { method: 'POST' }),
+  dismissCase: (id: string) => fetchApi<{ status: string }>(`/api/cases/${id}/dismiss`, { method: 'POST' }),
 
   auditLog: (params?: { user_id?: string; alert_id?: string; limit?: number }) => {
     const q = new URLSearchParams()

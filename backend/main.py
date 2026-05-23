@@ -1497,7 +1497,10 @@ async def escalate_user(user_id: str, db: AsyncSession = Depends(get_db)):
 async def get_cases(db: AsyncSession = Depends(get_db)):
     case_rows = (
         await db.execute(
-            select(CaseModel).order_by(CaseModel.updated_at.desc()).limit(20)
+            select(CaseModel)
+            .where(CaseModel.status == "open")
+            .order_by(CaseModel.updated_at.desc())
+            .limit(20)
         )
     ).scalars().all()
 
@@ -1650,6 +1653,44 @@ async def get_case_timeline(case_id: str, db: AsyncSession = Depends(get_db)):
         ))
 
     return sorted(items, key=lambda x: x.timestamp)
+
+
+@app.post("/api/cases/{case_id}/resolve")
+async def resolve_case(case_id: str, db: AsyncSession = Depends(get_db)):
+    case = await db.get(CaseModel, case_id)
+    if not case:
+        raise HTTPException(404, "Case not found")
+    case.status = "resolved"
+    case.updated_at = datetime.utcnow()
+    db.add(AuditLogModel(
+        id=str(uuid.uuid4()),
+        created_at=datetime.utcnow(),
+        action_type="case_resolved",
+        entity_type="case",
+        entity_id=case_id,
+        message=f"Case '{case.name}' marked as resolved by analyst.",
+    ))
+    await db.commit()
+    return {"status": "resolved"}
+
+
+@app.post("/api/cases/{case_id}/dismiss")
+async def dismiss_case(case_id: str, db: AsyncSession = Depends(get_db)):
+    case = await db.get(CaseModel, case_id)
+    if not case:
+        raise HTTPException(404, "Case not found")
+    case.status = "dismissed"
+    case.updated_at = datetime.utcnow()
+    db.add(AuditLogModel(
+        id=str(uuid.uuid4()),
+        created_at=datetime.utcnow(),
+        action_type="case_dismissed",
+        entity_type="case",
+        entity_id=case_id,
+        message=f"Case '{case.name}' dismissed as a false cluster by analyst.",
+    ))
+    await db.commit()
+    return {"status": "dismissed"}
 
 
 @app.get("/api/users/{user_id}", response_model=UserDetailResponse)

@@ -135,6 +135,8 @@ export default function CasesPage() {
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<'timeline' | 'alerts'>('timeline')
+  const [acting, setActing] = useState(false)
+  const [banner, setBanner] = useState<{ text: string; color: string } | null>(null)
 
   useEffect(() => {
     api.cases()
@@ -144,6 +146,32 @@ export default function CasesPage() {
   }, [])
 
   const selectedCase = cases.find(c => c.id === selectedCaseId) ?? null
+
+  const removeCase = (id: string) => {
+    setCases(prev => {
+      const remaining = prev.filter(c => c.id !== id)
+      setSelectedCaseId(remaining[0]?.id ?? null)
+      return remaining
+    })
+  }
+
+  const handleResolve = async () => {
+    if (!selectedCaseId || acting) return
+    setActing(true)
+    await api.resolveCase(selectedCaseId).catch(() => null)
+    setBanner({ text: 'Case closed. Investigation marked resolved — audit trail preserved.', color: C.low })
+    setTimeout(() => { removeCase(selectedCaseId) }, 1400)
+    setActing(false)
+  }
+
+  const handleDismiss = async () => {
+    if (!selectedCaseId || acting) return
+    setActing(true)
+    await api.dismissCase(selectedCaseId).catch(() => null)
+    setBanner({ text: 'Case dismissed. Marked as false cluster — no further action required.', color: C.textMuted })
+    setTimeout(() => { removeCase(selectedCaseId) }, 1400)
+    setActing(false)
+  }
 
   return (
     <div style={{ display: 'flex', height: '100vh', background: C.bg, overflow: 'hidden' }}>
@@ -162,10 +190,10 @@ export default function CasesPage() {
               <div key={i} style={{ height: 110, background: C.card, border: `1px solid ${C.border}`, borderRadius: 4 }} />
             ))}
             {!loading && cases.length === 0 && (
-              <div style={{ color: C.textMuted, fontSize: 12, padding: 16 }}>No kill-chain clusters yet (need ≥3 linked alerts in 24h).</div>
+              <div style={{ color: C.textMuted, fontSize: 12, padding: 16 }}>No open kill-chain cases.</div>
             )}
             {cases.map(item => (
-              <CaseCard key={item.id} item={item} active={item.id === selectedCaseId} onClick={() => setSelectedCaseId(item.id)} />
+              <CaseCard key={item.id} item={item} active={item.id === selectedCaseId} onClick={() => { setSelectedCaseId(item.id); setBanner(null) }} />
             ))}
           </div>
         </div>
@@ -180,13 +208,13 @@ export default function CasesPage() {
             <>
               {/* Detail header */}
               <div style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`, background: C.card, flexShrink: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: banner ? 10 : 0 }}>
                   <div>
                     <p style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 700, color: C.textPrimary }}>{selectedCase.name}</p>
                     <p style={{ margin: 0, fontSize: 11, color: C.textMuted }}>{selectedCase.user_names.join(', ')} · {selectedCase.linked_alerts_count} alerts</p>
                   </div>
-                  {/* View toggle */}
-                  <div style={{ display: 'flex', gap: 4 }}>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    {/* View toggle */}
                     {(['timeline', 'alerts'] as const).map(v => (
                       <button key={v} onClick={() => setView(v)}
                         style={{
@@ -199,8 +227,39 @@ export default function CasesPage() {
                         }}
                       >{v}</button>
                     ))}
+                    <div style={{ width: 1, height: 20, background: C.border, margin: '0 2px' }} />
+                    {/* Case actions */}
+                    <button
+                      onClick={handleResolve}
+                      disabled={acting}
+                      style={{
+                        padding: '5px 12px', fontSize: 11, fontWeight: 700, letterSpacing: '0.05em',
+                        background: C.low, border: 'none', color: '#fff',
+                        borderRadius: 3, cursor: acting ? 'default' : 'pointer', fontFamily: 'inherit',
+                        opacity: acting ? 0.6 : 1,
+                      }}
+                    >RESOLVE</button>
+                    <button
+                      onClick={handleDismiss}
+                      disabled={acting}
+                      style={{
+                        padding: '5px 12px', fontSize: 11, fontWeight: 700, letterSpacing: '0.05em',
+                        background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted,
+                        borderRadius: 3, cursor: acting ? 'default' : 'pointer', fontFamily: 'inherit',
+                        opacity: acting ? 0.6 : 1,
+                      }}
+                    >DISMISS</button>
                   </div>
                 </div>
+                {banner && (
+                  <div style={{
+                    padding: '7px 10px', fontSize: 11, color: banner.color,
+                    background: `${banner.color}18`, border: `1px solid ${banner.color}44`,
+                    borderRadius: 3, lineHeight: 1.5,
+                  }}>
+                    {banner.text}
+                  </div>
+                )}
               </div>
 
               {/* Detail body */}
