@@ -6,9 +6,9 @@ from models.isolation_forest import IsolationForestModel
 from models.lstm_autoencoder import LSTMAutoencoderModel
 from models.xgboost_model import XGBoostModel
 
-IF_WEIGHT = 0.3
+IF_WEIGHT = 0.4
 LSTM_WEIGHT = 0.4
-XGB_WEIGHT = 0.3
+XGB_WEIGHT = 0.2
 
 
 class EnsembleModel:

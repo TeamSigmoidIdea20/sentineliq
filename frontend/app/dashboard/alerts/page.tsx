@@ -178,7 +178,7 @@ export default function AlertsPage() {
       <Sidebar />
 
       {/* Queue rail */}
-      <div style={{ width: 320, flexShrink: 0, height: '100vh', display: 'flex', flexDirection: 'column', borderRight: `1px solid ${C.border}`, background: C.card }}>
+      <div style={{ width: 420, flexShrink: 0, height: '100vh', display: 'flex', flexDirection: 'column', borderRight: `1px solid ${C.border}`, background: C.card }}>
 
         {/* Rail header */}
         <div style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>

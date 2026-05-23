@@ -2024,9 +2024,7 @@ async def set_webhook(body: WebhookConfigRequest, db: AsyncSession = Depends(get
 async def ingest_event(body: IngestEventRequest):
     async with SessionLocal() as db:
         user = await db.get(UserModel, body.user_id)
-        if not user:
-            raise HTTPException(404, f"User {body.user_id} not found")
-        user_name = user.name
+        user_name = user.name if user else body.user_id
 
     event_id = str(uuid.uuid4())
     ev: dict = {
