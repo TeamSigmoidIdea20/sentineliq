@@ -16,7 +16,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import and_, delete, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database import AlertModel, AuditLogModel, CaseAlertModel, CaseModel, EventModel, ModelMetricModel, TimelineItemModel, UserModel, get_db, init_db, SessionLocal
+import httpx
+from database import AlertModel, AuditLogModel, CaseAlertModel, CaseModel, EventModel, ModelMetricModel, SettingModel, TimelineItemModel, UserModel, get_db, init_db, SessionLocal
 from llm_narrative import generate_alert_narrative
 from data.feature_engineering import FeatureEngineer
 from data.synthetic_generator import SyntheticGenerator
@@ -28,6 +29,8 @@ from schemas import (
     CoordinatedPattern,
     FeedEvent,
     HealthResponse,
+    IngestEventRequest,
+    IngestEventResponse,
     IntelligenceResponse,
     DailyCount,
     DeptRiskItem,
@@ -47,6 +50,8 @@ from schemas import (
     UserDetailResponse,
     UserEventResponse,
     UserResponse,
+    WebhookConfigRequest,
+    WebhookConfigResponse,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -57,6 +62,7 @@ engineer = FeatureEngineer()
 ensemble = EnsembleModel()
 _events_processed = 0
 _initialized = False
+_webhook_url_cache: str = ""
 _MAX_FEED = 20
 MODEL_VERSION = "v1.0.0"
 SAVED_MODEL_DIR = os.path.join(os.path.dirname(__file__), "models", "saved")
@@ -134,6 +140,8 @@ def _case_name(fraud_types: set[str], user_count: int = 1) -> str:
         return "Data Exfiltration Attempt"
     if {"privilege_escalation", "off_hours_login"}.issubset(fraud_types):
         return "Privilege Abuse Sequence"
+    if "account_modification" in fraud_types:
+        return "Account Record Tampering"
     if len(fraud_types) >= 3:
         return "Coordinated Insider Threat" if user_count > 1 else "Multi-Pattern Insider Threat"
     return "Escalating Insider Risk"
@@ -212,6 +220,23 @@ async def _startup() -> None:
     _initialized = True
     logger.info("Startup complete. Seeding demo state.")
     await seed_demo_state()
+
+    # Load persisted webhook URL
+    global _webhook_url_cache
+    async with SessionLocal() as db:
+        row = await db.get(SettingModel, "webhook_url")
+        if row and row.value:
+            _webhook_url_cache = row.value
+            logger.info("Webhook URL loaded from settings")
+
+
+async def _fire_webhook(url: str, payload: dict) -> None:
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(url, json=payload)
+            logger.info("Webhook delivered to %s", url[:60])
+    except Exception as exc:
+        logger.warning("Webhook delivery failed: %s", exc)
 
 
 async def _process_event(ev: dict) -> None:
@@ -323,6 +348,18 @@ async def _process_event(ev: dict) -> None:
 
         await _refresh_user_risk(ev["user_id"], db)
         await db.commit()
+
+    if alert_id and risk_score >= 80 and _webhook_url_cache:
+        asyncio.create_task(_fire_webhook(_webhook_url_cache, {
+            "alert_id": alert_id,
+            "user_name": ev.get("user_name", ""),
+            "risk_score": round(risk_score, 1),
+            "fraud_type": ev.get("fraud_type") or "anomalous_behavior",
+            "risk_level": _risk_level(risk_score),
+            "timestamp": ev.get("occurred_at", datetime.utcnow()).isoformat()
+            if isinstance(ev.get("occurred_at"), datetime)
+            else datetime.utcnow().isoformat(),
+        }))
 
 
 async def _refresh_user_risk(user_id: str, db: AsyncSession) -> None:
@@ -495,7 +532,7 @@ async def _update_or_create_case(user_id: str, alert: AlertModel, db: AsyncSessi
     return case_id
 
 
-SEED_VERSION = "v4"  # bump when seed logic changes to force reseed on deployed instances
+SEED_VERSION = "v5"  # bump when seed logic changes to force reseed on deployed instances
 
 
 async def _clear_seed_data(db) -> None:
@@ -709,9 +746,9 @@ async def seed_demo_state() -> None:
 
         # 12 standalone alerts spread over last 20h
         standalone_risks = [65, 72, 76, 80, 68, 84, 71, 88, 66, 79, 91, 70]
-        patterns_cycle = ["off_hours_login", "bulk_download", "cross_department_access", "privilege_escalation",
-                          "velocity_spike", "off_hours_login", "bulk_download", "cross_department_access",
-                          "privilege_escalation", "velocity_spike", "bulk_download", "off_hours_login"]
+        patterns_cycle = ["off_hours_login", "bulk_download", "account_modification", "privilege_escalation",
+                          "velocity_spike", "account_modification", "bulk_download", "cross_department_access",
+                          "privilege_escalation", "velocity_spike", "account_modification", "off_hours_login"]
         user_pool = ["usr_011", "usr_013", "usr_021", "usr_031", "usr_041",
                      "usr_022", "usr_032", "usr_042", "usr_023", "usr_033", "usr_043", "usr_014"]
         standalone_labels = ["TP", "FP", "TP", "FP", "TP", "TP", "FP", "TP", "FP", "TP", "TP", "TP"]
@@ -798,7 +835,7 @@ async def seed_demo_state() -> None:
     logger.info("seed_demo_state: done — seeded 300 normal events, 3 fraud chains, 12 standalone alerts (%s)", SEED_VERSION)
 
 
-_LIVE_FRAUD_PATTERNS = ["off_hours_login", "bulk_download", "cross_department_access", "privilege_escalation", "velocity_spike"]
+_LIVE_FRAUD_PATTERNS = ["off_hours_login", "bulk_download", "cross_department_access", "privilege_escalation", "velocity_spike", "account_modification"]
 
 async def _event_loop() -> None:
     live_count = 0
@@ -1018,7 +1055,7 @@ async def get_feed(db: AsyncSession = Depends(get_db)):
     rows = (
         await db.execute(
             select(EventModel)
-            .where(EventModel.event_source.in_(["live", "simulation"]))
+            .where(EventModel.event_source.in_(["live", "simulation", "ingest"]))
             .order_by(desc(sqlfunc.coalesce(EventModel.ingested_at, EventModel.timestamp)))
             .limit(_MAX_FEED)
         )
@@ -1954,6 +1991,86 @@ async def get_intelligence(db: AsyncSession = Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Webhook settings
+# ---------------------------------------------------------------------------
+
+@app.get("/api/settings/webhook", response_model=WebhookConfigResponse)
+async def get_webhook(db: AsyncSession = Depends(get_db)):
+    row = await db.get(SettingModel, "webhook_url")
+    url = row.value if row else ""
+    return WebhookConfigResponse(url=url, configured=bool(url))
+
+
+@app.post("/api/settings/webhook", response_model=WebhookConfigResponse)
+async def set_webhook(body: WebhookConfigRequest, db: AsyncSession = Depends(get_db)):
+    global _webhook_url_cache
+    row = await db.get(SettingModel, "webhook_url")
+    if row:
+        row.value = body.url
+        row.updated_at = datetime.utcnow()
+    else:
+        db.add(SettingModel(key="webhook_url", value=body.url, updated_at=datetime.utcnow()))
+    await db.commit()
+    _webhook_url_cache = body.url
+    return WebhookConfigResponse(url=body.url, configured=bool(body.url))
+
+
+# ---------------------------------------------------------------------------
+# External event ingestion
+# ---------------------------------------------------------------------------
+
+@app.post("/api/ingest", response_model=IngestEventResponse)
+async def ingest_event(body: IngestEventRequest):
+    async with SessionLocal() as db:
+        user = await db.get(UserModel, body.user_id)
+        if not user:
+            raise HTTPException(404, f"User {body.user_id} not found")
+        user_name = user.name
+
+    event_id = str(uuid.uuid4())
+    ev: dict = {
+        "id": event_id,
+        "user_id": body.user_id,
+        "user_name": user_name,
+        "timestamp": datetime.utcnow(),
+        "event_type": body.event_type,
+        "department": body.department,
+        "location": body.location,
+        "hour": body.hour,
+        "device": body.device,
+        "download_mb": body.download_mb,
+        "tx_count": body.tx_count,
+        "fraud_type": "",
+        "is_fraud": 0,
+        "description": body.description or f"External event: {body.event_type} in {body.department}",
+        "risk_score": 0.0,
+        "features_json": "{}",
+        "system": body.system,
+        "_source": "ingest",
+    }
+    await _process_event(ev)
+
+    async with SessionLocal() as db:
+        ev_row = await db.get(EventModel, event_id)
+        if not ev_row:
+            raise HTTPException(500, "Event processing failed")
+        alert_row = (
+            await db.execute(
+                select(AlertModel).where(AlertModel.event_id == event_id).limit(1)
+            )
+        ).scalars().first()
+
+    return IngestEventResponse(
+        event_id=event_id,
+        risk_score=round(ev_row.risk_score, 2),
+        risk_level=_risk_level(ev_row.risk_score),
+        alert_id=alert_row.id if alert_row else None,
+        alert_triggered=alert_row is not None,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Simulate / retrain
 # ---------------------------------------------------------------------------
 
@@ -1961,6 +2078,7 @@ _SCENARIO_PATTERNS: dict = {
     "bulk_exfiltration": "bulk_download",
     "privilege_escalation": "privilege_escalation",
     "off_hours_treasury": "off_hours_login",
+    "account_tampering": "account_modification",
 }
 
 @app.post("/api/simulate")

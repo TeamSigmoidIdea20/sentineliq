@@ -220,3 +220,33 @@ class RetrainResponse(BaseModel):
     recall_after: Optional[float] = None
     f1_after: Optional[float] = None
     labels_used: int = 0
+
+
+class WebhookConfigRequest(BaseModel):
+    url: str
+
+
+class WebhookConfigResponse(BaseModel):
+    url: str
+    configured: bool
+
+
+class IngestEventRequest(BaseModel):
+    user_id: str
+    event_type: str
+    department: str
+    location: str
+    hour: int
+    device: str = "workstation_corp"
+    download_mb: float = 0.0
+    tx_count: int = 1
+    description: str = ""
+    system: str = ""
+
+
+class IngestEventResponse(BaseModel):
+    event_id: str
+    risk_score: float
+    risk_level: str
+    alert_id: Optional[str] = None
+    alert_triggered: bool

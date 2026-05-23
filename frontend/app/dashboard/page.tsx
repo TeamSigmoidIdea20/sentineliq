@@ -16,6 +16,7 @@ const _SIMULATE_SCENARIOS = [
   { label: 'Bulk Data Exfiltration', scenario: 'bulk_exfiltration' },
   { label: 'Privilege Escalation', scenario: 'privilege_escalation' },
   { label: 'Off-Hours Treasury Access', scenario: 'off_hours_treasury' },
+  { label: 'Account Record Tampering', scenario: 'account_tampering' },
 ]
 
 export default function DashboardPage() {

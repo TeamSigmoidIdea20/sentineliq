@@ -157,6 +157,14 @@ class TimelineItemModel(Base):
     source_record_id: Mapped[str] = mapped_column(String, default="")
 
 
+class SettingModel(Base):
+    __tablename__ = "settings"
+
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    value: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
+
+
 async def init_db():
     async with engine.begin() as conn:
         await conn.execute(text("PRAGMA journal_mode=WAL"))
@@ -219,6 +227,7 @@ async def init_db():
             "CREATE INDEX IF NOT EXISTS idx_timeline_case_occurred ON timeline_items(case_id, occurred_at)",
             "CREATE INDEX IF NOT EXISTS idx_case_alerts_case ON case_alerts(case_id)",
             "CREATE INDEX IF NOT EXISTS idx_case_alerts_alert ON case_alerts(alert_id)",
+            "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT DEFAULT '', updated_at DATETIME)",
         ]:
             try:
                 await conn.execute(text(stmt))

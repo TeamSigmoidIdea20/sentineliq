@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import Sidebar from '@/components/Sidebar'
-import { api, type Intelligence, type ModelInfo, type Stats, timeAgo } from '@/lib/api'
+import { api, type Intelligence, type ModelInfo, type Stats, type WebhookConfig, timeAgo } from '@/lib/api'
 import { C } from '@/lib/tokens'
 
 const IntelligenceCharts = dynamic(() => import('@/components/IntelligenceCharts'), {
@@ -71,20 +71,41 @@ export default function IntelligencePage() {
   const [training, setTraining] = useState(false)
   const [logLines, setLogLines] = useState<string[]>([])
   const logRef = useRef<HTMLDivElement>(null)
+  const [webhook, setWebhook] = useState<WebhookConfig | null>(null)
+  const [webhookInput, setWebhookInput] = useState('')
+  const [webhookSaving, setWebhookSaving] = useState(false)
+  const [webhookSaved, setWebhookSaved] = useState(false)
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   const loadAll = async () => {
     setLoading(true)
-    const [intel, st, mi] = await Promise.allSettled([
+    const [intel, st, mi, wh] = await Promise.allSettled([
       api.intelligence(),
       api.stats(),
       api.modelInfo(),
+      api.getWebhook(),
     ])
     if (intel.status === 'fulfilled') setData(intel.value)
     else setData(null)
     if (st.status === 'fulfilled') setStats(st.value)
     if (mi.status === 'fulfilled') setModelInfo(mi.value)
+    if (wh.status === 'fulfilled') {
+      setWebhook(wh.value)
+      setWebhookInput(wh.value.url)
+    }
     setLoading(false)
   }
+
+  const saveWebhook = useCallback(async () => {
+    setWebhookSaving(true)
+    try {
+      const result = await api.setWebhook(webhookInput.trim())
+      setWebhook(result)
+      setWebhookSaved(true)
+      setTimeout(() => setWebhookSaved(false), 2500)
+    } catch { /* ignore */ }
+    setWebhookSaving(false)
+  }, [webhookInput])
 
   useEffect(() => { loadAll() }, [])
 
@@ -283,6 +304,101 @@ export default function IntelligencePage() {
               )}
 
               <IntelligenceCharts data={data} />
+
+              {/* Webhook Notifications */}
+              <div>
+                <p style={{ margin: '0 0 14px', fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  Webhook Notifications
+                </p>
+                <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 4, padding: '20px 20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+                    <div>
+                      <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 700, color: C.textPrimary }}>Outbound alert notifications</p>
+                      <p style={{ margin: 0, fontSize: 12, color: C.textMuted }}>Fires a POST request when any alert scores ≥ 80. Works with Slack, Teams, Discord, or any HTTP endpoint.</p>
+                    </div>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
+                      padding: '3px 8px', borderRadius: 2,
+                      border: `1px solid ${webhook?.configured ? C.low : C.border}`,
+                      color: webhook?.configured ? C.low : C.textMuted,
+                    }}>
+                      {webhook?.configured ? 'ACTIVE' : 'NOT CONFIGURED'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      type="url"
+                      placeholder="https://hooks.slack.com/services/..."
+                      value={webhookInput}
+                      onChange={(e) => setWebhookInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && saveWebhook()}
+                      style={{
+                        flex: 1, padding: '8px 12px', fontSize: 12, fontFamily: 'monospace',
+                        background: C.bg, border: `1px solid ${C.border}`, borderRadius: 3,
+                        color: C.textPrimary, outline: 'none',
+                      }}
+                    />
+                    <button
+                      onClick={saveWebhook}
+                      disabled={webhookSaving}
+                      style={{
+                        padding: '8px 16px', fontSize: 11, fontWeight: 700, letterSpacing: '0.05em',
+                        background: webhookSaved ? C.low : C.textPrimary,
+                        color: C.bg, border: 'none', borderRadius: 3, cursor: 'pointer',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {webhookSaved ? 'SAVED' : webhookSaving ? 'SAVING...' : 'SAVE'}
+                    </button>
+                  </div>
+                  {webhook?.configured && (
+                    <p style={{ margin: '10px 0 0', fontSize: 11, color: C.textMuted }}>
+                      Payload: <code style={{ fontFamily: 'monospace', color: C.textPrimary }}>{'{ alert_id, user_name, risk_score, fraud_type, risk_level, timestamp }'}</code>
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* API Connector */}
+              <div>
+                <p style={{ margin: '0 0 14px', fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  External System Connector
+                </p>
+                <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 4, padding: '20px 20px' }}>
+                  <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 700, color: C.textPrimary }}>Real-time event ingestion</p>
+                  <p style={{ margin: '0 0 16px', fontSize: 12, color: C.textMuted }}>
+                    POST raw events from Finacle, Temenos, or any core banking system directly into the ML pipeline. Each event is scored and can trigger an alert.
+                  </p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div>
+                      <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Endpoint</p>
+                      <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 3, padding: '8px 12px', fontFamily: 'monospace', fontSize: 11, color: C.textPrimary, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>POST {apiBase}/api/ingest</span>
+                        <button
+                          onClick={() => navigator.clipboard.writeText(`${apiBase}/api/ingest`)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textMuted, fontSize: 10, padding: 0 }}
+                        >
+                          COPY
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Response</p>
+                      <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 3, padding: '8px 12px', fontFamily: 'monospace', fontSize: 11, color: C.textMuted }}>
+                        {'{ event_id, risk_score, risk_level, alert_id?, alert_triggered }'}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 12 }}>
+                    <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Required fields</p>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {['user_id', 'event_type', 'department', 'location', 'hour', 'tx_count', 'download_mb'].map(f => (
+                        <span key={f} style={{ fontSize: 10, fontFamily: 'monospace', color: C.textPrimary, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 2, padding: '2px 7px' }}>{f}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </>
           )}
 

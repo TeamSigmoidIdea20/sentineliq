@@ -188,6 +188,15 @@ class SyntheticGenerator:
             ev["download_mb"] = random.uniform(20, 80)  # elevated download adds second signal
             ev["description"] = f"{name} processed {ev['tx_count']} transactions — {ev['tx_count'] // max(1, avg_tx)}x normal rate"
 
+        elif pattern == "account_modification":
+            foreign_depts = [d for d in ALL_DEPARTMENTS if d not in typ_depts]
+            foreign = random.choice(foreign_depts) if foreign_depts else "compliance"
+            ev["event_type"] = "system_query"
+            ev["department"] = foreign
+            ev["tx_count"] = int(avg_tx * random.uniform(3, 6))  # elevated record access
+            ev["download_mb"] = random.uniform(5, 30)            # exporting modified records
+            ev["description"] = f"{name} modified account records in {foreign} — abnormal access for {role}"
+
         # All fraud patterns use an anomalous device — gives device_change_frequency signal
         ev["device"] = random.choice(["mobile_vpn", "tablet_remote"])
         ev["fraud_type"] = pattern
@@ -199,7 +208,7 @@ class SyntheticGenerator:
             base_ts = datetime.utcnow() - timedelta(hours=random.randint(0, 2))
 
         events = []
-        fraud_patterns = ["off_hours_login","bulk_download","cross_department_access","privilege_escalation","velocity_spike"]
+        fraud_patterns = ["off_hours_login","bulk_download","cross_department_access","privilege_escalation","velocity_spike","account_modification"]
 
         for i in range(n):
             self._event_counter += 1

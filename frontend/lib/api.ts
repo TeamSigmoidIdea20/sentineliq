@@ -170,6 +170,32 @@ export interface RetrainResponse {
   labels_used: number
 }
 
+export interface WebhookConfig {
+  url: string
+  configured: boolean
+}
+
+export interface IngestEventRequest {
+  user_id: string
+  event_type: string
+  department: string
+  location: string
+  hour: number
+  device?: string
+  download_mb?: number
+  tx_count?: number
+  description?: string
+  system?: string
+}
+
+export interface IngestEventResponse {
+  event_id: string
+  risk_score: number
+  risk_level: string
+  alert_id?: string | null
+  alert_triggered: boolean
+}
+
 async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { 'Content-Type': 'application/json' },
@@ -258,6 +284,18 @@ export const api = {
   retrain: () => fetchApi<RetrainResponse>('/api/retrain', { method: 'POST' }),
 
   modelInfo: () => fetchApi<ModelInfo>('/api/model-info'),
+
+  getWebhook: () => fetchApi<WebhookConfig>('/api/settings/webhook'),
+
+  setWebhook: (url: string) => fetchApi<WebhookConfig>('/api/settings/webhook', {
+    method: 'POST',
+    body: JSON.stringify({ url }),
+  }),
+
+  ingestEvent: (event: IngestEventRequest) => fetchApi<IngestEventResponse>('/api/ingest', {
+    method: 'POST',
+    body: JSON.stringify(event),
+  }),
 
   alertTimeline: (id: string) => fetchApi<TimelineItem[]>(`/api/alerts/${id}/timeline`),
 
