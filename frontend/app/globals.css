@@ -75,6 +75,15 @@ body {
   animation: panel-slide-in 0.22s ease-out forwards;
 }
 
+@keyframes panel-appear {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.97); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+.alert-panel-overlay {
+  animation: panel-appear 0.18s ease-out forwards;
+}
+
 /* Action button hover — applies to all interactive buttons across the app */
 .btn-action {
   transition: opacity 0.12s, transform 0.12s;

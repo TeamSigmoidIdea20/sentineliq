@@ -244,6 +244,7 @@ export default function AlertsPage() {
                   { label: 'Bulk Data Exfiltration', scenario: 'bulk_exfiltration' },
                   { label: 'Privilege Escalation', scenario: 'privilege_escalation' },
                   { label: 'Off-Hours Treasury', scenario: 'off_hours_treasury' },
+                  { label: 'Account Record Tampering', scenario: 'account_tampering' },
                 ].map(({ label, scenario }, idx, arr) => (
                   <button key={scenario} onClick={() => handleSimulate(label, scenario)}
                     style={{
@@ -363,15 +364,21 @@ export default function AlertsPage() {
         )}
       </div>
 
-      {/* Inline detail panel */}
-      <div style={{ flex: 1, height: '100vh', overflow: 'hidden', minWidth: 0 }}>
-        <AlertPanel
-          alertId={selectedId}
-          onClose={() => setSelectedId(null)}
-          onResolved={handleResolved}
-          inline={true}
-        />
+      {/* Empty state when no alert selected */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8 }}>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.border} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+        <span style={{ fontSize: 12, color: C.textMuted }}>Select an alert to review</span>
       </div>
+
+      {/* Overlay alert panel */}
+      <AlertPanel
+        alertId={selectedId}
+        onClose={() => setSelectedId(null)}
+        onResolved={handleResolved}
+      />
     </div>
   )
 }

@@ -18,24 +18,14 @@ const FEATURE_DESC: Record<string, string> = {
   location_mismatch: 'location anomaly',
 }
 
-const EVENT_TAG: Record<string, { label: string; color: string }> = {
-  login: { label: 'Auth', color: '#4B9EF5' },
-  transaction: { label: 'Data', color: C.textMuted },
-  report_download: { label: 'Export', color: C.medium },
-  data_export: { label: 'Export', color: C.medium },
-  privilege_use: { label: 'Perm Δ', color: C.critical },
-  department_access: { label: 'Data', color: C.textMuted },
-  file_access: { label: 'Data', color: C.textMuted },
-  system_query: { label: 'Data', color: C.textMuted },
-}
-
-const FRAUD_TAG: Record<string, { label: string; color: string }> = {
-  off_hours_login: { label: 'Auth', color: C.critical },
-  bulk_download: { label: 'Export', color: C.medium },
-  cross_department_access: { label: 'Anomaly', color: C.critical },
-  privilege_escalation: { label: 'Perm Δ', color: C.critical },
-  velocity_spike: { label: 'Anomaly', color: C.critical },
-  anomalous_behavior: { label: 'Alert', color: C.critical },
+const FRAUD_BEHAVIOR: Record<string, string> = {
+  off_hours_login: 'logged into core banking systems outside their normal working hours',
+  bulk_download: 'performed a high-volume data download atypical for their role',
+  cross_department_access: 'accessed systems and records across departments outside their normal scope',
+  privilege_escalation: 'attempted to use elevated privileges or access restricted system functions',
+  velocity_spike: 'executed an abnormal surge of transactions in a compressed time window',
+  account_modification: 'modified account records in systems outside their department scope',
+  anomalous_behavior: 'exhibited multiple behavioural deviations from their established baseline',
 }
 
 function formatTs(iso: string): string {
@@ -50,15 +40,6 @@ function formatTs(iso: string): string {
   return rem > 0 ? `${h}h ${rem}m ago` : `${h}h ago`
 }
 
-const FRAUD_BEHAVIOR: Record<string, string> = {
-  off_hours_login: 'logged into core banking systems outside their normal working hours',
-  bulk_download: 'performed a high-volume data download atypical for their role',
-  cross_department_access: 'accessed systems and records across departments outside their normal scope',
-  privilege_escalation: 'attempted to use elevated privileges or access restricted system functions',
-  velocity_spike: 'executed an abnormal surge of transactions in a compressed time window',
-  anomalous_behavior: 'exhibited multiple behavioural deviations from their established baseline',
-}
-
 function generatePlainExplanation(alert: Alert, peerData?: PeerComparison | null): string {
   const firstName = alert.user_name.split(' ')[0]
   const behavior = FRAUD_BEHAVIOR[alert.fraud_type] ?? 'exhibited unusual behavioural patterns'
@@ -68,7 +49,7 @@ function generatePlainExplanation(alert: Alert, peerData?: PeerComparison | null
   if (peerData && peerData.metrics.length > 0) {
     const top = [...peerData.metrics].sort((a, b) => b.multiplier - a.multiplier)[0]
     if (top.multiplier > 1.5) {
-      text += ` Their ${top.metric.toLowerCase()} is ${top.multiplier.toFixed(1)}× the ${peerData.role.replace(/_/g, ' ')} peer average — a significant deviation from colleagues in the same role.`
+      text += ` Their ${top.metric.toLowerCase()} is ${top.multiplier.toFixed(1)}x the ${peerData.role.replace(/_/g, ' ')} peer average, a significant deviation from colleagues in the same role.`
     }
   }
 
@@ -110,10 +91,9 @@ interface Props {
   alertId: string | null
   onClose: () => void
   onResolved?: (id: string, newStatus: 'resolved' | 'dismissed') => void
-  inline?: boolean
 }
 
-export default function AlertPanel({ alertId, onClose, onResolved, inline = false }: Props) {
+export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
   const [alert, setAlert] = useState<Alert | null>(null)
   const [loading, setLoading] = useState(false)
   const [acting, setActing] = useState(false)
@@ -153,9 +133,13 @@ export default function AlertPanel({ alertId, onClose, onResolved, inline = fals
   }, [alert?.id])
 
   useEffect(() => {
-    return () => {
-      if (toastTimer.current) clearTimeout(toastTimer.current)
-    }
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  useEffect(() => {
+    return () => { if (toastTimer.current) clearTimeout(toastTimer.current) }
   }, [])
 
   const showToast = (msg: string) => {
@@ -173,9 +157,7 @@ export default function AlertPanel({ alertId, onClose, onResolved, inline = fals
       onResolved?.(alert.id, 'resolved')
     } catch {
       showToast('Failed to resolve — please try again')
-    } finally {
-      setActing(false)
-    }
+    } finally { setActing(false) }
   }
 
   const handleDismiss = async () => {
@@ -187,9 +169,7 @@ export default function AlertPanel({ alertId, onClose, onResolved, inline = fals
       onResolved?.(alert.id, 'dismissed')
     } catch {
       showToast('Failed to dismiss — please try again')
-    } finally {
-      setActing(false)
-    }
+    } finally { setActing(false) }
   }
 
   const handleLabel = async (label: 'TP' | 'FP') => {
@@ -224,33 +204,20 @@ export default function AlertPanel({ alertId, onClose, onResolved, inline = fals
     }
   }
 
-  if (!alertId) {
-    if (inline) {
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: C.textMuted, fontSize: 13, gap: 8 }}>
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={C.border} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-            <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-          </svg>
-          <span>Select an alert to review</span>
-        </div>
-      )
-    }
-    return null
-  }
+  if (!alertId) return null
 
-  const scoreColor = alert ? riskColor(alert.risk_score) : C.critical
+  const scoreColor = alert ? riskColor(alert.risk_score) : C.border
   const action = alert ? recommendedAction(alert.risk_score) : null
 
   return (
     <>
-      {!inline && (
-        <div
-          onClick={onClose}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 40 }}
-        />
-      )}
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 100 }}
+      />
 
+      {/* Toast */}
       {toast && (
         <div style={{
           position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)',
@@ -263,396 +230,402 @@ export default function AlertPanel({ alertId, onClose, onResolved, inline = fals
         </div>
       )}
 
-      <aside className={inline ? undefined : 'panel-full panel-slide-in'} style={inline ? {
-        height: '100%', overflowY: 'auto', background: C.card,
-        borderLeft: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column',
-      } : {
-        position: 'fixed', top: 0, right: 0, bottom: 0, width: 600,
-        background: C.card, borderLeft: `1px solid ${C.border}`,
-        zIndex: 50, overflowY: 'auto', display: 'flex', flexDirection: 'column',
-      }}>
+      {/* Modal */}
+      <div
+        className="alert-panel-overlay"
+        style={{
+          position: 'fixed', top: '50%', left: '50%',
+          width: 920, maxWidth: 'calc(100vw - 32px)', maxHeight: '88vh',
+          background: C.card, border: `1px solid ${C.border}`,
+          borderTop: `2px solid ${scoreColor}`,
+          zIndex: 101, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        }}
+      >
         {/* Header */}
-        <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: C.textPrimary, letterSpacing: '0.04em' }}>ALERT DETAIL</span>
-          <button onClick={onClose} aria-label="Close alert detail" style={{ background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 4 }}>×</button>
+        <div style={{
+          padding: '14px 20px', borderBottom: `1px solid ${C.border}`,
+          display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
+        }}>
+          {alert ? (
+            <>
+              <div style={{
+                width: 38, height: 38, borderRadius: '50%', background: scoreColor,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 13, fontWeight: 700, color: '#fff', flexShrink: 0,
+              }}>
+                {alert.user_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.textPrimary }}>{alert.user_name}</p>
+                <p style={{ margin: 0, fontSize: 11, color: C.textMuted }}>{alert.user_id} · {timeAgo(alert.ingested_at ?? alert.timestamp)}</p>
+              </div>
+              <div style={{ border: `1px solid ${C.border}`, borderRadius: 3, padding: '3px 10px', fontSize: 11, color: C.textMuted, flexShrink: 0 }}>
+                {formatFraudType(alert.fraud_type)}
+              </div>
+              <div style={{ flexShrink: 0 }}>
+                <span style={{ fontSize: 28, fontWeight: 800, color: scoreColor, letterSpacing: '-0.02em' }}>{Math.round(alert.risk_score)}</span>
+                <span style={{ fontSize: 11, color: C.textMuted }}>/100</span>
+              </div>
+              <RiskBadge level={alert.risk_level} score={alert.risk_score} />
+            </>
+          ) : (
+            <div style={{ flex: 1 }}>
+              <div style={{ height: 14, width: 120, background: C.border, borderRadius: 2, marginBottom: 8 }} />
+              <div style={{ height: 10, width: 80, background: C.hover, borderRadius: 2 }} />
+            </div>
+          )}
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            style={{
+              background: 'none', border: `1px solid ${C.border}`, color: C.textMuted,
+              cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '4px 9px',
+              borderRadius: 3, marginLeft: 4, flexShrink: 0,
+            }}
+          >×</button>
         </div>
 
+        {/* Loading skeleton */}
         {loading && (
-          <div style={{ padding: 24 }}>
-            {[80, 120, 60, 140, 100].map((w, i) => (
-              <div key={i} style={{ height: 14, width: w, background: '#30363D', borderRadius: 2, marginBottom: 12 }} />
+          <div style={{ padding: 28, display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {[100, 180, 80, 140, 60, 160, 90].map((w, i) => (
+              <div key={i} style={{ height: 13, width: w, background: C.border, borderRadius: 2 }} />
             ))}
           </div>
         )}
 
+        {/* Two-column body */}
         {!loading && alert && (
-          <div style={{ padding: 20, flex: 1, display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
-            {/* Identity */}
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: '50%',
-                  background: scoreColor, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 13, fontWeight: 700, color: C.textPrimary, flexShrink: 0,
-                }}>
-                  {alert.user_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                </div>
-                <div>
-                  <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: C.textPrimary }}>{alert.user_name}</p>
-                  <p style={{ margin: 0, fontSize: 11, color: C.textMuted }}>{alert.user_id} · {timeAgo(alert.ingested_at ?? alert.timestamp)}</p>
-                </div>
-                <div style={{ marginLeft: 'auto' }}>
-                  <RiskBadge level={alert.risk_level} score={alert.risk_score} />
-                </div>
-              </div>
-              <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 4, padding: '10px 14px' }}>
-                <p style={{ margin: 0, fontSize: 11, color: C.textMuted, marginBottom: 4 }}>Anomaly Type</p>
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: C.textPrimary }}>{formatFraudType(alert.fraud_type)}</p>
-              </div>
-            </div>
+            {/* ── Left column (55%) ── */}
+            <div style={{
+              width: '55%', overflowY: 'auto', padding: 20,
+              borderRight: `1px solid ${C.border}`,
+              display: 'flex', flexDirection: 'column', gap: 20,
+            }}>
 
-            {/* Risk score bar */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span style={{ fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Risk Score</span>
-                <span style={{ fontSize: 18, fontWeight: 800, color: scoreColor }}>
-                  {Math.round(alert.risk_score)}<span style={{ fontSize: 11, fontWeight: 400, color: C.textMuted }}>/100</span>
-                </span>
-              </div>
-              <div style={{ height: 8, background: C.border, borderRadius: 2, overflow: 'hidden' }}>
-                <div style={{ width: `${alert.risk_score}%`, height: '100%', background: scoreColor, borderRadius: 2, transition: 'width 0.4s ease' }} />
-              </div>
-            </div>
-
-            {/* Model scores */}
-            <div>
-              <p style={{ margin: '0 0 10px', fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Model Scores</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {[
-                  { label: 'Isolation Forest', key: 'isolation_forest', weight: '30%' },
-                  { label: 'LSTM Autoencoder', key: 'lstm', weight: '40%' },
-                  { label: 'XGBoost', key: 'xgboost', weight: '30%' },
-                ].map(({ label, key, weight }) => {
-                  const score = alert.model_scores[key as keyof typeof alert.model_scores]
-                  const pct = Math.round(score * 100)
-                  return (
-                    <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 11, color: C.textMuted, width: 130, flexShrink: 0 }}>{label}</span>
-                      <div style={{ flex: 1, height: 4, background: C.border, borderRadius: 2, overflow: 'hidden' }}>
-                        <div style={{ width: `${pct}%`, height: '100%', background: pct > 60 ? C.critical : pct > 40 ? C.medium : C.low }} />
-                      </div>
-                      <span style={{ fontSize: 11, color: C.textPrimary, width: 30, textAlign: 'right' }}>{pct}%</span>
-                      <span style={{ fontSize: 10, color: C.textMuted, width: 28 }}>{weight}</span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* SHAP */}
-            <div>
-              <p style={{ margin: '0 0 12px', fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Feature Attribution (SHAP)</p>
-              <SHAPChart values={alert.shap_values} />
-            </div>
-
-            {/* Analysis — two-part: ML signals + plain English */}
-            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 4, overflow: 'hidden' }}>
-              {/* Header */}
-              <div style={{ padding: '10px 14px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{ fontSize: 11, color: C.amber }}>✦</span>
-                <span style={{ fontSize: 10, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  {alert.ai_narrative ? 'AI Analysis' : 'Alert Analysis'}
-                </span>
-              </div>
-
-              {/* Part 1: ML model signals */}
-              <div style={{ padding: '10px 14px', borderBottom: `1px solid ${C.border}` }}>
-                <p style={{ margin: '0 0 8px', fontSize: 9, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                  ML Detection
+              {/* ML model score cards */}
+              <div>
+                <p style={{ margin: '0 0 10px', fontSize: 10, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+                  Model Scores
                 </p>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                   {([
-                    { label: 'Isolation Forest', score: alert.model_scores.isolation_forest, desc: 'point anomaly' },
-                    { label: 'LSTM', score: alert.model_scores.lstm, desc: 'behavioural drift' },
-                    { label: 'XGBoost', score: alert.model_scores.xgboost, desc: 'fraud pattern' },
-                  ] as const).map(({ label, score, desc }) => {
-                    const pct = Math.round(score * 100)
+                    { label: 'Isolation Forest', key: 'isolation_forest', weight: '30%', desc: 'point anomaly' },
+                    { label: 'LSTM', key: 'lstm', weight: '40%', desc: 'behavioural drift' },
+                    { label: 'XGBoost', key: 'xgboost', weight: '30%', desc: 'fraud pattern' },
+                  ] as const).map(({ label, key, weight, desc }) => {
+                    const pct = Math.round(alert.model_scores[key] * 100)
                     const color = pct >= 65 ? C.critical : pct >= 40 ? C.medium : C.low
                     return (
-                      <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5, background: C.card, border: `1px solid ${C.border}`, borderRadius: 3, padding: '4px 8px' }}>
-                        <span style={{ fontSize: 10, color: C.textMuted }}>{label}</span>
-                        <span style={{ fontSize: 11, fontWeight: 800, color }}>{pct}%</span>
-                        <span style={{ fontSize: 9, color: C.textMuted }}>{desc}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-                {alert.shap_values.filter(v => v.contribution > 0).sort((a, b) => b.contribution - a.contribution).slice(0, 2).map((v, i) => (
-                  <div key={v.feature} style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: i === 0 ? 0 : 4 }}>
-                    <span style={{ fontSize: 9, color: C.critical, fontWeight: 700 }}>↑</span>
-                    <span style={{ fontSize: 10, color: C.textMuted, fontFamily: 'monospace' }}>{v.feature}</span>
-                    <span style={{ fontSize: 10, color: C.textPrimary, fontWeight: 600 }}>+{v.contribution.toFixed(3)}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Part 2: Plain English */}
-              <div style={{ padding: '10px 14px' }}>
-                <p style={{ margin: '0 0 6px', fontSize: 9, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                  In Plain Terms
-                </p>
-                <p style={{ margin: 0, fontSize: 12, color: C.textPrimary, lineHeight: 1.7 }}>
-                  {alert.ai_narrative || generatePlainExplanation(alert, peerData)}
-                </p>
-              </div>
-            </div>
-
-            {/* Investigation Timeline */}
-            <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
-              <p style={{ margin: '0 0 14px', fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
-                Investigation Timeline {timeline.length > 0 && <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 4 }}>· {timeline.length} events</span>}
-              </p>
-              {timeline.length === 0 ? (
-                <p style={{ margin: 0, fontSize: 11, color: C.textMuted }}>No timeline events recorded for this alert.</p>
-              ) : (
-                <div style={{ position: 'relative', paddingLeft: 20 }}>
-                  <div style={{ position: 'absolute', left: 4, top: 8, bottom: 8, width: 1, background: C.border }} />
-                  {timeline.map((item, i) => {
-                    const kindColor = item.kind === 'trigger' ? C.critical
-                      : item.kind === 'case_opened' ? C.amber
-                      : item.kind === 'suspicious' ? C.medium
-                      : item.kind === 'analyst_action' ? C.low
-                      : C.textMuted
-                    const kindLabel = item.kind === 'baseline' ? 'BASE'
-                      : item.kind === 'suspicious' ? 'WARN'
-                      : item.kind === 'trigger' ? 'ALERT'
-                      : item.kind === 'case_opened' ? 'CASE'
-                      : 'ACTION'
-                    return (
-                      <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: i < timeline.length - 1 ? 12 : 0, position: 'relative' }}>
-                        <div style={{
-                          position: 'absolute', left: -16, top: 5,
-                          width: 8, height: 8, borderRadius: '50%',
-                          background: kindColor, border: `2px solid ${C.card}`,
-                        }} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                            <span style={{
-                              fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
-                              border: `1px solid ${kindColor}`, color: kindColor,
-                              flexShrink: 0, letterSpacing: '0.04em',
-                            }}>{kindLabel}</span>
-                            <p style={{ margin: 0, fontSize: 11, color: kindColor, fontWeight: item.kind !== 'baseline' ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {item.title}
-                            </p>
-                            {item.risk_delta && (
-                              <span style={{ fontSize: 10, color: C.critical, fontWeight: 700, flexShrink: 0 }}>{item.risk_delta}</span>
-                            )}
-                          </div>
-                          <p style={{ margin: 0, fontSize: 10, color: C.textMuted, lineHeight: 1.5 }}>{item.explanation}</p>
+                      <div key={key} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 3, padding: '10px 12px' }}>
+                        <p style={{ margin: '0 0 6px', fontSize: 10, color: C.textMuted }}>{label}</p>
+                        <p style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 800, color, letterSpacing: '-0.02em' }}>
+                          {pct}<span style={{ fontSize: 10, fontWeight: 400, color: C.textMuted }}>%</span>
+                        </p>
+                        <div style={{ height: 3, background: C.border, borderRadius: 2, overflow: 'hidden', marginBottom: 5 }}>
+                          <div style={{ width: `${pct}%`, height: '100%', background: color }} />
                         </div>
-                        <span style={{ fontSize: 9, color: C.textMuted, flexShrink: 0, marginTop: 2 }}>{formatTs(item.timestamp)}</span>
+                        <p style={{ margin: 0, fontSize: 9, color: C.textMuted }}>{desc} · {weight} weight</p>
                       </div>
                     )
                   })}
                 </div>
-              )}
-            </div>
+              </div>
 
-            {/* Peer Comparison */}
-            {peerData && peerData.metrics.length > 0 && (
-              <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
-                <p style={{ margin: '0 0 12px', fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
-                  Peer Comparison
-                  <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 5, fontSize: 10 }}>
-                    ({peerData.role.replace(/_/g, ' ')} peers)
+              {/* SHAP chart */}
+              <div>
+                <p style={{ margin: '0 0 12px', fontSize: 10, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+                  Feature Attribution (SHAP)
+                </p>
+                <SHAPChart values={alert.shap_values} />
+              </div>
+
+              {/* Analysis block */}
+              <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ padding: '9px 14px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 11, color: C.amber }}>✦</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    {alert.ai_narrative ? 'AI Analysis' : 'Alert Analysis'}
                   </span>
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  {peerData.metrics.map((m) => {
-                    const color = m.multiplier > 3 ? C.critical : m.multiplier > 1.5 ? C.medium : C.low
-                    const barPct = Math.min(100, (m.multiplier / 6) * 100)
-                    const peerContext = m.multiplier <= 1.2
-                      ? `This user's ${m.metric.toLowerCase()} is within normal range for their role.`
-                      : m.multiplier > 3
-                      ? `This is ${m.multiplier.toFixed(1)}x higher than the ${peerData.role.replace(/_/g, ' ')} average — a strong indicator of abnormal behaviour for this role.`
-                      : `This is ${m.multiplier.toFixed(1)}x higher than the ${peerData.role.replace(/_/g, ' ')} average — a significant deviation.`
-                    return (
-                      <div key={m.metric}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, alignItems: 'baseline', gap: 8 }}>
-                          <span style={{ fontSize: 11, color: C.textMuted, minWidth: 0 }}>{m.metric}</span>
-                          <span style={{ fontSize: 15, fontWeight: 800, color, letterSpacing: '-0.02em', flexShrink: 0 }}>
-                            {m.multiplier.toFixed(1)}x peer avg
-                          </span>
-                        </div>
-                        <div style={{ height: 4, background: C.border, borderRadius: 2, overflow: 'hidden', marginBottom: 5 }}>
-                          <div style={{ width: `${barPct}%`, height: '100%', background: color, transition: 'width 0.4s ease' }} />
-                        </div>
-                        <p style={{ margin: 0, fontSize: 10, color: C.textMuted, lineHeight: 1.5 }}>{peerContext}</p>
-                      </div>
-                    )
-                  })}
                 </div>
-              </div>
-            )}
-
-            {/* Case notes */}
-            <div>
-              <label
-                htmlFor="case-notes"
-                style={{ display: 'block', margin: '0 0 8px', fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}
-              >
-                Case Notes
-              </label>
-              <textarea
-                id="case-notes"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                onBlur={(e) => { saveNote(); e.target.style.borderColor = C.border }}
-                onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') saveNote() }}
-                placeholder="Add investigator notes… (Cmd+Enter to save)"
-                style={{
-                  width: '100%', minHeight: 80, padding: '10px 12px',
-                  background: C.bg, border: `1px solid ${C.border}`, borderRadius: 4,
-                  color: C.textPrimary, fontSize: 12, fontFamily: 'inherit', lineHeight: 1.6,
-                  resize: 'vertical', outline: 'none', boxSizing: 'border-box',
-                }}
-                onFocus={(e) => { e.target.style.borderColor = '#4D5562' }}
-              />
-              {noteSavedAt && (
-                <p style={{ margin: '4px 0 0', fontSize: 10, color: C.low }}>Saved {timeAgo(noteSavedAt.toISOString())}</p>
-              )}
-            </div>
-
-            {/* Analyst Feedback */}
-            <div>
-              <p style={{ margin: '0 0 8px', fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Analyst Feedback</p>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {(['TP', 'FP'] as const).map((lbl) => (
-                  <button
-                    key={lbl}
-                    className="btn-action"
-                    disabled={acting}
-                    onClick={() => handleLabel(lbl)}
-                    style={{
-                      flex: 1, padding: '7px 0', fontSize: 11, fontWeight: 700,
-                      letterSpacing: '0.06em', cursor: 'pointer', borderRadius: 3,
-                      border: `1px solid ${alert.label === lbl ? (lbl === 'TP' ? C.critical : C.low) : C.border}`,
-                      background: alert.label === lbl ? (lbl === 'TP' ? 'rgba(220,38,38,0.12)' : 'rgba(22,163,74,0.12)') : 'transparent',
-                      color: alert.label === lbl ? (lbl === 'TP' ? C.critical : C.low) : C.textMuted,
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    {lbl === 'TP' ? 'True Positive' : 'False Positive'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Recommended Action */}
-            {action && (
-              <div style={{
-                background: C.hover, border: `1px solid ${action.color}33`,
-                borderRadius: 4, padding: '12px 14px',
-                display: 'flex', gap: 10, alignItems: 'flex-start',
-              }}>
-                <AlertTriangle size={15} color={action.color} strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
-                <div>
-                  <p style={{ margin: '0 0 4px', fontSize: 10, fontWeight: 700, color: action.color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    Recommended Action
+                <div style={{ padding: '10px 14px', borderBottom: `1px solid ${C.border}` }}>
+                  <p style={{ margin: '0 0 8px', fontSize: 9, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    ML Detection Signals
                   </p>
-                  <p style={{ margin: 0, fontSize: 12, color: C.textMuted, lineHeight: 1.6 }}>{action.text}</p>
+                  {alert.shap_values
+                    .filter(v => v.contribution > 0)
+                    .sort((a, b) => b.contribution - a.contribution)
+                    .slice(0, 3)
+                    .map((v, i) => (
+                      <div key={v.feature} style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: i === 0 ? 0 : 4 }}>
+                        <span style={{ fontSize: 9, color: C.critical, fontWeight: 700 }}>↑</span>
+                        <span style={{ fontSize: 10, color: C.textMuted, fontFamily: 'monospace' }}>{v.feature}</span>
+                        <span style={{ fontSize: 10, color: C.textPrimary, fontWeight: 600 }}>+{v.contribution.toFixed(3)}</span>
+                      </div>
+                    ))}
+                </div>
+                <div style={{ padding: '10px 14px' }}>
+                  <p style={{ margin: '0 0 6px', fontSize: 9, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    In Plain Terms
+                  </p>
+                  <p style={{ margin: 0, fontSize: 12, color: C.textPrimary, lineHeight: 1.7 }}>
+                    {alert.ai_narrative || generatePlainExplanation(alert, peerData)}
+                  </p>
                 </div>
               </div>
-            )}
 
-            {/* Actions */}
-            <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
-              {alert.status === 'open' && (
-                <>
-                  <button
-                    className="btn-action"
-                    disabled={acting}
-                    onClick={handleResolve}
-                    style={{
-                      flex: 1, padding: '10px 0', fontSize: 12, fontWeight: 700,
-                      letterSpacing: '0.06em', cursor: 'pointer', borderRadius: 3,
-                      background: C.critical, border: 'none', color: C.textPrimary,
-                      opacity: acting ? 0.6 : 1,
-                    }}
-                  >
-                    MARK RESOLVED
-                  </button>
-                  <button
-                    className="btn-action"
-                    disabled={acting}
-                    onClick={handleDismiss}
-                    style={{
-                      flex: 1, padding: '10px 0', fontSize: 12, fontWeight: 700,
-                      letterSpacing: '0.06em', cursor: 'pointer', borderRadius: 3,
-                      background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted,
-                      opacity: acting ? 0.6 : 1,
-                    }}
-                  >
-                    DISMISS
-                  </button>
-                </>
-              )}
-              {alert.status !== 'open' && (
-                <div style={{ flex: 1, textAlign: 'center', padding: '10px 0' }}>
-                  <span style={{ fontSize: 12, color: alert.status === 'resolved' ? C.low : C.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    {alert.status === 'resolved' ? '✓ Resolved' : 'Dismissed'}
-                  </span>
+              {/* Peer comparison */}
+              {peerData && peerData.metrics.length > 0 && (
+                <div>
+                  <p style={{ margin: '0 0 12px', fontSize: 10, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+                    Peer Comparison
+                    <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 5 }}>({peerData.role.replace(/_/g, ' ')} peers)</span>
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {peerData.metrics.map((m) => {
+                      const color = m.multiplier > 3 ? C.critical : m.multiplier > 1.5 ? C.medium : C.low
+                      const barPct = Math.min(100, (m.multiplier / 6) * 100)
+                      return (
+                        <div key={m.metric}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <span style={{ fontSize: 11, color: C.textMuted }}>{m.metric}</span>
+                            <span style={{ fontSize: 14, fontWeight: 800, color, letterSpacing: '-0.02em' }}>{m.multiplier.toFixed(1)}x peer avg</span>
+                          </div>
+                          <div style={{ height: 4, background: C.border, borderRadius: 2, overflow: 'hidden', marginBottom: 4 }}>
+                            <div style={{ width: `${barPct}%`, height: '100%', background: color, transition: 'width 0.4s ease' }} />
+                          </div>
+                          <p style={{ margin: 0, fontSize: 10, color: C.textMuted, lineHeight: 1.5 }}>
+                            {m.multiplier <= 1.2
+                              ? `Within normal range for ${peerData.role.replace(/_/g, ' ')} peers.`
+                              : `${m.multiplier.toFixed(1)}x higher than ${peerData.role.replace(/_/g, ' ')} peer average.`}
+                          </p>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
-              <button
-                className="btn-action"
-                onClick={handleExport}
-                title="Export Evidence Package"
-                style={{
-                  padding: '10px 14px', fontSize: 12, fontWeight: 700,
-                  background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted,
-                  borderRadius: 3, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-                  flexShrink: 0,
-                }}
-              >
-                <Download size={14} strokeWidth={2} />
-              </button>
+
+              {/* Recommended action */}
+              {action && (
+                <div style={{
+                  background: C.hover, border: `1px solid ${action.color}33`,
+                  borderRadius: 3, padding: '12px 14px', display: 'flex', gap: 10, alignItems: 'flex-start',
+                }}>
+                  <AlertTriangle size={14} color={action.color} strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
+                  <div>
+                    <p style={{ margin: '0 0 4px', fontSize: 10, fontWeight: 700, color: action.color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      Recommended Action
+                    </p>
+                    <p style={{ margin: 0, fontSize: 12, color: C.textMuted, lineHeight: 1.6 }}>{action.text}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Case notes */}
+              <div>
+                <label
+                  htmlFor="case-notes"
+                  style={{ display: 'block', margin: '0 0 8px', fontSize: 10, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}
+                >
+                  Case Notes
+                </label>
+                <textarea
+                  id="case-notes"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  onBlur={(e) => { saveNote(); e.target.style.borderColor = C.border }}
+                  onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') saveNote() }}
+                  placeholder="Add investigator notes… (Cmd+Enter to save)"
+                  style={{
+                    width: '100%', minHeight: 80, padding: '10px 12px',
+                    background: C.bg, border: `1px solid ${C.border}`, borderRadius: 3,
+                    color: C.textPrimary, fontSize: 12, fontFamily: 'inherit', lineHeight: 1.6,
+                    resize: 'vertical', outline: 'none', boxSizing: 'border-box',
+                  }}
+                  onFocus={(e) => { e.target.style.borderColor = '#4D5562' }}
+                />
+                {noteSavedAt && (
+                  <p style={{ margin: '4px 0 0', fontSize: 10, color: C.low }}>Saved {timeAgo(noteSavedAt.toISOString())}</p>
+                )}
+              </div>
             </div>
 
-            {/* Analyst Actions */}
-            <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
-              <p style={{ margin: '0 0 10px', fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
-                Analyst Actions
-              </p>
-              {auditLog.length === 0 ? (
-                <p style={{ fontSize: 11, color: C.textMuted }}>No actions recorded yet.</p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {auditLog.map((entry) => (
-                    <div key={entry.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                      <span style={{
-                        fontSize: 9, fontWeight: 700, letterSpacing: '0.05em', flexShrink: 0, marginTop: 2,
-                        color: entry.action_type === 'restrict' ? C.critical : entry.action_type === 'label' ? C.low : C.textMuted,
-                        border: `1px solid ${entry.action_type === 'restrict' ? C.critical : entry.action_type === 'label' ? C.low : C.border}`,
-                        borderRadius: 2, padding: '1px 5px', textTransform: 'uppercase',
-                      }}>
-                        {entry.action_type}
-                      </span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ margin: 0, fontSize: 11, color: C.textPrimary, lineHeight: 1.4 }}>{entry.message}</p>
-                        <p style={{ margin: 0, fontSize: 10, color: C.textMuted }}>{timeAgo(entry.created_at)}</p>
-                      </div>
+            {/* ── Right column (45%) ── */}
+            <div style={{ width: '45%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+              {/* Scrollable: timeline + audit log */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+                {/* Investigation Timeline */}
+                <div>
+                  <p style={{ margin: '0 0 14px', fontSize: 10, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+                    Investigation Timeline
+                    {timeline.length > 0 && (
+                      <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 4 }}>· {timeline.length} events</span>
+                    )}
+                  </p>
+                  {timeline.length === 0 ? (
+                    <p style={{ margin: 0, fontSize: 11, color: C.textMuted }}>No timeline events recorded for this alert.</p>
+                  ) : (
+                    <div style={{ position: 'relative', paddingLeft: 20 }}>
+                      <div style={{ position: 'absolute', left: 4, top: 8, bottom: 8, width: 1, background: C.border }} />
+                      {timeline.map((item, i) => {
+                        const kindColor = item.kind === 'trigger' ? C.critical
+                          : item.kind === 'case_opened' ? C.amber
+                          : item.kind === 'suspicious' ? C.medium
+                          : item.kind === 'analyst_action' ? C.low
+                          : C.textMuted
+                        const kindLabel = item.kind === 'baseline' ? 'BASE'
+                          : item.kind === 'suspicious' ? 'WARN'
+                          : item.kind === 'trigger' ? 'ALERT'
+                          : item.kind === 'case_opened' ? 'CASE'
+                          : 'ACTION'
+                        return (
+                          <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: i < timeline.length - 1 ? 14 : 0, position: 'relative' }}>
+                            <div style={{
+                              position: 'absolute', left: -16, top: 5,
+                              width: 8, height: 8, borderRadius: '50%',
+                              background: kindColor, border: `2px solid ${C.card}`,
+                            }} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                                <span style={{
+                                  fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
+                                  border: `1px solid ${kindColor}`, color: kindColor,
+                                  flexShrink: 0, letterSpacing: '0.04em',
+                                }}>{kindLabel}</span>
+                                <p style={{ margin: 0, fontSize: 11, color: kindColor, fontWeight: item.kind !== 'baseline' ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {item.title}
+                                </p>
+                                {item.risk_delta && (
+                                  <span style={{ fontSize: 10, color: C.critical, fontWeight: 700, flexShrink: 0 }}>{item.risk_delta}</span>
+                                )}
+                              </div>
+                              <p style={{ margin: 0, fontSize: 10, color: C.textMuted, lineHeight: 1.5 }}>{item.explanation}</p>
+                            </div>
+                            <span style={{ fontSize: 9, color: C.textMuted, flexShrink: 0, marginTop: 2 }}>{formatTs(item.timestamp)}</span>
+                          </div>
+                        )
+                      })}
                     </div>
+                  )}
+                </div>
+
+                {/* Analyst Actions */}
+                <div>
+                  <p style={{ margin: '0 0 10px', fontSize: 10, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+                    Analyst Actions
+                  </p>
+                  {auditLog.length === 0 ? (
+                    <p style={{ margin: 0, fontSize: 11, color: C.textMuted }}>No actions recorded yet.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {auditLog.map((entry) => (
+                        <div key={entry.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                          <span style={{
+                            fontSize: 9, fontWeight: 700, letterSpacing: '0.05em', flexShrink: 0, marginTop: 2,
+                            color: entry.action_type === 'restrict' ? C.critical : entry.action_type === 'label' ? C.low : C.textMuted,
+                            border: `1px solid ${entry.action_type === 'restrict' ? C.critical : entry.action_type === 'label' ? C.low : C.border}`,
+                            borderRadius: 2, padding: '1px 5px', textTransform: 'uppercase',
+                          }}>{entry.action_type}</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ margin: 0, fontSize: 11, color: C.textPrimary, lineHeight: 1.4 }}>{entry.message}</p>
+                            <p style={{ margin: 0, fontSize: 10, color: C.textMuted }}>{timeAgo(entry.created_at)}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Pinned footer */}
+              <div style={{
+                borderTop: `1px solid ${C.border}`, padding: '14px 20px',
+                flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8,
+                background: C.card,
+              }}>
+                {/* TP / FP label buttons */}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {(['TP', 'FP'] as const).map((lbl) => (
+                    <button
+                      key={lbl}
+                      className="btn-action"
+                      disabled={acting}
+                      onClick={() => handleLabel(lbl)}
+                      style={{
+                        flex: 1, padding: '7px 0', fontSize: 11, fontWeight: 700,
+                        letterSpacing: '0.06em', cursor: 'pointer', borderRadius: 3,
+                        border: `1px solid ${alert.label === lbl ? (lbl === 'TP' ? C.critical : C.low) : C.border}`,
+                        background: alert.label === lbl ? (lbl === 'TP' ? 'rgba(220,38,38,0.12)' : 'rgba(22,163,74,0.12)') : 'transparent',
+                        color: alert.label === lbl ? (lbl === 'TP' ? C.critical : C.low) : C.textMuted,
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {lbl === 'TP' ? 'True Positive' : 'False Positive'}
+                    </button>
                   ))}
                 </div>
-              )}
-            </div>
 
+                {/* Resolve / Dismiss / Export */}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {alert.status === 'open' ? (
+                    <>
+                      <button
+                        className="btn-action"
+                        disabled={acting}
+                        onClick={handleResolve}
+                        style={{
+                          flex: 1, padding: '9px 0', fontSize: 11, fontWeight: 700,
+                          letterSpacing: '0.06em', cursor: 'pointer', borderRadius: 3,
+                          background: C.critical, border: 'none', color: '#fff',
+                          opacity: acting ? 0.6 : 1,
+                        }}
+                      >MARK RESOLVED</button>
+                      <button
+                        className="btn-action"
+                        disabled={acting}
+                        onClick={handleDismiss}
+                        style={{
+                          flex: 1, padding: '9px 0', fontSize: 11, fontWeight: 700,
+                          letterSpacing: '0.06em', cursor: 'pointer', borderRadius: 3,
+                          background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted,
+                          opacity: acting ? 0.6 : 1,
+                        }}
+                      >DISMISS</button>
+                    </>
+                  ) : (
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '9px 0' }}>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em',
+                        color: alert.status === 'resolved' ? C.low : C.textMuted,
+                      }}>
+                        {alert.status === 'resolved' ? '✓ Resolved' : 'Dismissed'}
+                      </span>
+                    </div>
+                  )}
+                  <button
+                    className="btn-action"
+                    onClick={handleExport}
+                    title="Export Evidence Package"
+                    style={{
+                      padding: '9px 14px', background: 'transparent',
+                      border: `1px solid ${C.border}`, color: C.textMuted,
+                      borderRadius: 3, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Download size={13} strokeWidth={2} />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
-      </aside>
+      </div>
     </>
   )
 }
