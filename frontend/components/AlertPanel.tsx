@@ -49,7 +49,8 @@ function generatePlainExplanation(alert: Alert, peerData?: PeerComparison | null
   if (peerData && peerData.metrics.length > 0) {
     const top = [...peerData.metrics].sort((a, b) => b.multiplier - a.multiplier)[0]
     if (top.multiplier > 1.5) {
-      text += ` Their ${top.metric.toLowerCase()} is ${top.multiplier.toFixed(1)}x the ${peerData.role.replace(/_/g, ' ')} peer average, a significant deviation from colleagues in the same role.`
+      const role = peerData.role.replace(/_/g, ' ')
+      text += ` Their ${top.metric.toLowerCase()} is ${top.multiplier.toFixed(1)}x the ${role} peer average, placing them well outside the normal range for this role.`
     }
   }
 
@@ -58,14 +59,13 @@ function generatePlainExplanation(alert: Alert, peerData?: PeerComparison | null
     .sort((a, b) => b.contribution - a.contribution)
     .slice(0, 2)
 
-  if (topShap.length >= 1) {
+  if (topShap.length === 1) {
     const f1 = FEATURE_DESC[topShap[0].feature] ?? topShap[0].feature.replace(/_/g, ' ')
-    text += ` The clearest sign was ${f1}`
-    if (topShap.length >= 2) {
-      const f2 = FEATURE_DESC[topShap[1].feature] ?? topShap[1].feature.replace(/_/g, ' ')
-      text += `, combined with ${f2}`
-    }
-    text += ' — both outside normal operating parameters for this user.'
+    text += ` The primary signal driving this alert was ${f1}, which deviated significantly from this user's established baseline.`
+  } else if (topShap.length >= 2) {
+    const f1 = FEATURE_DESC[topShap[0].feature] ?? topShap[0].feature.replace(/_/g, ' ')
+    const f2 = FEATURE_DESC[topShap[1].feature] ?? topShap[1].feature.replace(/_/g, ' ')
+    text += ` The two strongest signals were ${f1} and ${f2}, each deviating significantly from this user's established baseline.`
   }
 
   return text

@@ -39,7 +39,9 @@ function Select({ value, onChange, options, label }: {
   )
 }
 
-function AlertRow({ alert, selected, onClick }: { alert: Alert; selected: boolean; onClick: () => void }) {
+function AlertRow({ alert, selected, onClick, isRight }: {
+  alert: Alert; selected: boolean; onClick: () => void; isRight?: boolean
+}) {
   const [hov, setHov] = useState(false)
   const color = alert.risk_level === 'critical' || alert.risk_level === 'high' ? C.critical
     : alert.risk_level === 'medium' ? C.medium : C.low
@@ -50,13 +52,15 @@ function AlertRow({ alert, selected, onClick }: { alert: Alert; selected: boolea
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
-        padding: '11px 14px', borderBottom: `1px solid ${C.border}`,
+        padding: '13px 18px', borderBottom: `1px solid ${C.border}`,
         cursor: 'pointer', transition: 'background 0.1s',
         background: selected ? C.hover : hov ? '#16191f' : 'transparent',
-        borderLeft: `3px solid ${selected ? color : 'transparent'}`,
+        borderLeft: isRight
+          ? `${selected ? 3 : 1}px solid ${selected ? color : C.border}`
+          : `3px solid ${selected ? color : 'transparent'}`,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
         <div style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
         <span style={{ flex: 1, fontSize: 12, fontWeight: selected ? 700 : 500, color: C.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {alert.user_name}
@@ -69,6 +73,17 @@ function AlertRow({ alert, selected, onClick }: { alert: Alert; selected: boolea
         <span style={{ fontSize: 10, color: C.textMuted }}>{formatFraudType(alert.fraud_type)}</span>
         <span style={{ fontSize: 10, color: C.textMuted }}>{timeAgo(alert.ingested_at ?? alert.timestamp)}</span>
       </div>
+      {alert.status !== 'open' && (
+        <div style={{ marginTop: 4 }}>
+          <span style={{
+            fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', padding: '1px 5px',
+            border: `1px solid ${alert.status === 'resolved' ? C.low : C.border}`,
+            color: alert.status === 'resolved' ? C.low : C.textMuted, borderRadius: 2,
+          }}>
+            {alert.status.toUpperCase()}
+          </span>
+        </div>
+      )}
     </div>
   )
 }
@@ -92,7 +107,7 @@ export default function AlertsPage() {
   const [simToast, setSimToast] = useState('')
   const [simBusy, setSimBusy] = useState(false)
   const simRef = useRef<HTMLDivElement>(null)
-  const PAGE_SIZE = 30
+  const PAGE_SIZE = 40
 
   useEffect(() => {
     if (!simOpen) return
@@ -103,7 +118,7 @@ export default function AlertsPage() {
     return () => document.removeEventListener('mousedown', handler)
   }, [simOpen])
 
-  const fetch = useCallback(async () => {
+  const fetchAlerts = useCallback(async () => {
     setLoading(true)
     try {
       const res = await api.alerts({
@@ -121,10 +136,9 @@ export default function AlertsPage() {
     finally { setLoading(false) }
   }, [riskLevel, status, timeRange, page, minScore])
 
-  useEffect(() => { fetch() }, [fetch])
+  useEffect(() => { fetchAlerts() }, [fetchAlerts])
   useEffect(() => { setPage(1) }, [riskLevel, status, timeRange, minScore])
 
-  // Read URL params on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const ft = params.get('fraud_type')
@@ -133,7 +147,6 @@ export default function AlertsPage() {
     if (id) setSelectedId(id)
   }, [])
 
-  // Auto-open first alert matching the fraud_type param once alerts load
   useEffect(() => {
     if (!fraudTypeFilter || alerts.length === 0 || selectedId) return
     const match = alerts.find((a) => a.fraud_type === fraudTypeFilter)
@@ -145,7 +158,7 @@ export default function AlertsPage() {
   const handleResolved = (id: string, newStatus: 'resolved' | 'dismissed') => {
     setAlerts(prev => prev.filter(a => a.id !== id))
     setSelectedId(null)
-    if (newStatus) fetch()
+    if (newStatus) fetchAlerts()
   }
 
   const handleRetrain = async () => {
@@ -165,7 +178,7 @@ export default function AlertsPage() {
     try {
       await api.simulate(scenario)
       setSimToast(`${label} injected — refreshing`)
-      setTimeout(() => { setSimToast(''); setPage(1); setStatus('open'); fetch() }, 2000)
+      setTimeout(() => { setSimToast(''); setPage(1); setStatus('open'); fetchAlerts() }, 2000)
     } catch {
       setSimToast('Simulate failed — backend may be starting')
       setTimeout(() => setSimToast(''), 4000)
@@ -177,167 +190,200 @@ export default function AlertsPage() {
     <div style={{ display: 'flex', height: '100vh', background: C.bg, overflow: 'hidden' }}>
       <Sidebar />
 
-      {/* Queue rail */}
-      <div style={{ width: 420, flexShrink: 0, height: '100vh', display: 'flex', flexDirection: 'column', borderRight: `1px solid ${C.border}`, background: C.card }}>
+      {/* Main content */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-        {/* Rail header */}
-        <div style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: C.textPrimary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Alerts</span>
-            <span style={{ fontSize: 10, color: C.textMuted }}>{total} total</span>
+        {/* Header */}
+        <div style={{ background: C.card, borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+
+          {/* Title row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 20px', borderBottom: `1px solid ${C.border}` }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: C.textPrimary, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Alert Queue
+            </span>
+            <span style={{ fontSize: 10, color: C.textMuted, paddingRight: 8, borderRight: `1px solid ${C.border}` }}>
+              {total} total
+            </span>
+
+            {stats && (
+              <>
+                <span style={{ fontSize: 10, color: C.textMuted }}>
+                  <span style={{ color: C.textPrimary, fontWeight: 700 }}>{stats.labels_collected}</span> labels
+                </span>
+                {stats.labels_collected > 0 && (
+                  <span style={{ fontSize: 10, color: C.textMuted }}>
+                    <span style={{ color: stats.false_positive_rate > 20 ? C.medium : C.low, fontWeight: 700 }}>
+                      {stats.false_positive_rate}%
+                    </span> FP rate
+                  </span>
+                )}
+              </>
+            )}
+
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+              {/* Simulate dropdown */}
+              <div ref={simRef} style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setSimOpen(o => !o)}
+                  disabled={simBusy}
+                  style={{
+                    padding: '5px 10px', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
+                    background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted,
+                    borderRadius: 3, cursor: 'pointer',
+                  }}
+                >
+                  SIMULATE ▾
+                </button>
+                {simOpen && (
+                  <div style={{
+                    position: 'absolute', top: '100%', right: 0, marginTop: 3, zIndex: 20,
+                    background: C.card, border: `1px solid ${C.border}`, borderRadius: 4,
+                    minWidth: 220, boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                  }}>
+                    {[
+                      { label: 'Bulk Data Exfiltration', scenario: 'bulk_exfiltration' },
+                      { label: 'Privilege Escalation', scenario: 'privilege_escalation' },
+                      { label: 'Off-Hours Treasury', scenario: 'off_hours_treasury' },
+                      { label: 'Account Record Tampering', scenario: 'account_tampering' },
+                    ].map(({ label, scenario }, idx, arr) => (
+                      <button key={scenario} onClick={() => handleSimulate(label, scenario)}
+                        style={{
+                          display: 'block', width: '100%', textAlign: 'left',
+                          padding: '9px 12px', fontSize: 11, color: C.textPrimary,
+                          background: 'transparent', border: 'none',
+                          borderBottom: idx < arr.length - 1 ? `1px solid ${C.border}` : 'none',
+                          cursor: 'pointer', fontFamily: 'inherit',
+                        }}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = C.hover}
+                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <button onClick={handleRetrain} disabled={retraining}
+                style={{
+                  padding: '5px 10px', fontSize: 10, fontWeight: 700,
+                  background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted,
+                  borderRadius: 3, cursor: 'pointer', opacity: retraining ? 0.5 : 1,
+                }}
+              >
+                {retraining ? 'RETRAINING…' : 'RETRAIN'}
+              </button>
+
+              <button onClick={fetchAlerts}
+                style={{
+                  padding: '5px 10px', fontSize: 10, fontWeight: 700,
+                  background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted,
+                  borderRadius: 3, cursor: 'pointer',
+                }}
+              >↺</button>
+            </div>
           </div>
 
-          {/* Filters */}
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+          {/* Filters row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 20px', flexWrap: 'wrap' }}>
             <Select value={riskLevel} onChange={setRiskLevel} options={RISK_LEVELS.map(v => ({ value: v }))} label="Risk level" />
             <Select value={status} onChange={setStatus} options={STATUSES.map(v => ({ value: v }))} label="Status" />
             <Select value={timeRange} onChange={setTimeRange} options={TIME_RANGES} label="Time range" />
-          </div>
-          {/* Min score threshold slider */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 10, color: C.textMuted, flexShrink: 0 }}>Min score</span>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={minScore}
-              onChange={(e) => setMinScore(Number(e.target.value))}
-              style={{ flex: 1, accentColor: C.critical, cursor: 'pointer' }}
-            />
-            <span style={{ fontSize: 11, fontWeight: 700, color: C.textPrimary, width: 24, textAlign: 'right', flexShrink: 0 }}>{minScore}</span>
-          </div>
-          {/* Pattern filter chip — shown when navigated from coordinated activity banner */}
-          {fraudTypeFilter && (
-            <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 9, fontWeight: 700, color: C.critical, border: `1px solid ${C.critical}`, borderRadius: 2, padding: '2px 6px', letterSpacing: '0.05em' }}>
-                PATTERN
-              </span>
-              <span style={{ fontSize: 10, color: C.textPrimary, fontWeight: 600 }}>
-                {formatFraudType(fraudTypeFilter)}
-              </span>
-              <span style={{ fontSize: 10, color: C.textMuted }}>— auto-selected below</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8 }}>
+              <span style={{ fontSize: 10, color: C.textMuted, flexShrink: 0 }}>Min score</span>
+              <input
+                type="range" min={0} max={100} value={minScore}
+                onChange={(e) => setMinScore(Number(e.target.value))}
+                style={{ width: 120, accentColor: C.critical, cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: 11, fontWeight: 700, color: C.textPrimary, width: 24, flexShrink: 0 }}>{minScore}</span>
             </div>
-          )}
-        </div>
 
-        {/* Simulate + actions */}
-        <div style={{ display: 'flex', gap: 4, padding: '8px 14px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
-          <div ref={simRef} style={{ position: 'relative' }}>
-            <button
-              onClick={() => setSimOpen(o => !o)}
-              disabled={simBusy}
-              style={{
-                padding: '5px 10px', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
-                background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted,
-                borderRadius: 3, cursor: 'pointer',
-              }}
-            >
-              SIMULATE ▾
-            </button>
-            {simOpen && (
-              <div style={{
-                position: 'absolute', top: '100%', left: 0, marginTop: 3, zIndex: 20,
-                background: C.card, border: `1px solid ${C.border}`, borderRadius: 4,
-                minWidth: 220, boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-              }}>
-                {[
-                  { label: 'Bulk Data Exfiltration', scenario: 'bulk_exfiltration' },
-                  { label: 'Privilege Escalation', scenario: 'privilege_escalation' },
-                  { label: 'Off-Hours Treasury', scenario: 'off_hours_treasury' },
-                  { label: 'Account Record Tampering', scenario: 'account_tampering' },
-                ].map(({ label, scenario }, idx, arr) => (
-                  <button key={scenario} onClick={() => handleSimulate(label, scenario)}
-                    style={{
-                      display: 'block', width: '100%', textAlign: 'left',
-                      padding: '9px 12px', fontSize: 11, color: C.textPrimary,
-                      background: 'transparent', border: 'none',
-                      borderBottom: idx < arr.length - 1 ? `1px solid ${C.border}` : 'none',
-                      cursor: 'pointer', fontFamily: 'inherit',
-                    }}
-                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = C.hover}
-                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-                  >
-                    {label}
-                  </button>
-                ))}
+            {fraudTypeFilter && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: C.critical, border: `1px solid ${C.critical}`, borderRadius: 2, padding: '2px 6px', letterSpacing: '0.05em' }}>
+                  PATTERN
+                </span>
+                <span style={{ fontSize: 10, color: C.textPrimary, fontWeight: 600 }}>
+                  {formatFraudType(fraudTypeFilter)}
+                </span>
+                <button onClick={() => setFraudTypeFilter(null)} style={{ fontSize: 10, color: C.textMuted, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  × clear
+                </button>
               </div>
             )}
           </div>
-          <button onClick={handleRetrain} disabled={retraining}
-            style={{
-              padding: '5px 10px', fontSize: 10, fontWeight: 700,
-              background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted,
-              borderRadius: 3, cursor: 'pointer', opacity: retraining ? 0.5 : 1,
-            }}
-          >
-            {retraining ? 'RETRAINING…' : 'RETRAIN'}
-          </button>
-          <button onClick={fetch}
-            style={{
-              padding: '5px 10px', fontSize: 10, fontWeight: 700,
-              background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted,
-              borderRadius: 3, cursor: 'pointer',
-            }}
-          >↺</button>
+
+          {/* Toast / retrain message */}
+          {(simToast || retrainMsg) && (
+            <div style={{ padding: '6px 20px', background: '#1A2233', borderTop: `1px solid ${C.border}`, fontSize: 11, color: simToast ? C.medium : C.low }}>
+              {simToast || retrainMsg}
+            </div>
+          )}
         </div>
 
-        {(simToast || retrainMsg) && (
-          <div style={{ padding: '6px 14px', background: '#1A2233', borderBottom: `1px solid ${C.border}`, fontSize: 11, color: simToast ? C.medium : C.low, flexShrink: 0 }}>
-            {simToast || retrainMsg}
-          </div>
-        )}
-
-        {/* Stats bar */}
-        {stats && (
-          <div style={{ display: 'flex', padding: '6px 14px', gap: 14, borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
-            <div>
-              <div style={{ fontSize: 9, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>FP Rate</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: stats.labels_collected > 0 ? C.medium : C.textMuted }}>
-                {stats.labels_collected > 0 ? `${stats.false_positive_rate}%` : '—'}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: 9, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Labels</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.textPrimary }}>{stats.labels_collected}</div>
-            </div>
-            <div style={{ marginLeft: 'auto' }}>
-              <div style={{ fontSize: 9, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Showing</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.textPrimary }}>{alerts.length}</div>
-            </div>
-          </div>
-        )}
-
-        {/* Alert list */}
+        {/* Alert grid — scrollable */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {loading && [...Array(8)].map((_, i) => (
-            <div key={i} style={{ height: 56, borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', padding: '0 14px', gap: 10 }}>
-              <div style={{ width: 6, height: 6, borderRadius: '50%', background: C.border }} />
-              <div style={{ flex: 1, height: 10, background: C.border, borderRadius: 2 }} />
-              <div style={{ width: 24, height: 10, background: C.border, borderRadius: 2 }} />
+          {loading && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+              {[...Array(16)].map((_, i) => (
+                <div key={i} style={{
+                  height: 64, borderBottom: `1px solid ${C.border}`,
+                  borderLeft: i % 2 === 1 ? `1px solid ${C.border}` : undefined,
+                  display: 'flex', alignItems: 'center', padding: '0 18px', gap: 10,
+                }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: C.border }} />
+                  <div style={{ flex: 1, height: 10, background: C.border, borderRadius: 2 }} />
+                  <div style={{ width: 24, height: 10, background: C.border, borderRadius: 2 }} />
+                </div>
+              ))}
             </div>
-          ))}
-          {!loading && alerts.length === 0 && (
-            <div style={{ padding: 20, color: C.textMuted, fontSize: 12 }}>No alerts match filters.</div>
           )}
-          {!loading && alerts.map(a => (
-            <AlertRow key={a.id} alert={a} selected={selectedId === a.id} onClick={() => setSelectedId(a.id === selectedId ? null : a.id)} />
-          ))}
+
+          {!loading && alerts.length === 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 10 }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.border} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+              <span style={{ fontSize: 12, color: C.textMuted }}>No alerts match the current filters</span>
+            </div>
+          )}
+
+          {!loading && alerts.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+              {alerts.map((a, i) => (
+                <AlertRow
+                  key={a.id}
+                  alert={a}
+                  selected={selectedId === a.id}
+                  onClick={() => setSelectedId(a.id === selectedId ? null : a.id)}
+                  isRight={i % 2 === 1}
+                />
+              ))}
+              {/* Fill empty right cell if odd count */}
+              {alerts.length % 2 === 1 && (
+                <div style={{ borderBottom: `1px solid ${C.border}`, borderLeft: `1px solid ${C.border}` }} />
+              )}
+            </div>
+          )}
         </div>
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px', borderTop: `1px solid ${C.border}`, flexShrink: 0 }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '8px 20px', borderTop: `1px solid ${C.border}`, flexShrink: 0,
+            background: C.card,
+          }}>
             <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
-              style={{ fontSize: 11, background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted, padding: '3px 8px', borderRadius: 3, cursor: 'pointer', opacity: page <= 1 ? 0.4 : 1 }}>
+              style={{ fontSize: 11, background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted, padding: '4px 10px', borderRadius: 3, cursor: 'pointer', opacity: page <= 1 ? 0.4 : 1 }}>
               ← Prev
             </button>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: C.textMuted }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: C.textMuted }}>
+              Page
               <input
-                type="number"
-                min={1}
-                max={totalPages}
-                defaultValue={page}
-                key={page}
+                type="number" min={1} max={totalPages} defaultValue={page} key={page}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     const v = parseInt((e.target as HTMLInputElement).value)
@@ -349,143 +395,17 @@ export default function AlertsPage() {
                   if (!isNaN(v)) setPage(Math.max(1, Math.min(totalPages, v)))
                 }}
                 style={{
-                  width: 32, textAlign: 'center', background: C.bg, border: `1px solid ${C.border}`,
-                  color: C.textPrimary, fontSize: 10, borderRadius: 3, padding: '2px 4px',
+                  width: 36, textAlign: 'center', background: C.bg, border: `1px solid ${C.border}`,
+                  color: C.textPrimary, fontSize: 11, borderRadius: 3, padding: '3px 4px',
                   fontFamily: 'inherit', outline: 'none',
                 }}
               />
-              / {totalPages}
+              of {totalPages}
             </span>
             <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}
-              style={{ fontSize: 11, background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted, padding: '3px 8px', borderRadius: 3, cursor: 'pointer', opacity: page >= totalPages ? 0.4 : 1 }}>
+              style={{ fontSize: 11, background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted, padding: '4px 10px', borderRadius: 3, cursor: 'pointer', opacity: page >= totalPages ? 0.4 : 1 }}>
               Next →
             </button>
-          </div>
-        )}
-      </div>
-
-      {/* Threat Overview panel */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 28 }}>
-        <p style={{ margin: '0 0 20px', fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-          Threat Overview
-        </p>
-
-        {/* Severity breakdown from current alert list */}
-        {alerts.length > 0 && (() => {
-          const counts = { critical: 0, high: 0, medium: 0, low: 0 }
-          alerts.forEach(a => { counts[a.risk_level] = (counts[a.risk_level] || 0) + 1 })
-          const total = alerts.length
-          const bars: { label: string; key: keyof typeof counts; color: string }[] = [
-            { label: 'Critical', key: 'critical', color: C.critical },
-            { label: 'High', key: 'high', color: '#E85D4A' },
-            { label: 'Medium', key: 'medium', color: C.medium },
-            { label: 'Low', key: 'low', color: C.low },
-          ]
-          return (
-            <div style={{ marginBottom: 24 }}>
-              <p style={{ margin: '0 0 12px', fontSize: 10, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
-                Severity Breakdown — {total} showing
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {bars.map(({ label, key, color }) => {
-                  const n = counts[key]
-                  const pct = total > 0 ? Math.round((n / total) * 100) : 0
-                  return (
-                    <div key={key}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <span style={{ fontSize: 11, color: n > 0 ? color : C.textMuted }}>{label}</span>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: n > 0 ? color : C.textMuted }}>{n}</span>
-                      </div>
-                      <div style={{ height: 4, background: C.border, borderRadius: 2, overflow: 'hidden' }}>
-                        <div style={{ width: `${pct}%`, height: '100%', background: color, transition: 'width 0.4s ease' }} />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )
-        })()}
-
-        {/* Key stats from /api/stats */}
-        {stats && (
-          <div style={{ marginBottom: 24 }}>
-            <p style={{ margin: '0 0 12px', fontSize: 10, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
-              System Metrics
-            </p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              {[
-                { label: 'Alerts 24h', value: stats.alerts_24h ?? stats.alerts_today ?? 0, color: C.critical },
-                { label: 'High Risk Users', value: stats.high_risk_count, color: C.medium },
-                { label: 'Labels Collected', value: stats.labels_collected, color: C.textPrimary },
-                { label: 'FP Rate', value: stats.labels_collected > 0 ? `${stats.false_positive_rate}%` : '—', color: stats.false_positive_rate > 20 ? C.medium : C.low },
-              ].map(({ label, value, color }) => (
-                <div key={label} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 3, padding: '12px 14px' }}>
-                  <p style={{ margin: '0 0 6px', fontSize: 9, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{label}</p>
-                  <p style={{ margin: 0, fontSize: 22, fontWeight: 800, color, letterSpacing: '-0.02em' }}>{value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Coordinated patterns */}
-        {stats && stats.coordinated_patterns && stats.coordinated_patterns.length > 0 && (
-          <div style={{ marginBottom: 24 }}>
-            <p style={{ margin: '0 0 12px', fontSize: 10, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
-              Coordinated Patterns
-            </p>
-            {stats.coordinated_patterns.map((p, i) => (
-              <div key={i} style={{ background: 'rgba(220,38,38,0.06)', border: `1px solid rgba(220,38,38,0.2)`, borderRadius: 3, padding: '10px 14px', marginBottom: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: C.critical }}>
-                    {p.pattern.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                  </span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: C.critical }}>{p.users} users</span>
-                </div>
-                <span style={{ fontSize: 10, color: C.textMuted }}>{p.window}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Retrain readiness */}
-        {stats && (
-          <div>
-            <p style={{ margin: '0 0 10px', fontSize: 10, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
-              Active Learning
-            </p>
-            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 3, padding: '12px 14px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontSize: 11, color: C.textMuted }}>Labels toward retrain</span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: stats.labels_collected >= 10 ? C.low : C.textPrimary }}>
-                  {stats.labels_collected} / 10
-                </span>
-              </div>
-              <div style={{ height: 5, background: C.border, borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
-                <div style={{
-                  width: `${Math.min(100, (stats.labels_collected / 10) * 100)}%`,
-                  height: '100%', background: stats.labels_collected >= 10 ? C.low : C.medium,
-                  transition: 'width 0.4s ease',
-                }} />
-              </div>
-              <p style={{ margin: 0, fontSize: 10, color: C.textMuted }}>
-                {stats.labels_collected >= 10
-                  ? 'Retrain ready — go to Intelligence page'
-                  : `${10 - stats.labels_collected} more TP/FP labels needed to trigger retraining`}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Empty prompt */}
-        {alerts.length === 0 && !loading && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 8 }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.border} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-              <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-            <span style={{ fontSize: 12, color: C.textMuted }}>No alerts — select an alert to review</span>
           </div>
         )}
       </div>
