@@ -364,13 +364,130 @@ export default function AlertsPage() {
         )}
       </div>
 
-      {/* Empty state when no alert selected */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8 }}>
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.border} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-          <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-        </svg>
-        <span style={{ fontSize: 12, color: C.textMuted }}>Select an alert to review</span>
+      {/* Threat Overview panel */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: 28 }}>
+        <p style={{ margin: '0 0 20px', fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          Threat Overview
+        </p>
+
+        {/* Severity breakdown from current alert list */}
+        {alerts.length > 0 && (() => {
+          const counts = { critical: 0, high: 0, medium: 0, low: 0 }
+          alerts.forEach(a => { counts[a.risk_level] = (counts[a.risk_level] || 0) + 1 })
+          const total = alerts.length
+          const bars: { label: string; key: keyof typeof counts; color: string }[] = [
+            { label: 'Critical', key: 'critical', color: C.critical },
+            { label: 'High', key: 'high', color: '#E85D4A' },
+            { label: 'Medium', key: 'medium', color: C.medium },
+            { label: 'Low', key: 'low', color: C.low },
+          ]
+          return (
+            <div style={{ marginBottom: 24 }}>
+              <p style={{ margin: '0 0 12px', fontSize: 10, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
+                Severity Breakdown — {total} showing
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {bars.map(({ label, key, color }) => {
+                  const n = counts[key]
+                  const pct = total > 0 ? Math.round((n / total) * 100) : 0
+                  return (
+                    <div key={key}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontSize: 11, color: n > 0 ? color : C.textMuted }}>{label}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: n > 0 ? color : C.textMuted }}>{n}</span>
+                      </div>
+                      <div style={{ height: 4, background: C.border, borderRadius: 2, overflow: 'hidden' }}>
+                        <div style={{ width: `${pct}%`, height: '100%', background: color, transition: 'width 0.4s ease' }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Key stats from /api/stats */}
+        {stats && (
+          <div style={{ marginBottom: 24 }}>
+            <p style={{ margin: '0 0 12px', fontSize: 10, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
+              System Metrics
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {[
+                { label: 'Alerts 24h', value: stats.alerts_24h ?? stats.alerts_today ?? 0, color: C.critical },
+                { label: 'High Risk Users', value: stats.high_risk_count, color: C.medium },
+                { label: 'Labels Collected', value: stats.labels_collected, color: C.textPrimary },
+                { label: 'FP Rate', value: stats.labels_collected > 0 ? `${stats.false_positive_rate}%` : '—', color: stats.false_positive_rate > 20 ? C.medium : C.low },
+              ].map(({ label, value, color }) => (
+                <div key={label} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 3, padding: '12px 14px' }}>
+                  <p style={{ margin: '0 0 6px', fontSize: 9, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{label}</p>
+                  <p style={{ margin: 0, fontSize: 22, fontWeight: 800, color, letterSpacing: '-0.02em' }}>{value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Coordinated patterns */}
+        {stats && stats.coordinated_patterns && stats.coordinated_patterns.length > 0 && (
+          <div style={{ marginBottom: 24 }}>
+            <p style={{ margin: '0 0 12px', fontSize: 10, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
+              Coordinated Patterns
+            </p>
+            {stats.coordinated_patterns.map((p, i) => (
+              <div key={i} style={{ background: 'rgba(220,38,38,0.06)', border: `1px solid rgba(220,38,38,0.2)`, borderRadius: 3, padding: '10px 14px', marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: C.critical }}>
+                    {p.pattern.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: C.critical }}>{p.users} users</span>
+                </div>
+                <span style={{ fontSize: 10, color: C.textMuted }}>{p.window}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Retrain readiness */}
+        {stats && (
+          <div>
+            <p style={{ margin: '0 0 10px', fontSize: 10, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
+              Active Learning
+            </p>
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 3, padding: '12px 14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontSize: 11, color: C.textMuted }}>Labels toward retrain</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: stats.labels_collected >= 10 ? C.low : C.textPrimary }}>
+                  {stats.labels_collected} / 10
+                </span>
+              </div>
+              <div style={{ height: 5, background: C.border, borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
+                <div style={{
+                  width: `${Math.min(100, (stats.labels_collected / 10) * 100)}%`,
+                  height: '100%', background: stats.labels_collected >= 10 ? C.low : C.medium,
+                  transition: 'width 0.4s ease',
+                }} />
+              </div>
+              <p style={{ margin: 0, fontSize: 10, color: C.textMuted }}>
+                {stats.labels_collected >= 10
+                  ? 'Retrain ready — go to Intelligence page'
+                  : `${10 - stats.labels_collected} more TP/FP labels needed to trigger retraining`}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Empty prompt */}
+        {alerts.length === 0 && !loading && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 8 }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.border} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            <span style={{ fontSize: 12, color: C.textMuted }}>No alerts — select an alert to review</span>
+          </div>
+        )}
       </div>
 
       {/* Overlay alert panel */}

@@ -76,12 +76,19 @@ body {
 }
 
 @keyframes panel-appear {
-  from { opacity: 0; transform: translate(-50%, -48%) scale(0.97); }
+  from { opacity: 0; transform: translate(-50%, -44%) scale(0.94); }
   to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes backdrop-appear {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .alert-panel-overlay {
-  animation: panel-appear 0.18s ease-out forwards;
+  animation: panel-appear 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.alert-panel-backdrop {
+  animation: backdrop-appear 0.2s ease forwards;
 }
 
 /* Action button hover — applies to all interactive buttons across the app */
