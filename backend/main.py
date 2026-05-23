@@ -532,7 +532,7 @@ async def _update_or_create_case(user_id: str, alert: AlertModel, db: AsyncSessi
     return case_id
 
 
-SEED_VERSION = "v5"  # bump when seed logic changes to force reseed on deployed instances
+SEED_VERSION = "v6"  # bump when seed logic changes to force reseed on deployed instances
 
 
 async def _clear_seed_data(db) -> None:

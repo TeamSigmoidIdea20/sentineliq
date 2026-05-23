@@ -40,7 +40,7 @@ class XGBoostModel:
             return
 
         self._model = xgb.XGBClassifier(
-            n_estimators=150,
+            n_estimators=60,
             max_depth=3,
             learning_rate=0.1,
             scale_pos_weight=2,
@@ -50,6 +50,7 @@ class XGBoostModel:
             gamma=0.1,
             reg_alpha=0.1,
             reg_lambda=1.0,
+            max_delta_step=1,
             use_label_encoder=False,
             eval_metric="logloss",
             random_state=42,
@@ -63,12 +64,14 @@ class XGBoostModel:
         if not self.is_fitted or self._model is None:
             return 0.5
         x = features.reshape(1, -1)
-        return float(self._model.predict_proba(x)[0][1])
+        # Cap at 0.88 — XGBoost probabilities are uncalibrated on imbalanced data
+        # and saturate toward 1.0; capping keeps ensemble contributions realistic.
+        return min(float(self._model.predict_proba(x)[0][1]), 0.88)
 
     def score_batch(self, X: np.ndarray) -> list[float]:
         if not self.is_fitted or self._model is None:
             return [0.5] * len(X)
-        return self._model.predict_proba(X)[:, 1].tolist()
+        return [min(v, 0.88) for v in self._model.predict_proba(X)[:, 1].tolist()]
 
     def explain(self, features: np.ndarray) -> list[dict]:
         if not self.is_fitted or self._explainer is None:

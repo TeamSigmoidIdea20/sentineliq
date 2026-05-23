@@ -53,7 +53,7 @@ function generatePlainExplanation(alert: Alert, peerData?: PeerComparison | null
     }
   }
 
-  const topShap = [...alert.shap_values]
+  const topShap = [...(alert.shap_values ?? [])]
     .filter((v) => v.contribution > 0)
     .sort((a, b) => b.contribution - a.contribution)
     .slice(0, 2)
@@ -326,7 +326,7 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
                   <p style={{ margin: '0 0 8px', fontSize: 9, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                     Top ML Signals
                   </p>
-                  {alert.shap_values
+                  {(alert.shap_values ?? [])
                     .filter(v => v.contribution > 0)
                     .sort((a, b) => b.contribution - a.contribution)
                     .slice(0, 3)
@@ -374,7 +374,7 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
                 <p style={{ margin: '0 0 12px', fontSize: 10, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
                   Feature Attribution (SHAP)
                 </p>
-                <SHAPChart values={alert.shap_values} />
+                <SHAPChart values={alert.shap_values ?? []} />
               </div>
 
               {/* Peer comparison */}

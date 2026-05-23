@@ -110,7 +110,9 @@ class SyntheticGenerator:
         hour = random.randint(ls, le - 1)
         event_ts = _clamp_past(ts.replace(hour=hour, minute=random.randint(0, 59), second=random.randint(0, 59)))
         department = random.choice(typ_depts)
-        location = random.choice(norm_locs)
+        # 5% of normal events originate from an atypical location — prevents
+        # location_mismatch from being a perfect fraud separator in XGBoost training.
+        location = "external" if random.random() < 0.05 else random.choice(norm_locs)
         event_type = random.choice(EVENT_TYPES)
         device = random.choice(DEVICES[:3])
         download_mb = random.gauss(3, 1) if event_type == "report_download" else random.gauss(0.5, 0.2)
