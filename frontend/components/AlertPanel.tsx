@@ -427,7 +427,7 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
               <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 20 }}>
 
                 {/* Analysis block — top of right column, always visible on open */}
-                <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 3 }}>
                   <div style={{ padding: '9px 14px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ fontSize: 11, color: C.amber }}>✦</span>
                     <span style={{ fontSize: 10, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
