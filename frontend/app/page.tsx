@@ -10,6 +10,7 @@ const C = {
   border: TOKENS.border,
   primary: TOKENS.textPrimary,
   muted: TOKENS.textMuted,
+  body: 'rgba(240,246,252,0.72)',
   red: TOKENS.critical,
   amber: TOKENS.amber,
   green: TOKENS.low,
@@ -93,23 +94,23 @@ const WORKFLOW = [
 const ENVIRONMENTS = [
   {
     title: 'Retail & corporate banking',
-    desc: 'Detect and investigate CRM, ORA, and loan-origination systems. Off-hours access to records of branch tellers, treasury, and loan-ops desks.',
-    tags: ['Teller access anomalies', 'Payroll queries', 'Off-hours system use'],
+    desc: 'Monitors branch tellers, loan-ops, and CRM access. Catches off-hours logins, bulk record queries, and payroll system anomalies before the damage spreads.',
+    tags: ['Off-hours teller access detection', 'Bulk record download alerts', 'Velocity spikes on loan origination'],
   },
   {
     title: 'Treasury & capital markets',
-    desc: 'Privileged security options and cross-department access where a single bad approval can move ₹crores in a single transaction.',
-    tags: ['Transaction velocity during trading hours', 'Approved system queries across desks', 'Privileged access during peak management'],
+    desc: 'A single privileged action in treasury can move crores. SentinelIQ scores every cross-desk access and privilege use against the trader\'s own historical baseline.',
+    tags: ['Transaction velocity during trading windows', 'Cross-desk access pattern detection', 'Privilege escalation alerts, real-time'],
   },
   {
     title: 'Regulatory compliance & audit',
-    desc: 'MITRE ATT&CK technique mapping aligns with every alert. Case files include the complete audit chain — ready for RBI / SEBI / Internal audit handoff.',
-    tags: ['T1078 — Valid Accounts', 'T1530 — Cloud Storage Access', 'T1087 — Account Manipulation + 30s'],
+    desc: 'Every alert maps to a MITRE ATT&CK technique. Case files include the full event chain, SHAP evidence, and analyst labels — ready for RBI, SEBI, or internal audit.',
+    tags: ['T1078 — Valid Accounts', 'T1530 — Data from Cloud Storage', 'T1087 — Account Discovery'],
   },
   {
-    title: 'Security operations centres',
-    desc: 'Integrates next to your SIEM, not against it. SentinelIQ owns insider models (identity-facing fraud); your SOC tooling owns the rest.',
-    tags: ['1-seat monitoring — no onboarding', 'REST API — Microservice / OpenAPI documented', 'Single-sign — CSV / SSO faking owns the seat'],
+    title: 'Security operations teams',
+    desc: 'Each alert arrives pre-explained. Risk score, top SHAP drivers, 30-day behavioural history, and peer comparison — so analysts triage in seconds, not hours.',
+    tags: ['Ensemble-scored alerts with SHAP attribution', 'Audit-ready JSON case export per incident', 'Kill-chain case clustering across users'],
   },
 ]
 
@@ -176,7 +177,7 @@ export default function LandingPage() {
             </motion.h1>
             <motion.p
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, delay: 0.15 }}
-              style={{ margin: '0 0 32px', fontSize: 15, color: C.muted, lineHeight: 1.72, maxWidth: 460 }}
+              style={{ margin: '0 0 32px', fontSize: 16, color: C.body, lineHeight: 1.72, maxWidth: 460 }}
             >
               SentinelIQ builds a behavioural fingerprint for every privileged employee and scores every action in real time. The moment behaviour deviates from baseline, investigators know — not 12 months later.
             </motion.p>
@@ -297,7 +298,7 @@ export default function LandingPage() {
                 <span style={{ fontSize: 36, fontWeight: 800, lineHeight: 1, color: red ? C.red : C.primary, letterSpacing: '-0.03em' }}>{value}</span>
                 {unit && <span style={{ fontSize: 12, color: C.muted }}>{unit}</span>}
               </div>
-              <p style={{ margin: 0, fontSize: 12, color: C.muted, lineHeight: 1.6 }}>{label}</p>
+              <p style={{ margin: 0, fontSize: 13, color: C.body, lineHeight: 1.6 }}>{label}</p>
             </motion.div>
           ))}
         </motion.div>
@@ -368,8 +369,8 @@ export default function LandingPage() {
                   )}
                 </div>
                 <div>
-                  <p style={{ margin: '0 0 6px', fontSize: 13, fontWeight: 700, color: C.primary, letterSpacing: '-0.01em' }}>{label}</p>
-                  <p style={{ margin: 0, fontSize: 12, color: C.muted, lineHeight: 1.65 }}>{desc}</p>
+                  <p style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 700, color: C.primary, letterSpacing: '-0.01em' }}>{label}</p>
+                  <p style={{ margin: 0, fontSize: 13, color: C.body, lineHeight: 1.65 }}>{desc}</p>
                 </div>
               </motion.div>
             ))}
@@ -400,7 +401,7 @@ export default function LandingPage() {
               >
                 <p style={{ margin: '0 0 14px', fontSize: 11, fontWeight: 800, color: C.red, fontFamily: 'monospace', letterSpacing: '0.04em' }}>{n}</p>
                 <p style={{ margin: '0 0 10px', fontSize: 15, fontWeight: 700, color: C.primary, letterSpacing: '-0.01em' }}>{title}</p>
-                <p style={{ margin: 0, fontSize: 12, color: C.muted, lineHeight: 1.65 }}>{desc}</p>
+                <p style={{ margin: 0, fontSize: 14, color: C.body, lineHeight: 1.65 }}>{desc}</p>
               </motion.div>
             ))}
           </motion.div>
@@ -415,7 +416,7 @@ export default function LandingPage() {
             <h2 style={{ margin: '0 0 16px', fontSize: 'clamp(22px, 3vw, 32px)', fontWeight: 800, color: C.primary, letterSpacing: '-0.02em', lineHeight: 1.15 }}>
               When the score breaks threshold, the analyst sees the full picture.
             </h2>
-            <p style={{ margin: 0, fontSize: 14, color: C.muted, lineHeight: 1.72 }}>
+            <p style={{ margin: 0, fontSize: 15, color: C.body, lineHeight: 1.72 }}>
               Not a severity flag — a complete evidence package. Risk score, SHAP explanation, 30 days of behavioural history, peer comparison, and every linked prior incident for that user.
             </p>
           </motion.div>
@@ -475,11 +476,11 @@ export default function LandingPage() {
                 whileHover={{ backgroundColor: '#1A1F26', transition: { duration: 0.15 } }}
                 style={{ background: C.bg, padding: '28px 28px', cursor: 'default' }}
               >
-                <p style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 700, color: C.primary, letterSpacing: '-0.01em' }}>{title}</p>
-                <p style={{ margin: '0 0 14px', fontSize: 12, color: C.muted, lineHeight: 1.65 }}>{desc}</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <p style={{ margin: '0 0 10px', fontSize: 16, fontWeight: 700, color: C.primary, letterSpacing: '-0.01em' }}>{title}</p>
+                <p style={{ margin: '0 0 16px', fontSize: 14, color: C.body, lineHeight: 1.65 }}>{desc}</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                   {tags.map(t => (
-                    <span key={t} style={{ fontSize: 11, color: C.muted }}>· {t}</span>
+                    <span key={t} style={{ fontSize: 13, color: C.muted }}>· {t}</span>
                   ))}
                 </div>
               </motion.div>
@@ -512,7 +513,7 @@ export default function LandingPage() {
           <h2 style={{ margin: '0 0 14px', fontSize: 'clamp(24px, 4vw, 40px)', fontWeight: 800, color: C.primary, letterSpacing: '-0.02em', lineHeight: 1.1, maxWidth: 580 }}>
             The next insider fraud attempt is already in progress.
           </h2>
-          <p style={{ margin: '0 0 36px', color: C.muted, fontSize: 14, maxWidth: 420, lineHeight: 1.65 }}>
+          <p style={{ margin: '0 0 36px', color: C.body, fontSize: 15, maxWidth: 420, lineHeight: 1.65 }}>
             SentinelIQ surfaces it before the damage is done.
           </p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
