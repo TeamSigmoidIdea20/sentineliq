@@ -370,7 +370,7 @@ export default function AlertsPage() {
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
+        {alerts.length > 0 && (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '8px 20px', borderTop: `1px solid ${C.border}`, flexShrink: 0,

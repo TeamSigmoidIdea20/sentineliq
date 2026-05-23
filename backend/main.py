@@ -840,7 +840,7 @@ _LIVE_FRAUD_PATTERNS = ["off_hours_login", "bulk_download", "cross_department_ac
 async def _event_loop() -> None:
     live_count = 0
     while True:
-        await asyncio.sleep(15)  # 1 live event per 15 seconds
+        await asyncio.sleep(5)  # 1 live event per 5 seconds (~12/min)
         try:
             live_count += 1
             # Every 15th live event is an explicit fraud (~7% rate, matches training distribution)
