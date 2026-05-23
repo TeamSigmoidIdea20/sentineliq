@@ -306,40 +306,6 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
               display: 'flex', flexDirection: 'column', gap: 20,
             }}>
 
-              {/* Analysis block — first, so plain-English explanation is immediately visible */}
-              <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{ padding: '9px 14px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 11, color: C.amber }}>✦</span>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    {alert.ai_narrative ? 'AI Analysis' : 'Alert Analysis'}
-                  </span>
-                </div>
-                <div style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}` }}>
-                  <p style={{ margin: '0 0 6px', fontSize: 9, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                    In Plain Terms
-                  </p>
-                  <p style={{ margin: 0, fontSize: 13, color: C.textPrimary, lineHeight: 1.75 }}>
-                    {alert.ai_narrative || generatePlainExplanation(alert, peerData)}
-                  </p>
-                </div>
-                <div style={{ padding: '10px 14px' }}>
-                  <p style={{ margin: '0 0 8px', fontSize: 9, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                    Top ML Signals
-                  </p>
-                  {(alert.shap_values ?? [])
-                    .filter(v => v.contribution > 0)
-                    .sort((a, b) => b.contribution - a.contribution)
-                    .slice(0, 3)
-                    .map((v, i) => (
-                      <div key={v.feature} style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: i === 0 ? 0 : 4 }}>
-                        <span style={{ fontSize: 9, color: C.critical, fontWeight: 700 }}>↑</span>
-                        <span style={{ fontSize: 10, color: C.textMuted, fontFamily: 'monospace' }}>{v.feature}</span>
-                        <span style={{ fontSize: 10, color: C.textPrimary, fontWeight: 600 }}>+{v.contribution.toFixed(3)}</span>
-                      </div>
-                    ))}
-                </div>
-              </div>
-
               {/* ML model score cards */}
               <div>
                 <p style={{ margin: '0 0 10px', fontSize: 10, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
@@ -375,6 +341,40 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
                   Feature Attribution (SHAP)
                 </p>
                 <SHAPChart values={alert.shap_values ?? []} />
+              </div>
+
+              {/* Analysis block — plain-English explanation below SHAP so context is already set */}
+              <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ padding: '9px 14px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 11, color: C.amber }}>✦</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    {alert.ai_narrative ? 'AI Analysis' : 'Alert Analysis'}
+                  </span>
+                </div>
+                <div style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}` }}>
+                  <p style={{ margin: '0 0 6px', fontSize: 9, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    In Plain Terms
+                  </p>
+                  <p style={{ margin: 0, fontSize: 13, color: C.textPrimary, lineHeight: 1.75 }}>
+                    {alert.ai_narrative || generatePlainExplanation(alert, peerData)}
+                  </p>
+                </div>
+                <div style={{ padding: '10px 14px' }}>
+                  <p style={{ margin: '0 0 8px', fontSize: 9, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    Top ML Signals
+                  </p>
+                  {(alert.shap_values ?? [])
+                    .filter(v => v.contribution > 0)
+                    .sort((a, b) => b.contribution - a.contribution)
+                    .slice(0, 3)
+                    .map((v, i) => (
+                      <div key={v.feature} style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: i === 0 ? 0 : 4 }}>
+                        <span style={{ fontSize: 9, color: C.critical, fontWeight: 700 }}>↑</span>
+                        <span style={{ fontSize: 10, color: C.textMuted, fontFamily: 'monospace' }}>{v.feature}</span>
+                        <span style={{ fontSize: 10, color: C.textPrimary, fontWeight: 600 }}>+{v.contribution.toFixed(3)}</span>
+                      </div>
+                    ))}
+                </div>
               </div>
 
               {/* Peer comparison */}
