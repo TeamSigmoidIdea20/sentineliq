@@ -52,18 +52,18 @@ const STATS = [
 
 const FEATURES = [
   {
-    label: 'Real-time behavioural baselines',
-    desc: 'Each employee is scored against their own 30-day pattern — not a generic role profile. Off-hours logins, download queues, cross-department queries all compared against the user\'s actual baseline.',
+    label: 'Per-user behavioural baselines',
+    desc: 'Each employee is scored against their own 30-day history, not a generic role profile. Off-hours logins, download volumes, and cross-department queries are all measured against what that specific user actually does.',
     visual: 'baseline',
   },
   {
-    label: '3-model ensemble',
-    desc: 'Isolation Forest, an LSTM Autoencoder, and gradient-boosted trees vote in parallel — a single IF / LSTM / XGB disagreement is itself a signal we surface to the analyst.',
+    label: '3-model ensemble scoring',
+    desc: 'Isolation Forest, an LSTM Autoencoder, and XGBoost score every event in parallel. When the models disagree, that disagreement is itself a signal surfaced to the analyst alongside the final risk score.',
     visual: 'ensemble',
   },
   {
-    label: 'SHAP explainability — built in',
-    desc: 'Every alert ships with feature attribution. Analysts see which behavioural signals drove the score, by how much, against the user\'s own baseline. No "black-box anomaly" alerts.',
+    label: 'SHAP explainability, built in',
+    desc: 'Every alert ships with feature attribution. Analysts see exactly which behavioural signals drove the score, by how much, measured against the user\'s own baseline. No black-box anomaly flags.',
     visual: 'shap',
   },
 ]
@@ -72,45 +72,45 @@ const WORKFLOW = [
   {
     n: '01',
     title: 'Detect',
-    desc: 'Every user action is encoded into 8 engineered features and scored in real time across all three models. Within 50ms of the event.',
+    desc: 'Every user action is encoded into 8 rolling-window features and scored across all three models in real time. The ensemble produces a single 0-100 risk score within milliseconds.',
   },
   {
     n: '02',
     title: 'Surface',
-    desc: 'If the ensemble threshold is breached, an alert lands on the analyst\'s home screen with a one-sentence summary — value, what, why.',
+    desc: 'When the ensemble score breaches threshold, an alert lands on the analyst queue with a one-line summary: who triggered it, what the event type was, and the risk score.',
   },
   {
     n: '03',
     title: 'Explain',
-    desc: 'One click opens the full case view: 21-day risk history, SHAP attribution, model scores, peer comparison, linked events — no, what, why.',
+    desc: 'One click opens the full case view: 30-day risk history, SHAP attribution, individual model scores, peer comparison against same-role employees, and every linked prior event for that user.',
   },
   {
     n: '04',
     title: 'Decide',
-    desc: 'Resolve or escalate with a single keystroke. All labels feed back into active learning — the model improves with every analyst decision.',
+    desc: 'Resolve or escalate with a single action. Every analyst label feeds back into active learning so the XGBoost model improves with each decision made on the platform.',
   },
 ]
 
 const ENVIRONMENTS = [
   {
-    title: 'Retail & corporate banking',
-    desc: 'Monitors branch tellers, loan-ops, and CRM access. Catches off-hours logins, bulk record queries, and payroll system anomalies before the damage spreads.',
-    tags: ['Off-hours teller access detection', 'Bulk record download alerts', 'Velocity spikes on loan origination'],
+    title: 'Retail and corporate banking',
+    desc: 'Monitors branch tellers, loan-ops desks, and CRM access. Detects off-hours logins, bulk record queries, and payroll system anomalies against each employee\'s personal baseline.',
+    tags: ['Off-hours teller access detection', 'Bulk record download alerts', 'Velocity spikes on loan origination systems'],
   },
   {
-    title: 'Treasury & capital markets',
-    desc: 'A single privileged action in treasury can move crores. SentinelIQ scores every cross-desk access and privilege use against the trader\'s own historical baseline.',
-    tags: ['Transaction velocity during trading windows', 'Cross-desk access pattern detection', 'Privilege escalation alerts, real-time'],
+    title: 'Treasury and capital markets',
+    desc: 'A single privileged action in treasury can move crores. SentinelIQ scores every cross-desk access and privilege escalation against the trader\'s own historical activity pattern.',
+    tags: ['Transaction velocity during trading windows', 'Cross-desk access pattern detection', 'Real-time privilege escalation alerts'],
   },
   {
-    title: 'Regulatory compliance & audit',
-    desc: 'Every alert maps to a MITRE ATT&CK technique. Case files include the full event chain, SHAP evidence, and analyst labels — ready for RBI, SEBI, or internal audit.',
-    tags: ['T1078 — Valid Accounts', 'T1530 — Data from Cloud Storage', 'T1087 — Account Discovery'],
+    title: 'Regulatory compliance and audit',
+    desc: 'Every alert maps to a MITRE ATT&CK technique. Case files include the full event chain, SHAP evidence, and analyst labels, packaged for RBI, SEBI, or internal audit handoff.',
+    tags: ['T1078: Valid Accounts', 'T1530: Data from Cloud Storage', 'T1087: Account Discovery'],
   },
   {
     title: 'Security operations teams',
-    desc: 'Each alert arrives pre-explained. Risk score, top SHAP drivers, 30-day behavioural history, and peer comparison — so analysts triage in seconds, not hours.',
-    tags: ['Ensemble-scored alerts with SHAP attribution', 'Audit-ready JSON case export per incident', 'Kill-chain case clustering across users'],
+    desc: 'Each alert arrives pre-explained with risk score, top SHAP drivers, 30-day behavioural history, and peer comparison. Analysts triage in seconds rather than spending hours on manual correlation.',
+    tags: ['Ensemble-scored alerts with SHAP attribution', 'Audit-ready JSON case export per incident', 'Kill-chain case clustering across linked events'],
   },
 ]
 
@@ -179,7 +179,7 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, delay: 0.15 }}
               style={{ margin: '0 0 32px', fontSize: 16, color: C.body, lineHeight: 1.72, maxWidth: 460 }}
             >
-              SentinelIQ builds a behavioural fingerprint for every privileged employee and scores every action in real time. The moment behaviour deviates from baseline, investigators know — not 12 months later.
+              SentinelIQ builds a behavioural fingerprint for every privileged employee and scores every action in real time. When behaviour deviates from baseline, investigators know within seconds, not after the damage is already done.
             </motion.p>
             <motion.div
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, delay: 0.22 }}
@@ -417,7 +417,7 @@ export default function LandingPage() {
               When the score breaks threshold, the analyst sees the full picture.
             </h2>
             <p style={{ margin: 0, fontSize: 15, color: C.body, lineHeight: 1.72 }}>
-              Not a severity flag — a complete evidence package. Risk score, SHAP explanation, 30 days of behavioural history, peer comparison, and every linked prior incident for that user.
+              Not just a severity flag. Every alert comes with the full evidence package: risk score, SHAP explanation, 30 days of behavioural history, peer comparison against same-role employees, and every linked prior incident for that user.
             </p>
           </motion.div>
 
