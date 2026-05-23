@@ -1764,7 +1764,7 @@ async def get_user(user_id: str, db: AsyncSession = Depends(get_db)):
 async def get_user_events(
     user_id: str,
     before: datetime = Query(...),
-    limit: int = Query(10, ge=1, le=50),
+    limit: int = Query(10, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
 ):
     rows = (

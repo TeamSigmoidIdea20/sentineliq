@@ -164,17 +164,19 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
-            {lastUpdated && (
-              <span style={{ fontSize: 10, color: C.textMuted }}>Updated {lastUpdated.toLocaleTimeString()}</span>
-            )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', display: 'inline-block',
-                background: backendStatus === 'ok' ? C.low : backendStatus === 'initializing' ? C.amber : C.critical,
-              }} />
-              <span style={{ fontSize: 11, fontWeight: 600,
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {lastUpdated && (
+                <span style={{ fontSize: 10, color: C.textMuted, fontFamily: 'monospace' }}>
+                  {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </span>
+              )}
+              <span style={{
+                fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
+                padding: '3px 8px', borderRadius: 2,
+                border: `1px solid ${backendStatus === 'ok' ? C.low : backendStatus === 'initializing' ? C.amber : C.critical}`,
                 color: backendStatus === 'ok' ? C.low : backendStatus === 'initializing' ? C.amber : C.critical,
               }}>
-                {backendStatus === 'ok' ? 'OPERATIONAL' : backendStatus === 'initializing' ? 'INITIALIZING' : 'OFFLINE'}
+                {backendStatus === 'ok' ? 'SYS ONLINE' : backendStatus === 'initializing' ? 'INITIALIZING' : 'SYS OFFLINE'}
               </span>
             </div>
           </div>

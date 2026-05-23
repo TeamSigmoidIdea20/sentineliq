@@ -49,9 +49,6 @@ export default function Sidebar() {
         </Link>
         <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
           <span className="animate-pulse-dot" style={{ width: 6, height: 6, borderRadius: '50%', background: C.low, display: 'inline-block' }} />
-          <span style={{ fontSize: 10, color: C.low, letterSpacing: '0.06em', fontWeight: 600 }}>
-            LIVE MONITORING
-          </span>
         </div>
       </div>
 
