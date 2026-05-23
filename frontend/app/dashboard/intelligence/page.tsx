@@ -144,7 +144,7 @@ export default function IntelligencePage() {
           `[00:07] Loading analyst labels from SQLite — ${labelsN} labels found...`,
           '[00:08] Retraining XGBoost — n_estimators=100, 5 fraud classes...',
           `[00:09] XGBoost retrained. Precision: ${precisionVal} | Recall: ${recallVal} | F1: ${f1Val}`,
-          '[00:10] Ensemble weights applied: IF(0.3) + LSTM(0.4) + XGB(0.3)',
+          '[00:10] Ensemble weights applied: IF(0.4) + LSTM(0.4) + XGB(0.2)',
           '[00:11] Models saved to disk. Pipeline complete.',
         ]
 
@@ -226,7 +226,7 @@ export default function IntelligencePage() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
                   <ModelCard
                     name="Isolation Forest"
-                    weight="30%"
+                    weight="40%"
                     description="Trained on synthetic events at startup. Contamination parameter set to 0.1 — the model expects ~10% of events to be anomalous. Scores each incoming event by how isolated it is from the normal cluster. No labels required — fully unsupervised."
                     params={[
                       { label: 'contamination', value: modelInfo ? String(modelInfo.isolation_forest.contamination) : '0.1' },
@@ -248,7 +248,7 @@ export default function IntelligencePage() {
                   />
                   <ModelCard
                     name="XGBoost Classifier"
-                    weight="30%"
+                    weight="20%"
                     description="Trained on labeled synthetic data with 5 fraud pattern classes. Retrains when investigators label alerts as True Positive or False Positive — active learning loop. Each retrain incorporates analyst feedback to improve precision."
                     params={[
                       { label: 'n_estimators', value: modelInfo ? String(modelInfo.xgboost.n_estimators) : '150' },

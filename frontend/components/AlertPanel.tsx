@@ -347,9 +347,9 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
                 </p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                   {([
-                    { label: 'Isolation Forest', key: 'isolation_forest', weight: '30%', desc: 'point anomaly' },
+                    { label: 'Isolation Forest', key: 'isolation_forest', weight: '40%', desc: 'point anomaly' },
                     { label: 'LSTM', key: 'lstm', weight: '40%', desc: 'behavioural drift' },
-                    { label: 'XGBoost', key: 'xgboost', weight: '30%', desc: 'fraud pattern' },
+                    { label: 'XGBoost', key: 'xgboost', weight: '20%', desc: 'fraud pattern' },
                   ] as const).map(({ label, key, weight, desc }) => {
                     const pct = Math.round(alert.model_scores[key] * 100)
                     const color = pct >= 65 ? C.critical : pct >= 40 ? C.medium : C.low
