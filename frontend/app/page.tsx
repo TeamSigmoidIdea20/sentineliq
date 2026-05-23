@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { motion, type Variants } from 'framer-motion'
-import { Activity, GitBranch, Search } from 'lucide-react'
 import { C as TOKENS } from '@/lib/tokens'
 
 const C = {
@@ -16,133 +15,106 @@ const C = {
   green: TOKENS.low,
 }
 
-// ── Motion configs ────────────────────────────────────────────────────────────
 const containerVariants: Variants = {
   hidden: {},
-  visible: { transition: { staggerChildren: 0.13 } },
+  visible: { transition: { staggerChildren: 0.11 } },
 }
 const fadeInUp: Variants = {
-  hidden: { opacity: 0, y: 22 },
+  hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } },
 }
 const fadeIn: Variants = {
   hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { duration: 0.5, ease: 'easeOut' } },
+  visible: { opacity: 1, transition: { duration: 0.45, ease: 'easeOut' } },
 }
+const BTN_TAP = { scale: 0.97 }
 
-const CARD_HOVER = {
-  y: -4,
-  borderColor: '#4D5562',
-  boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
-  transition: { duration: 0.2, ease: 'easeOut' },
-}
-const BTN_TAP = { scale: 0.96 }
-
-// ── Data ──────────────────────────────────────────────────────────────────────
 const MOCK_ALERTS = [
   { id: 'a3f9b2c1', user: 'James Sterling', type: 'Bulk Data Export', risk: 'CRITICAL', score: 94, color: C.red },
-  { id: 'b7d1e4f0', user: 'Maria Lopez', type: 'Off-Hours Login', risk: 'HIGH', score: 78, color: C.red },
-  { id: 'c2a8f3d9', user: 'Arun Kapoor', type: 'Velocity Spike', risk: 'MEDIUM', score: 61, color: C.amber },
+  { id: 'b7d1e4f0', user: 'Maria Lopez',    type: 'Off-Hours Login',  risk: 'HIGH',     score: 78, color: C.red },
+  { id: 'c2a8f3d9', user: 'Arun Kapoor',    type: 'Velocity Spike',   risk: 'MEDIUM',   score: 61, color: C.amber },
 ]
 
-const STEPS = [
+const SHAP_MOCK = [
+  { feature: 'transaction_velocity_ratio', value: 28.4, positive: true },
+  { feature: 'off_hours_ratio',            value: 19.2, positive: true },
+  { feature: 'access_entropy',             value: 14.1, positive: true },
+  { feature: 'login_hour_deviation',       value: 9.3,  positive: true },
+  { feature: 'download_volume_zscore',     value: 6.2,  positive: false },
+]
+
+const STATS = [
+  { value: '12–18', unit: 'months', label: 'Average detection lag for insider fraud' },
+  { value: '30%',   unit: '',       label: 'Of banking fraud traced to internal actors' },
+  { value: '0.4%',  unit: '',       label: 'False positive rate on 3-model ensemble', red: true },
+]
+
+const FEATURES = [
   {
-    step: '1',
-    title: 'Every User Gets a Fingerprint',
-    Icon: Activity,
-    desc: "SentinelIQ learns each employee's normal patterns across login timing, transaction volume, department access, and device usage over a 90-day rolling window.",
+    label: 'Real-time behavioural baselines',
+    desc: 'Each employee is scored against their own 30-day pattern — not a generic role profile. Off-hours logins, download queues, cross-department queries all compared against the user\'s actual baseline.',
+    visual: 'baseline',
   },
   {
-    step: '2',
-    title: 'Three Models. One Verdict.',
-    Icon: GitBranch,
-    desc: 'Every incoming event is scored in real time by three ML models working in parallel. Isolation Forest catches sudden anomalies. LSTM Autoencoder detects slow drift. XGBoost produces the final risk score.',
+    label: '3-model ensemble',
+    desc: 'Isolation Forest, an LSTM Autoencoder, and gradient-boosted trees vote in parallel — a single IF / LSTM / XGB disagreement is itself a signal we surface to the analyst.',
+    visual: 'ensemble',
   },
   {
-    step: '3',
-    title: 'Investigators See Why, Not Just What',
-    Icon: Search,
-    desc: 'When a threshold is breached, SentinelIQ generates an alert with a SHAP waterfall explanation showing exactly which behaviours drove the score. No black boxes.',
+    label: 'SHAP explainability — built in',
+    desc: 'Every alert ships with feature attribution. Analysts see which behavioural signals drove the score, by how much, against the user\'s own baseline. No "black-box anomaly" alerts.',
+    visual: 'shap',
+  },
+]
+
+const WORKFLOW = [
+  {
+    n: '01',
+    title: 'Detect',
+    desc: 'Every user action is encoded into 8 engineered features and scored in real time across all three models. Within 50ms of the event.',
+  },
+  {
+    n: '02',
+    title: 'Surface',
+    desc: 'If the ensemble threshold is breached, an alert lands on the analyst\'s home screen with a one-sentence summary — value, what, why.',
+  },
+  {
+    n: '03',
+    title: 'Explain',
+    desc: 'One click opens the full case view: 21-day risk history, SHAP attribution, model scores, peer comparison, linked events — no, what, why.',
+  },
+  {
+    n: '04',
+    title: 'Decide',
+    desc: 'Resolve or escalate with a single keystroke. All labels feed back into active learning — the model improves with every analyst decision.',
+  },
+]
+
+const ENVIRONMENTS = [
+  {
+    title: 'Retail & corporate banking',
+    desc: 'Detect and investigate CRM, ORA, and loan-origination systems. Off-hours access to records of branch tellers, treasury, and loan-ops desks.',
+    tags: ['Teller access anomalies', 'Payroll queries', 'Off-hours system use'],
+  },
+  {
+    title: 'Treasury & capital markets',
+    desc: 'Privileged security options and cross-department access where a single bad approval can move ₹crores in a single transaction.',
+    tags: ['Transaction velocity during trading hours', 'Approved system queries across desks', 'Privileged access during peak management'],
+  },
+  {
+    title: 'Regulatory compliance & audit',
+    desc: 'MITRE ATT&CK technique mapping aligns with every alert. Case files include the complete audit chain — ready for RBI / SEBI / Internal audit handoff.',
+    tags: ['T1078 — Valid Accounts', 'T1530 — Cloud Storage Access', 'T1087 — Account Manipulation + 30s'],
+  },
+  {
+    title: 'Security operations centres',
+    desc: 'Integrates next to your SIEM, not against it. SentinelIQ owns insider models (identity-facing fraud); your SOC tooling owns the rest.',
+    tags: ['1-seat monitoring — no onboarding', 'REST API — Microservice / OpenAPI documented', 'Single-sign — CSV / SSO faking owns the seat'],
   },
 ]
 
 const FRAMEWORKS = ['Isolation Forest', 'LSTM Autoencoder', 'XGBoost', 'SHAP', 'FastAPI', 'Next.js']
 
-const FEATURES = [
-  {
-    title: 'Real-Time Monitoring',
-    desc: 'Continuous behavioural event stream scored in under 50ms. Every login, transaction, and file access evaluated against a per-user baseline.',
-    badge: '50ms latency',
-  },
-  {
-    title: '3-Model Ensemble',
-    desc: 'Isolation Forest for point anomalies, LSTM Autoencoder for temporal sequences, and XGBoost for supervised pattern scoring, combined into a single risk signal.',
-    badge: 'IF · LSTM · XGB',
-  },
-  {
-    title: 'SHAP Explainability',
-    desc: 'Every alert ships with feature-level SHAP attributions from TreeExplainer. Analysts see exactly which behaviours drove the risk score.',
-    badge: 'Top-5 features per alert',
-  },
-]
-
-const STATS = [
-  { value: '12–18', unit: 'months', label: 'Average detection lag for insider fraud: the time attackers operate undetected', red: false },
-  { value: '30%', unit: '', label: 'Of all banking fraud events traced back to internal actors with valid access', red: false },
-  { value: '0.4%', unit: '', label: "False positive rate on SentinelIQ's 3-model ensemble", red: true },
-]
-
-const THREAT_PATTERNS = [
-  {
-    type: 'Privilege Escalation',
-    desc: 'Exploiting temporary permissions or misconfigured roles to reach systems outside their clearance level, often done incrementally to avoid triggering single-event rules.',
-  },
-  {
-    type: 'Bulk Data Exfiltration',
-    desc: 'Anomalous download volumes compressed into narrow time windows. Often timed around resignation notices or performance reviews, when monitoring attention is elsewhere.',
-  },
-  {
-    type: 'Off-Hours Access',
-    desc: 'Logins and high-value transactions at 2am from unfamiliar device fingerprints. Invisible to day-shift supervisors and nearly impossible to catch with manual review cycles.',
-  },
-  {
-    type: 'Cross-Department Queries',
-    desc: 'A teller querying treasury systems. An analyst accessing HR payroll data. Each access might look legitimate in isolation; only behavioural baseline comparison reveals the pattern.',
-  },
-]
-
-const SHAP_MOCK = [
-  { feature: 'transaction_velocity_ratio', value: 28.4, positive: true },
-  { feature: 'off_hours_ratio', value: 19.2, positive: true },
-  { feature: 'access_entropy', value: 14.1, positive: true },
-  { feature: 'login_hour_deviation', value: 9.3, positive: true },
-  { feature: 'download_volume_zscore', value: 6.2, positive: false },
-]
-
-const ALERT_STEPS = [
-  {
-    n: '01',
-    heading: 'Event scored in real time',
-    body: 'Every user action (login, transaction, or file access) is encoded into 8 engineered features and passed through all three models simultaneously in under 50ms.',
-  },
-  {
-    n: '02',
-    heading: 'Ensemble threshold triggers the alert',
-    body: 'When the weighted ensemble score (IF 0.3 + LSTM 0.4 + XGB 0.3) exceeds 70, an alert is created with severity level, user context, and a frozen snapshot of the triggering event.',
-  },
-  {
-    n: '03',
-    heading: 'SHAP explains why the score fired',
-    body: 'TreeExplainer runs on the XGBoost component and returns the top 5 feature contributions — positive values push the score up, negative values pulled it down.',
-  },
-  {
-    n: '04',
-    heading: 'Analyst reviews the full evidence package',
-    body: 'The investigator sees the risk score, SHAP breakdown, 30 days of risk history, and all linked prior alerts for the user — then labels it TP/FP to improve future model accuracy.',
-  },
-]
-
-// ── Component ─────────────────────────────────────────────────────────────────
 export default function LandingPage() {
   return (
     <div style={{ background: C.bg, minHeight: '100vh', fontFamily: 'inherit', overflowX: 'hidden' }}>
@@ -154,20 +126,20 @@ export default function LandingPage() {
         background: 'rgba(13,17,23,0.92)',
         backdropFilter: 'blur(12px)',
       }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 32px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 28, height: 28, overflow: 'hidden', flexShrink: 0 }}>
+            <div style={{ width: 26, height: 26, overflow: 'hidden', flexShrink: 0 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.png" alt="SentinelIQ logo" style={{ height: 28, width: 'auto', display: 'block', objectFit: 'cover', objectPosition: 'left center' }} />
+              <img src="/logo.png" alt="SentinelIQ" style={{ height: 26, width: 'auto', display: 'block' }} />
             </div>
             <span style={{ fontSize: 15, fontWeight: 700, color: C.primary, letterSpacing: '-0.02em' }}>SentinelIQ</span>
           </div>
           <nav style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
-            {['Features', 'Models', 'Enterprise'].map((item) => (
-              <span key={item} className="landing-nav-link" style={{ fontSize: 13, color: C.muted }}>{item}</span>
+            {['Models', 'Explainability', 'Enterprise'].map(item => (
+              <span key={item} style={{ fontSize: 13, color: C.muted, cursor: 'default' }}>{item}</span>
             ))}
             <motion.div whileHover={{ scale: 1.04 }} whileTap={BTN_TAP}>
-              <Link href="/dashboard" className="landing-btn-primary" style={{
+              <Link href="/dashboard" style={{
                 fontSize: 12, fontWeight: 700, letterSpacing: '0.05em',
                 padding: '7px 16px', borderRadius: 3,
                 background: C.primary, color: C.bg, textDecoration: 'none', display: 'block',
@@ -179,565 +151,351 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* ── Hero ── */}
+      {/* ── Hero — split layout ── */}
       <section style={{
-        backgroundImage: `linear-gradient(to right, rgba(13,17,23,1) 40%, rgba(13,17,23,0.4) 100%), url('/hero-bg.png')`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center right',
-        backgroundRepeat: 'no-repeat',
+        backgroundImage: `linear-gradient(to right, rgba(13,17,23,1) 55%, rgba(13,17,23,0.3) 100%), url('/hero-bg.png')`,
+        backgroundSize: 'cover', backgroundPosition: 'center right', backgroundRepeat: 'no-repeat',
+        borderBottom: `1px solid ${C.border}`,
       }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 24px 0', textAlign: 'center' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '80px 32px 72px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'center' }}>
 
-          {/* Announcement badge */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            whileHover={{ scale: 1.02, borderColor: '#4D5562' }}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              border: `1px solid ${C.border}`, borderRadius: 3,
-              padding: '5px 12px', marginBottom: 18, cursor: 'default',
-            }}
-          >
-            <span className="animate-pulse-dot" style={{ width: 6, height: 6, borderRadius: '50%', background: C.green, display: 'inline-block', flexShrink: 0 }} />
-            <span style={{ fontSize: 12, color: C.muted, fontWeight: 500 }}>New: Behavioural Pattern Detection v2.4</span>
-          </motion.div>
-
-          {/* Headline */}
-          <motion.h1
-            initial={{ opacity: 0, y: 22 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.08 }}
-            style={{
-              margin: '0 auto 14px',
-              fontSize: 'clamp(34px, 5.2vw, 58px)',
-              fontWeight: 800,
-              color: C.primary,
-              lineHeight: 1.07,
-              letterSpacing: '-0.03em',
-              maxWidth: 780,
-            }}
-          >
-            Detect Insider Fraud{' '}
-            <span style={{ color: C.red }}>Before It Happens</span>
-          </motion.h1>
-
-          {/* Subtext */}
-          <motion.p
-            initial={{ opacity: 0, y: 22 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.18 }}
-            style={{ margin: '0 auto 24px', maxWidth: 680, fontSize: 20, fontWeight: 500, color: C.primary, lineHeight: 1.7 }}
-          >
-            Every year, insider fraud costs Indian banks thousands of crores. Most cases are discovered 12–18 months after the damage is done; by which point it is too late. SentinelIQ watches every privileged user, every action, in real time. The moment behaviour deviates from baseline, investigators know.
-          </motion.p>
-
-          {/* CTA buttons */}
-          <motion.div
-            initial={{ opacity: 0, y: 22 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.28 }}
-            style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}
-          >
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={BTN_TAP} style={{ display: 'inline-block' }}>
-              <Link href="/dashboard" className="landing-btn-primary" style={{
-                fontSize: 14, fontWeight: 700, letterSpacing: '0.02em',
-                padding: '12px 28px', borderRadius: 3,
-                background: C.primary, color: C.bg, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6,
-              }}>
-                View Live Demo
-                <motion.span
-                  initial={{ x: 0 }} whileHover={{ x: 3 }}
-                  style={{ display: 'inline-block', transition: 'transform 0.15s' }}
-                >→</motion.span>
-              </Link>
+          {/* Left: text */}
+          <div>
+            <motion.p
+              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
+              style={{ margin: '0 0 20px', fontSize: 11, color: C.muted, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}
+            >
+              Designed for the SOC desk
+            </motion.p>
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, delay: 0.07 }}
+              style={{ margin: '0 0 20px', fontSize: 'clamp(32px, 4.5vw, 54px)', fontWeight: 800, color: C.primary, lineHeight: 1.08, letterSpacing: '-0.03em' }}
+            >
+              Detect Insider Fraud{' '}
+              <span style={{ color: C.red }}>Before the Damage Is Done.</span>
+            </motion.h1>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, delay: 0.15 }}
+              style={{ margin: '0 0 32px', fontSize: 15, color: C.muted, lineHeight: 1.72, maxWidth: 460 }}
+            >
+              SentinelIQ builds a behavioural fingerprint for every privileged employee and scores every action in real time. The moment behaviour deviates from baseline, investigators know — not 12 months later.
+            </motion.p>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, delay: 0.22 }}
+              style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}
+            >
+              <motion.div whileHover={{ scale: 1.04 }} whileTap={BTN_TAP}>
+                <Link href="/dashboard" style={{
+                  fontSize: 13, fontWeight: 700, letterSpacing: '0.02em',
+                  padding: '11px 24px', borderRadius: 3,
+                  background: C.primary, color: C.bg, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6,
+                }}>
+                  View Live Demo →
+                </Link>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.03 }} whileTap={BTN_TAP}>
+                <a href="#workflow" style={{
+                  fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 3,
+                  background: 'transparent', color: C.primary,
+                  border: `1px solid ${C.border}`, textDecoration: 'none', display: 'block',
+                }}>
+                  See How It Works
+                </a>
+              </motion.div>
             </motion.div>
-            <motion.div whileHover={{ scale: 1.04 }} whileTap={BTN_TAP} style={{ display: 'inline-block' }}>
-              <a href="#how-it-works" className="landing-btn-secondary" style={{
-                fontSize: 14, fontWeight: 600,
-                padding: '12px 28px', borderRadius: 3,
-                background: 'transparent', color: C.primary,
-                border: `1px solid ${C.border}`, textDecoration: 'none', display: 'block',
-              }}>
-                See How It Works
-              </a>
-            </motion.div>
-          </motion.div>
+          </div>
 
-          {/* ── Browser mockup — floats continuously ── */}
+          {/* Right: browser mockup */}
           <motion.div
-            initial={{ opacity: 0, y: 36 }}
-            animate={{ opacity: 1, y: [36, 0, -6, 0] }}
-            transition={{ duration: 0.7, delay: 0.38, times: [0, 0.6, 0.8, 1] }}
-            style={{ maxWidth: 960, margin: '0 auto', paddingBottom: 80 }}
+            initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.65, delay: 0.3 }}
           >
             <motion.div
-              animate={{ y: [0, -7, 0] }}
-              transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut', delay: 1.2 }}
+              animate={{ y: [0, -6, 0] }}
+              transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut', delay: 1.5 }}
             >
-              <motion.div
-                whileHover={{ boxShadow: '0 48px 120px rgba(0,0,0,0.8)', transition: { duration: 0.3 } }}
-                style={{
-                  border: `1px solid ${C.border}`, borderRadius: 6, overflow: 'hidden',
-                  boxShadow: '0 32px 96px rgba(0,0,0,0.6)', position: 'relative',
-                }}
-              >
-                {/* Scanline sweep */}
+              <div style={{
+                border: `1px solid ${C.border}`, borderRadius: 6, overflow: 'hidden',
+                boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
+              }}>
                 <div className="mockup-scanline" />
-
-                {/* Browser chrome */}
-                <div style={{
-                  background: '#080D13', borderBottom: `1px solid ${C.border}`,
-                  padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 6,
-                }}>
+                <div style={{ background: '#080D13', borderBottom: `1px solid ${C.border}`, padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 5 }}>
                   {[C.red, C.amber, C.green].map((c, i) => (
-                    <motion.div
-                      key={i}
-                      whileHover={{ scale: 1.3 }}
-                      style={{ width: 10, height: 10, borderRadius: '50%', background: c, opacity: 0.75, cursor: 'default' }}
-                    />
+                    <div key={i} style={{ width: 9, height: 9, borderRadius: '50%', background: c, opacity: 0.7 }} />
                   ))}
-                  <div style={{
-                    flex: 1, marginLeft: 14, height: 22, background: C.card,
-                    borderRadius: 3, border: `1px solid ${C.border}`,
-                    display: 'flex', alignItems: 'center', paddingLeft: 10, gap: 6,
-                  }}>
-                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: C.green }} />
-                    <span style={{ fontSize: 11, color: C.muted }}>sentineliq.vercel.app/dashboard</span>
+                  <div style={{ flex: 1, marginLeft: 12, height: 20, background: C.card, borderRadius: 3, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', paddingLeft: 8, gap: 5 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: C.green }} />
+                    <span style={{ fontSize: 10, color: C.muted }}>sentineliq.vercel.app/dashboard</span>
                   </div>
                 </div>
-
-                {/* Dashboard layout */}
-                <div style={{ background: C.bg, display: 'grid', gridTemplateColumns: '152px 1fr', minHeight: 320 }}>
-
-                  {/* Sidebar */}
-                  <div style={{ borderRight: `1px solid ${C.border}`, padding: '14px 0', background: C.bg }}>
-                    <div style={{ padding: '4px 14px 14px', display: 'flex', alignItems: 'center', gap: 7 }}>
-                      <div style={{ width: 20, height: 20, overflow: 'hidden', flexShrink: 0 }}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src="/logo.png" alt="" aria-hidden="true" style={{ height: 20, width: 'auto', display: 'block', objectFit: 'cover', objectPosition: 'left center' }} />
-                      </div>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: C.primary, letterSpacing: '-0.01em' }}>SentinelIQ</span>
+                <div style={{ background: C.bg, display: 'grid', gridTemplateColumns: '130px 1fr', minHeight: 280 }}>
+                  <div style={{ borderRight: `1px solid ${C.border}`, padding: '12px 0', background: C.bg }}>
+                    <div style={{ padding: '4px 12px 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/logo.png" alt="" aria-hidden="true" style={{ height: 18, width: 'auto', display: 'block' }} />
+                      <span style={{ fontSize: 10, fontWeight: 700, color: C.primary }}>SentinelIQ</span>
                     </div>
-                    {[
-                      { label: 'Overview', active: true },
-                      { label: 'Alerts', active: false },
-                      { label: 'Users', active: false },
-                    ].map(({ label, active }) => (
-                      <motion.div
-                        key={label}
-                        whileHover={{ backgroundColor: active ? '#1C2128' : '#161B22', transition: { duration: 0.15 } }}
-                        style={{
-                          padding: '7px 14px', fontSize: 11,
-                          color: active ? C.primary : C.muted,
-                          background: active ? '#1C2128' : 'transparent',
-                          borderLeft: active ? `2px solid ${C.red}` : '2px solid transparent',
-                          cursor: 'default',
-                        }}
-                      >
-                        {label}
-                      </motion.div>
+                    {[{ label: 'Overview', active: true }, { label: 'Alerts', active: false }, { label: 'Users', active: false }].map(({ label, active }) => (
+                      <div key={label} style={{
+                        padding: '6px 12px', fontSize: 10,
+                        color: active ? C.primary : C.muted,
+                        background: active ? '#1C2128' : 'transparent',
+                        borderLeft: active ? `2px solid ${C.red}` : '2px solid transparent',
+                      }}>{label}</div>
                     ))}
-                    <div style={{ margin: '16px 14px 0', display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span className="animate-pulse-dot" style={{ width: 5, height: 5, borderRadius: '50%', background: C.green, display: 'inline-block', flexShrink: 0 }} />
-                      <span style={{ fontSize: 8, color: C.green, fontWeight: 700, letterSpacing: '0.06em' }}>MONITORING ACTIVE</span>
-                    </div>
                   </div>
-
-                  {/* Main panel */}
-                  <div style={{ padding: 14 }}>
-                    {/* Stat cards */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
+                  <div style={{ padding: 12 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 10 }}>
                       {[
                         { label: 'Users Monitored', value: '50', color: C.primary },
-                        { label: 'Alerts Today', value: '7', color: C.primary },
-                        { label: 'High Risk', value: '3', color: C.red },
-                        { label: 'False Positive Rate', value: '0.4%', color: C.green },
+                        { label: 'Alerts Today',    value: '7',  color: C.primary },
+                        { label: 'High Risk',       value: '3',  color: C.red },
+                        { label: 'FP Rate',         value: '0.4%', color: C.green },
                       ].map(({ label, value, color }) => (
-                        <motion.div
-                          key={label}
-                          whileHover={{ borderColor: '#4D5562', y: -2, transition: { duration: 0.15 } }}
-                          style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 4, padding: '10px 12px', cursor: 'default' }}
-                        >
-                          <p style={{ margin: '0 0 4px', fontSize: 7, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{label}</p>
-                          <p style={{ margin: 0, fontSize: 22, fontWeight: 800, color, letterSpacing: '-0.02em' }}>{value}</p>
-                        </motion.div>
+                        <div key={label} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 3, padding: '8px 10px' }}>
+                          <p style={{ margin: '0 0 3px', fontSize: 7, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{label}</p>
+                          <p style={{ margin: 0, fontSize: 18, fontWeight: 800, color, letterSpacing: '-0.02em' }}>{value}</p>
+                        </div>
                       ))}
                     </div>
-
-                    {/* Alert table */}
-                    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 4, overflow: 'hidden' }}>
-                      <div style={{ padding: '7px 12px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span className="animate-pulse-dot" style={{ width: 5, height: 5, borderRadius: '50%', background: C.green, display: 'inline-block', flexShrink: 0 }} />
-                        <span style={{ fontSize: 8, color: C.muted, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Live Intelligence Feed</span>
+                    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ padding: '6px 10px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span className="animate-pulse-dot" style={{ width: 5, height: 5, borderRadius: '50%', background: C.green, display: 'inline-block' }} />
+                        <span style={{ fontSize: 7, color: C.muted, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Live Intelligence Feed</span>
                       </div>
                       {MOCK_ALERTS.map((alert, i) => (
-                        <motion.div
-                          key={alert.id}
-                          whileHover={{ backgroundColor: '#1C2128', transition: { duration: 0.12 } }}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
-                            borderBottom: i < MOCK_ALERTS.length - 1 ? `1px solid ${C.border}` : 'none',
-                            cursor: 'default',
-                          }}
-                        >
-                          <span style={{ fontSize: 8, color: C.muted, fontFamily: 'monospace', width: 48, flexShrink: 0 }}>{alert.id.slice(0, 7)}</span>
-                          <span style={{ fontSize: 10, color: C.primary, fontWeight: 600, width: 100, flexShrink: 0 }}>{alert.user}</span>
-                          <span style={{ fontSize: 10, color: C.muted, flex: 1 }}>{alert.type}</span>
-                          <span style={{
-                            fontSize: 7, fontWeight: 700, color: alert.color,
-                            border: `1px solid ${alert.color}`,
-                            borderRadius: 2, padding: '2px 6px', letterSpacing: '0.05em', flexShrink: 0,
-                          }}>{alert.risk}</span>
-                          <span className={alert.score >= 80 ? 'risk-glow' : ''} style={{ fontSize: 11, fontWeight: 800, color: alert.color, width: 26, textAlign: 'right', flexShrink: 0 }}>{alert.score}</span>
-                        </motion.div>
+                        <div key={alert.id} style={{
+                          display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px',
+                          borderBottom: i < MOCK_ALERTS.length - 1 ? `1px solid ${C.border}` : 'none',
+                        }}>
+                          <span style={{ fontSize: 8, color: C.muted, fontFamily: 'monospace', width: 44, flexShrink: 0 }}>{alert.id.slice(0, 7)}</span>
+                          <span style={{ fontSize: 9, color: C.primary, fontWeight: 600, flex: 1 }}>{alert.user}</span>
+                          <span style={{ fontSize: 9, color: C.muted }}>{alert.type}</span>
+                          <span style={{ fontSize: 6, fontWeight: 700, color: alert.color, border: `1px solid ${alert.color}`, borderRadius: 2, padding: '1px 5px', letterSpacing: '0.05em', flexShrink: 0 }}>{alert.risk}</span>
+                          <span style={{ fontSize: 10, fontWeight: 800, color: alert.color, width: 22, textAlign: 'right', flexShrink: 0 }}>{alert.score}</span>
+                        </div>
                       ))}
                     </div>
                   </div>
                 </div>
-              </motion.div>
+              </div>
             </motion.div>
           </motion.div>
         </div>
       </section>
 
       {/* ── Stats strip ── */}
-      <section style={{ borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}` }}>
+      <section style={{ borderBottom: `1px solid ${C.border}` }}>
         <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: '-80px' }}
-          style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)' }}
+          variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true, margin: '-80px' }}
+          style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)' }}
         >
           {STATS.map(({ value, unit, label, red }, i) => (
-            <motion.div
-              key={label}
-              variants={fadeIn}
-              whileHover={{ backgroundColor: '#0F1419', transition: { duration: 0.2 } }}
-              style={{
-                padding: '48px 40px',
-                borderRight: i < STATS.length - 1 ? `1px solid ${C.border}` : 'none',
-                cursor: 'default',
-              }}
+            <motion.div key={label} variants={fadeIn}
+              style={{ padding: '40px 40px', borderRight: i < STATS.length - 1 ? `1px solid ${C.border}` : 'none' }}
             >
-              <p style={{ margin: '0 0 10px', fontSize: 11, color: C.muted, lineHeight: 1.55 }}>{label}</p>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <motion.span
-                  initial={{ opacity: 0, scale: 0.7 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, ease: 'easeOut', delay: i * 0.1 }}
-                  style={{ fontSize: 40, fontWeight: 800, lineHeight: 1, color: red ? C.red : C.primary, letterSpacing: '-0.03em', display: 'inline-block' }}
-                >
-                  {value}
-                </motion.span>
-                {unit && <span style={{ fontSize: 13, color: C.muted, fontWeight: 500 }}>{unit}</span>}
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, marginBottom: 8 }}>
+                <span style={{ fontSize: 36, fontWeight: 800, lineHeight: 1, color: red ? C.red : C.primary, letterSpacing: '-0.03em' }}>{value}</span>
+                {unit && <span style={{ fontSize: 12, color: C.muted }}>{unit}</span>}
               </div>
+              <p style={{ margin: 0, fontSize: 12, color: C.muted, lineHeight: 1.6 }}>{label}</p>
             </motion.div>
           ))}
         </motion.div>
       </section>
 
-      {/* ── Problem Statement ── */}
-      <section style={{ background: C.card, borderBottom: `1px solid ${C.border}` }}>
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: '-60px' }}
-          style={{ maxWidth: 1200, margin: '0 auto', padding: '88px 24px' }}
-        >
-          <div className="problem-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'start' }}>
-
-            {/* Left: narrative */}
-            <motion.div variants={fadeInUp}>
-              <p style={{ margin: '0 0 12px', fontSize: 11, color: C.red, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>The Problem</p>
-              <h2 style={{ margin: '0 0 24px', fontSize: 'clamp(22px, 3.5vw, 32px)', fontWeight: 800, color: C.primary, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
-                Rule-based systems don't catch the employee who already knows where the cameras are.
-              </h2>
-              <p style={{ margin: '0 0 18px', fontSize: 14, color: C.muted, lineHeight: 1.72 }}>
-                Traditional fraud controls work on known patterns. Blocklists, velocity thresholds, static rules: they stop the fraud you have already seen. Insider threats are different. The attacker has valid credentials, legitimate access, and years of institutional knowledge about exactly how systems are monitored.
-              </p>
-              <p style={{ margin: 0, fontSize: 14, color: C.muted, lineHeight: 1.72 }}>
-                By the time a rule fires, the data has already left the building. SentinelIQ builds a statistical fingerprint of what each employee's normal behaviour looks like — and flags deviation the moment it begins, not 12 months later when an audit cycle finally catches up.
-              </p>
-            </motion.div>
-
-            {/* Right: threat pattern cards */}
-            <motion.div variants={fadeInUp} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {THREAT_PATTERNS.map(({ type, desc }) => (
-                <motion.div
-                  key={type}
-                  whileHover={{
-                    x: 6,
-                    borderColor: '#4D5562',
-                    backgroundColor: '#1A1F26',
-                    boxShadow: '0 6px 24px rgba(0,0,0,0.35)',
-                    transition: { duration: 0.18, ease: 'easeOut' },
-                  }}
-                  style={{ padding: '18px 20px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 4, cursor: 'default' }}
-                >
-                  <p style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 700, color: C.primary, letterSpacing: '-0.01em' }}>{type}</p>
-                  <p style={{ margin: 0, fontSize: 12, color: C.muted, lineHeight: 1.65 }}>{desc}</p>
-                </motion.div>
-              ))}
-            </motion.div>
-
-          </div>
-        </motion.div>
-      </section>
-
-      {/* ── How It Works ── */}
-      <section id="how-it-works" style={{ background: C.bg, borderBottom: `1px solid ${C.border}` }}>
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: '-60px' }}
-          style={{ maxWidth: 1200, margin: '0 auto', padding: '88px 24px' }}
-        >
-          <motion.div variants={fadeIn} style={{ textAlign: 'center', marginBottom: 64 }}>
-            <h2 style={{ margin: '0 0 12px', fontSize: 'clamp(22px, 4vw, 34px)', fontWeight: 800, color: C.primary, letterSpacing: '-0.02em' }}>
-              From Event to Evidence in Under 30 Seconds
+      {/* ── Features — 3 columns ── */}
+      <section style={{ borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '80px 32px' }}>
+          <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}
+            style={{ marginBottom: 52 }}
+          >
+            <p style={{ margin: '0 0 12px', fontSize: 11, color: C.muted, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Built around the analyst</p>
+            <h2 style={{ margin: 0, fontSize: 'clamp(24px, 3.5vw, 36px)', fontWeight: 800, color: C.primary, letterSpacing: '-0.02em', lineHeight: 1.15, maxWidth: 560 }}>
+              Every screen, every chart, every chip is there because an analyst asked for it.
             </h2>
-            <p style={{ margin: 0, color: C.muted, fontSize: 15 }}>50ms to score. Under a minute for an analyst to have a verdict.</p>
           </motion.div>
 
-          <div className="steps-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24 }}>
-            {STEPS.map(({ step, title, Icon, desc }) => (
-              <motion.div
-                key={step}
-                variants={fadeInUp}
-                whileHover={{
-                  y: -4, borderColor: '#4D5562', boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
-                  backgroundColor: '#1A1F26',
-                  transition: { duration: 0.2, ease: 'easeOut' },
-                }}
-                style={{
-                  position: 'relative', overflow: 'hidden',
-                  padding: '32px 28px',
-                  background: C.card, border: `1px solid ${C.border}`, borderRadius: 4, cursor: 'default',
-                }}
+          <motion.div
+            variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true, margin: '-60px' }}
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, background: C.border, border: `1px solid ${C.border}`, borderRadius: 4, overflow: 'hidden' }}
+          >
+            {FEATURES.map(({ label, desc, visual }) => (
+              <motion.div key={label} variants={fadeInUp}
+                style={{ background: C.card, padding: '28px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}
               >
-                <span style={{
-                  position: 'absolute', top: -8, left: 12,
-                  fontSize: 96, fontWeight: 800, lineHeight: 1,
-                  color: C.muted, opacity: 0.15,
-                  userSelect: 'none', pointerEvents: 'none',
-                  letterSpacing: '-0.04em',
-                }}>
-                  {step}
-                </span>
-                <div style={{ position: 'relative', zIndex: 1 }}>
-                  <motion.div
-                    whileHover={{ scale: 1.2, rotate: -8, transition: { duration: 0.2 } }}
-                    style={{ marginBottom: 18, display: 'inline-block' }}
-                  >
-                    <Icon size={22} color={C.red} strokeWidth={1.5} />
-                  </motion.div>
-                  <p style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 700, color: C.primary, letterSpacing: '-0.01em' }}>{title}</p>
-                  <p style={{ margin: 0, fontSize: 13, color: C.muted, lineHeight: 1.72 }}>{desc}</p>
+                {/* Visual preview */}
+                <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 3, padding: '12px 14px', minHeight: 72 }}>
+                  {visual === 'baseline' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      {[{ label: 'Login hour', pct: 72, color: C.red }, { label: 'Download vol', pct: 45, color: C.amber }, { label: 'Dept access', pct: 28, color: C.green }].map(b => (
+                        <div key={b.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 8, color: C.muted, width: 56, flexShrink: 0 }}>{b.label}</span>
+                          <div style={{ flex: 1, height: 4, background: '#30363D', borderRadius: 2, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${b.pct}%`, background: b.color, borderRadius: 2 }} />
+                          </div>
+                          <span style={{ fontSize: 8, color: b.color, width: 24, textAlign: 'right' }}>{b.pct}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {visual === 'ensemble' && (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', height: 60 }}>
+                      {[{ m: 'IF', h: 48, c: C.red }, { m: 'LSTM', h: 62, c: C.amber }, { m: 'XGB', h: 55, c: C.green }].map(b => (
+                        <div key={b.m} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, height: '100%', justifyContent: 'flex-end' }}>
+                          <div style={{ width: '100%', height: b.h, background: b.c, opacity: 0.75, borderRadius: '2px 2px 0 0' }} />
+                          <span style={{ fontSize: 7, color: C.muted, fontWeight: 700 }}>{b.m}</span>
+                        </div>
+                      ))}
+                      <div style={{ width: 1, height: 62, background: C.border, alignSelf: 'flex-start' }} />
+                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%', paddingLeft: 4 }}>
+                        <span style={{ fontSize: 7, color: C.muted }}>score</span>
+                        <span style={{ fontSize: 18, fontWeight: 800, color: C.red, lineHeight: 1 }}>88</span>
+                      </div>
+                    </div>
+                  )}
+                  {visual === 'shap' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {SHAP_MOCK.slice(0, 3).map(s => (
+                        <div key={s.feature} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 7, color: C.muted, fontFamily: 'monospace', width: 76, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.feature}</span>
+                          <div style={{ flex: 1, height: 3, background: '#30363D', borderRadius: 1, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${Math.min((s.value / 30) * 100, 100)}%`, background: s.positive ? C.red : C.green, borderRadius: 1 }} />
+                          </div>
+                          <span style={{ fontSize: 7, color: s.positive ? C.red : C.green, width: 20, textAlign: 'right' }}>{s.positive ? '+' : '−'}{s.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <p style={{ margin: '0 0 6px', fontSize: 13, fontWeight: 700, color: C.primary, letterSpacing: '-0.01em' }}>{label}</p>
+                  <p style={{ margin: 0, fontSize: 12, color: C.muted, lineHeight: 1.65 }}>{desc}</p>
                 </div>
               </motion.div>
             ))}
-          </div>
-        </motion.div>
-      </section>
-
-      {/* ── Operations Room image strip ── */}
-      <section style={{ position: 'relative', height: 400, overflow: 'hidden', backgroundImage: `url('/ops-room.png')`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(13,17,23,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <motion.h2
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            style={{ margin: 0, fontSize: 'clamp(22px, 4vw, 40px)', fontWeight: 800, color: C.primary, letterSpacing: '-0.02em', textAlign: 'center' }}
-          >
-            Your analysts shouldn't be the last to know.
-          </motion.h2>
+          </motion.div>
         </div>
       </section>
 
-      {/* ── Feature rows ── */}
-      <section style={{ maxWidth: 1200, margin: '0 auto', padding: '88px 24px', borderBottom: `1px solid ${C.border}` }}>
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
-          style={{ textAlign: 'center', marginBottom: 52 }}
-        >
-          <h2 style={{ margin: '0 0 12px', fontSize: 'clamp(22px, 4vw, 34px)', fontWeight: 800, color: C.primary, letterSpacing: '-0.02em' }}>
-            Built for High-Stakes Detection
-          </h2>
-          <p style={{ margin: 0, color: C.muted, fontSize: 15 }}>Production-grade ML pipeline running end-to-end on every event.</p>
-        </motion.div>
+      {/* ── Analyst workflow — 4 steps ── */}
+      <section id="workflow" style={{ background: C.card, borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '80px 32px' }}>
+          <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}
+            style={{ marginBottom: 52 }}
+          >
+            <p style={{ margin: '0 0 12px', fontSize: 11, color: C.muted, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Analyst workflow</p>
+            <h2 style={{ margin: 0, fontSize: 'clamp(24px, 3.5vw, 36px)', fontWeight: 800, color: C.primary, letterSpacing: '-0.02em', lineHeight: 1.15 }}>
+              Detect, explain, decide. In under 30 seconds.
+            </h2>
+          </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-60px' }}
-          transition={{ duration: 0.5 }}
-          style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 4, overflow: 'hidden' }}
-        >
-          {FEATURES.map(({ title, desc, badge }, i) => (
-            <motion.div
-              key={title}
-              className="landing-feature-row"
-              whileHover={{ backgroundColor: '#1C2128', transition: { duration: 0.15 } }}
-              style={{
-                display: 'grid', gridTemplateColumns: '52px 1fr auto',
-                gap: 28, padding: '32px 36px',
-                borderBottom: i < FEATURES.length - 1 ? `1px solid ${C.border}` : 'none',
-                alignItems: 'start', cursor: 'default',
-              }}
-            >
-              <motion.span
-                whileHover={{ color: C.red, transition: { duration: 0.15 } }}
-                style={{ fontSize: 12, color: C.muted, fontWeight: 700, fontFamily: 'monospace', paddingTop: 3, letterSpacing: '0.02em' }}
+          <motion.div
+            variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true, margin: '-60px' }}
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1, background: C.border, border: `1px solid ${C.border}`, borderRadius: 4, overflow: 'hidden' }}
+          >
+            {WORKFLOW.map(({ n, title, desc }) => (
+              <motion.div key={n} variants={fadeInUp}
+                whileHover={{ backgroundColor: '#1A1F26', transition: { duration: 0.15 } }}
+                style={{ background: C.bg, padding: '28px 22px', cursor: 'default' }}
               >
-                0{i + 1}
-              </motion.span>
-              <div>
-                <p style={{ margin: '0 0 10px', fontSize: 16, fontWeight: 700, color: C.primary, letterSpacing: '-0.01em' }}>{title}</p>
-                <p style={{ margin: 0, fontSize: 13, color: C.muted, lineHeight: 1.7 }}>{desc}</p>
-              </div>
-              <motion.span
-                whileHover={{ scale: 1.06, borderColor: C.red, transition: { duration: 0.15 } }}
-                style={{
-                  fontSize: 10, fontWeight: 700, color: C.red,
-                  border: `1px solid ${C.red}`, borderRadius: 2,
-                  padding: '3px 8px', letterSpacing: '0.05em', whiteSpace: 'nowrap', marginTop: 4,
-                  cursor: 'default', display: 'inline-block',
-                }}
-              >
-                {badge}
-              </motion.span>
-            </motion.div>
-          ))}
-        </motion.div>
+                <p style={{ margin: '0 0 14px', fontSize: 11, fontWeight: 800, color: C.red, fontFamily: 'monospace', letterSpacing: '0.04em' }}>{n}</p>
+                <p style={{ margin: '0 0 10px', fontSize: 15, fontWeight: 700, color: C.primary, letterSpacing: '-0.01em' }}>{title}</p>
+                <p style={{ margin: 0, fontSize: 12, color: C.muted, lineHeight: 1.65 }}>{desc}</p>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
       </section>
 
-      {/* ── Inside a Live Alert ── */}
-      <section style={{ background: C.card, borderBottom: `1px solid ${C.border}` }}>
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: '-60px' }}
-          style={{ maxWidth: 1200, margin: '0 auto', padding: '88px 24px' }}
-        >
-          <motion.div variants={fadeIn} style={{ marginBottom: 64 }}>
-            <p style={{ margin: '0 0 12px', fontSize: 11, color: C.red, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Investigator View</p>
-            <h2 style={{ margin: '0 0 14px', fontSize: 'clamp(22px, 4vw, 34px)', fontWeight: 800, color: C.primary, letterSpacing: '-0.02em', maxWidth: 640 }}>
+      {/* ── SHAP investigator view ── */}
+      <section style={{ borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '80px 32px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'center' }}>
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}>
+            <p style={{ margin: '0 0 12px', fontSize: 11, color: C.muted, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Investigator view</p>
+            <h2 style={{ margin: '0 0 16px', fontSize: 'clamp(22px, 3vw, 32px)', fontWeight: 800, color: C.primary, letterSpacing: '-0.02em', lineHeight: 1.15 }}>
               When the score breaks threshold, the analyst sees the full picture.
             </h2>
-            <p style={{ margin: 0, color: C.muted, fontSize: 15, maxWidth: 560, lineHeight: 1.65 }}>
-              Not a severity flag: a complete evidence package. Risk score, SHAP explanation, 30 days of behavioural history, and every linked prior incident for that user.
+            <p style={{ margin: 0, fontSize: 14, color: C.muted, lineHeight: 1.72 }}>
+              Not a severity flag — a complete evidence package. Risk score, SHAP explanation, 30 days of behavioural history, peer comparison, and every linked prior incident for that user.
             </p>
           </motion.div>
 
-          <div className="alert-demo-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'start' }}>
-
-            {/* Left: step-by-step */}
-            <motion.div variants={fadeInUp} style={{ display: 'flex', flexDirection: 'column' }}>
-              {ALERT_STEPS.map(({ n, heading, body }, i) => (
-                <motion.div
-                  key={n}
-                  whileHover={{ x: 4, transition: { duration: 0.18 } }}
-                  style={{ display: 'flex', gap: 18, paddingBottom: i < ALERT_STEPS.length - 1 ? 32 : 0, cursor: 'default' }}
-                >
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
-                    <motion.span
-                      whileHover={{ borderColor: C.red, color: C.red, backgroundColor: 'rgba(220,38,38,0.08)', transition: { duration: 0.15 } }}
-                      style={{
-                        width: 34, height: 34, borderRadius: 3,
-                        background: C.bg, border: `1px solid ${C.border}`,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 11, fontWeight: 800, color: C.red, letterSpacing: '0.04em', flexShrink: 0,
-                      }}
-                    >
-                      {n}
-                    </motion.span>
-                    {i < ALERT_STEPS.length - 1 && (
-                      <div style={{ width: 1, flex: 1, background: C.border, marginTop: 8, minHeight: 24 }} />
-                    )}
-                  </div>
-                  <div style={{ paddingTop: 6 }}>
-                    <p style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 700, color: C.primary }}>{heading}</p>
-                    <p style={{ margin: 0, fontSize: 13, color: C.muted, lineHeight: 1.7 }}>{body}</p>
-                  </div>
-                </motion.div>
-              ))}
-            </motion.div>
-
-            {/* Right: SHAP panel mockup */}
-            <motion.div variants={fadeInUp}>
-              <motion.div
-                whileHover={{ ...CARD_HOVER, transition: { duration: 0.2 } }}
-                style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 4, overflow: 'hidden' }}
-              >
-                <div style={{ padding: '16px 18px', borderBottom: `1px solid ${C.border}` }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                    <motion.span
-                      whileHover={{ scale: 1.05, transition: { duration: 0.15 } }}
-                      style={{ fontSize: 10, fontWeight: 700, color: C.red, letterSpacing: '0.08em', textTransform: 'uppercase', border: `1px solid ${C.red}`, borderRadius: 2, padding: '2px 6px', cursor: 'default' }}
-                    >
-                      Critical
-                    </motion.span>
-                    <span className="risk-glow" style={{ fontSize: 28, fontWeight: 800, color: C.red, lineHeight: 1 }}>94</span>
-                  </div>
-                  <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 700, color: C.primary }}>Bulk Data Export Detected</p>
-                  <p style={{ margin: 0, fontSize: 11, color: C.muted }}>James Sterling · Treasury Dept · 2 minutes ago</p>
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.1 }}>
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: C.red, letterSpacing: '0.08em', textTransform: 'uppercase', border: `1px solid ${C.red}`, borderRadius: 2, padding: '2px 6px' }}>Critical</span>
+                  <span style={{ fontSize: 26, fontWeight: 800, color: C.red, lineHeight: 1 }}>94</span>
                 </div>
-                <div style={{ padding: '18px 18px 20px' }}>
-                  <p style={{ margin: '0 0 18px', fontSize: 10, fontWeight: 700, color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                    Top Risk Factors (SHAP)
-                  </p>
-                  {SHAP_MOCK.map(({ feature, value, positive }, idx) => (
-                    <motion.div
-                      key={feature}
-                      whileHover={{ x: 3, transition: { duration: 0.15 } }}
-                      style={{ marginBottom: 14, cursor: 'default' }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                        <span style={{ fontSize: 11, color: C.muted, fontFamily: 'monospace' }}>{feature}</span>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: positive ? C.red : C.green }}>
-                          {positive ? '+' : '−'}{value}
-                        </span>
-                      </div>
-                      <div style={{ height: 3, background: C.border, borderRadius: 1, overflow: 'hidden' }}>
-                        <motion.div
-                          initial={{ width: 0 }}
-                          whileInView={{ width: `${Math.min((value / 30) * 100, 100)}%` }}
-                          viewport={{ once: true }}
-                          transition={{ duration: 0.7, ease: 'easeOut', delay: idx * 0.1 }}
-                          style={{ height: '100%', background: positive ? C.red : C.green, borderRadius: 1 }}
-                        />
-                      </div>
-                    </motion.div>
+                <p style={{ margin: '0 0 3px', fontSize: 13, fontWeight: 700, color: C.primary }}>Bulk Data Export Detected</p>
+                <p style={{ margin: 0, fontSize: 11, color: C.muted }}>James Sterling · Treasury Dept · 2 minutes ago</p>
+              </div>
+              <div style={{ padding: '16px 16px 18px' }}>
+                <p style={{ margin: '0 0 14px', fontSize: 10, fontWeight: 700, color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Top Risk Factors (SHAP)</p>
+                {SHAP_MOCK.map(({ feature, value, positive }, idx) => (
+                  <div key={feature} style={{ marginBottom: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <span style={{ fontSize: 10, color: C.muted, fontFamily: 'monospace' }}>{feature}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: positive ? C.red : C.green }}>{positive ? '+' : '−'}{value}</span>
+                    </div>
+                    <div style={{ height: 3, background: C.border, borderRadius: 1, overflow: 'hidden' }}>
+                      <motion.div
+                        initial={{ width: 0 }}
+                        whileInView={{ width: `${Math.min((value / 30) * 100, 100)}%` }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 0.6, ease: 'easeOut', delay: idx * 0.08 }}
+                        style={{ height: '100%', background: positive ? C.red : C.green, borderRadius: 1 }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ── Environments ── */}
+      <section style={{ background: C.card, borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '80px 32px' }}>
+          <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}
+            style={{ marginBottom: 48 }}
+          >
+            <p style={{ margin: '0 0 12px', fontSize: 11, color: C.muted, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Built for</p>
+            <h2 style={{ margin: 0, fontSize: 'clamp(24px, 3.5vw, 36px)', fontWeight: 800, color: C.primary, letterSpacing: '-0.02em', lineHeight: 1.15, maxWidth: 560 }}>
+              High-stakes environments where insider risk is existential.
+            </h2>
+          </motion.div>
+          <motion.div
+            variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true, margin: '-60px' }}
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1, background: C.border, border: `1px solid ${C.border}`, borderRadius: 4, overflow: 'hidden' }}
+          >
+            {ENVIRONMENTS.map(({ title, desc, tags }) => (
+              <motion.div key={title} variants={fadeInUp}
+                whileHover={{ backgroundColor: '#1A1F26', transition: { duration: 0.15 } }}
+                style={{ background: C.bg, padding: '28px 28px', cursor: 'default' }}
+              >
+                <p style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 700, color: C.primary, letterSpacing: '-0.01em' }}>{title}</p>
+                <p style={{ margin: '0 0 14px', fontSize: 12, color: C.muted, lineHeight: 1.65 }}>{desc}</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {tags.map(t => (
+                    <span key={t} style={{ fontSize: 11, color: C.muted }}>· {t}</span>
                   ))}
                 </div>
               </motion.div>
-            </motion.div>
-
-          </div>
-        </motion.div>
+            ))}
+          </motion.div>
+        </div>
       </section>
 
-      {/* ── Trusted Frameworks ── */}
-      <section style={{ background: C.card, borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}` }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', gap: 0 }}>
+      {/* ── Frameworks strip ── */}
+      <section style={{ borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 32px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap', justifyContent: 'center' }}>
             {FRAMEWORKS.map((name, i) => (
               <div key={name} style={{ display: 'flex', alignItems: 'center' }}>
-                {i > 0 && <span style={{ width: 1, height: 14, background: C.border, display: 'inline-block', margin: '0 18px', flexShrink: 0 }} />}
-                <span className="landing-framework-item" style={{ fontSize: 11, color: C.muted, fontWeight: 600, letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
-                  {name}
-                </span>
+                {i > 0 && <span style={{ width: 1, height: 12, background: C.border, display: 'inline-block', margin: '0 16px' }} />}
+                <span style={{ fontSize: 11, color: C.muted, fontWeight: 600, letterSpacing: '0.04em' }}>{name}</span>
               </div>
             ))}
           </div>
@@ -745,36 +503,31 @@ export default function LandingPage() {
       </section>
 
       {/* ── CTA ── */}
-      <section style={{ background: C.card, borderBottom: `1px solid ${C.border}` }}>
+      <section>
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
-          style={{ maxWidth: 1200, margin: '0 auto', padding: '88px 24px', textAlign: 'center' }}
+          initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}
+          style={{ maxWidth: 1100, margin: '0 auto', padding: '80px 32px' }}
         >
-          <h2 style={{ margin: '0 0 14px', fontSize: 'clamp(22px, 4vw, 34px)', fontWeight: 800, color: C.primary, letterSpacing: '-0.02em' }}>
+          <p style={{ margin: '0 0 16px', fontSize: 11, color: C.muted, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>The next incident</p>
+          <h2 style={{ margin: '0 0 14px', fontSize: 'clamp(24px, 4vw, 40px)', fontWeight: 800, color: C.primary, letterSpacing: '-0.02em', lineHeight: 1.1, maxWidth: 580 }}>
             The next insider fraud attempt is already in progress.
           </h2>
-          <p style={{ margin: '0 auto 40px', color: C.muted, fontSize: 15, maxWidth: 460, lineHeight: 1.65 }}>
+          <p style={{ margin: '0 0 36px', color: C.muted, fontSize: 14, maxWidth: 420, lineHeight: 1.65 }}>
             SentinelIQ surfaces it before the damage is done.
           </p>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={BTN_TAP} style={{ display: 'inline-block' }}>
-              <Link href="/dashboard" className="landing-btn-primary" style={{
-                fontSize: 14, fontWeight: 700, letterSpacing: '0.02em',
-                padding: '12px 28px', borderRadius: 3,
-                background: C.primary, color: C.bg, textDecoration: 'none',
-                display: 'flex', alignItems: 'center', gap: 6,
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <motion.div whileHover={{ scale: 1.04 }} whileTap={BTN_TAP}>
+              <Link href="/dashboard" style={{
+                fontSize: 13, fontWeight: 700, letterSpacing: '0.02em',
+                padding: '11px 24px', borderRadius: 3,
+                background: C.primary, color: C.bg, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6,
               }}>
-                Get a Demo
-                <motion.span initial={{ x: 0 }} whileHover={{ x: 3 }} style={{ display: 'inline-block', transition: 'transform 0.15s' }}>→</motion.span>
+                Get a Demo →
               </Link>
             </motion.div>
-            <motion.div whileHover={{ scale: 1.04 }} whileTap={BTN_TAP} style={{ display: 'inline-block' }}>
-              <a href="#" className="landing-btn-secondary" style={{
-                fontSize: 14, fontWeight: 600,
-                padding: '12px 28px', borderRadius: 3,
+            <motion.div whileHover={{ scale: 1.03 }} whileTap={BTN_TAP}>
+              <a href="#" style={{
+                fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 3,
                 background: 'transparent', color: C.primary,
                 border: `1px solid ${C.border}`, textDecoration: 'none', display: 'block',
               }}>
@@ -786,48 +539,22 @@ export default function LandingPage() {
       </section>
 
       {/* ── Footer ── */}
-      <footer>
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '56px 24px 0' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 40, marginBottom: 48, justifyContent: 'space-between', alignItems: 'flex-start' }}>
-
-            {/* Brand */}
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-                <div style={{ width: 24, height: 24, overflow: 'hidden', flexShrink: 0 }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/logo.png" alt="" aria-hidden="true" style={{ height: 24, width: 'auto', display: 'block', objectFit: 'cover', objectPosition: 'left center' }} />
-                </div>
-                <span style={{ fontSize: 14, fontWeight: 700, color: C.primary }}>SentinelIQ</span>
-              </div>
-              <p style={{ margin: 0, fontSize: 13, color: C.muted, lineHeight: 1.65 }}>Team SIGMOID, iDEA 2.0, Union Bank of India</p>
-            </div>
-
-            {/* Links */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'flex-end' }}>
-              <a href="#" className="landing-footer-link" style={{ fontSize: 13, color: C.muted, textDecoration: 'none' }}>GitHub Repository</a>
-              <Link href="/dashboard" className="landing-footer-link" style={{ fontSize: 13, color: C.muted, textDecoration: 'none' }}>View Demo</Link>
-            </div>
+      <footer style={{ borderTop: `1px solid ${C.border}` }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="" aria-hidden="true" style={{ height: 20, width: 'auto', display: 'block' }} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: C.primary }}>SentinelIQ</span>
+            <span style={{ fontSize: 12, color: C.muted, marginLeft: 8 }}>Team SIGMOID · iDEA 2.0 · Union Bank of India</span>
           </div>
-
-          {/* Bottom bar */}
-          <div style={{
-            borderTop: `1px solid ${C.border}`, padding: '20px 0',
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12,
-          }}>
-            <p style={{ margin: 0, fontSize: 12, color: C.muted }}>© 2026 SentinelIQ Fraud Intelligence. All rights reserved.</p>
-            <motion.span
-              whileHover={{ borderColor: '#4D5562', color: C.primary, transition: { duration: 0.15 } }}
-              style={{
-                fontSize: 10, fontWeight: 700, color: C.muted,
-                border: `1px solid ${C.border}`, borderRadius: 2,
-                padding: '3px 8px', letterSpacing: '0.06em', cursor: 'default',
-              }}
-            >
-              ISO 27001 Certified
-            </motion.span>
+          <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+            <a href="#" style={{ fontSize: 12, color: C.muted, textDecoration: 'none' }}>GitHub</a>
+            <Link href="/dashboard" style={{ fontSize: 12, color: C.muted, textDecoration: 'none' }}>Demo</Link>
+            <span style={{ fontSize: 10, fontWeight: 700, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 2, padding: '2px 7px', letterSpacing: '0.06em' }}>ISO 27001</span>
           </div>
         </div>
       </footer>
+
     </div>
   )
 }

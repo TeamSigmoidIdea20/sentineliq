@@ -47,9 +47,6 @@ export default function Sidebar() {
             </span>
           </div>
         </Link>
-        <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span className="animate-pulse-dot" style={{ width: 6, height: 6, borderRadius: '50%', background: C.low, display: 'inline-block' }} />
-        </div>
       </div>
 
       {/* Search */}
