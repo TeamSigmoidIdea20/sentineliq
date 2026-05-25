@@ -25,7 +25,7 @@ SentinelIQ builds a dynamic per-user behavioural baseline for every monitored ba
 
 - **Frontend:** https://sentineliq-gold.vercel.app/
 - **Backend API:** https://rak2315-sentineliq-backend.hf.space
-- **Demo Video:** *(link to be added)*
+- **Demo Video:** https://youtu.be/JtFDP3gYGvs
 
 > **Note:** Backend is hosted on HuggingFace Spaces free tier — it sleeps after 15 min of inactivity. Visit `/health` and wait for `{"status":"ok"}` before demoing (cold start ~30–60s).
 
