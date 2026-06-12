@@ -1,3 +1,9 @@
+# XGBoost model — the supervised ("learn from labelled fraud") member of the ensemble.
+# Two jobs:
+#   1. score()   → probability that an event is fraud, used in the blended risk.
+#   2. explain()  → SHAP values that tell the analyst WHICH features drove the score.
+# xgboost/shap are optional imports; if missing, the model degrades to neutral
+# scores and a deterministic fallback explanation instead of crashing.
 from __future__ import annotations
 
 import logging
@@ -13,6 +19,7 @@ try:
 except ImportError:
     XGB_AVAILABLE = False
 
+# The 8 engineered features, in the fixed order the model expects them.
 FEATURE_NAMES = [
     "login_hour_deviation",
     "transaction_velocity_ratio",
@@ -39,6 +46,9 @@ class XGBoostModel:
             self.is_fitted = True
             return
 
+        # Hyperparameters are tuned for a SMALL, imbalanced labelled set:
+        #   shallow trees + column/row subsampling stop one feature dominating SHAP,
+        #   scale_pos_weight + the regularisers (gamma/alpha/lambda) resist overfitting.
         self._model = xgb.XGBClassifier(
             n_estimators=60,
             max_depth=3,
@@ -57,10 +67,12 @@ class XGBoostModel:
             verbosity=0,
         )
         self._model.fit(X, y)
+        # TreeExplainer gives fast, exact SHAP values for tree models.
         self._explainer = shap.TreeExplainer(self._model)
         self.is_fitted = True
 
     def score(self, features: np.ndarray) -> float:
+        # Single event → fraud probability for the positive class.
         if not self.is_fitted or self._model is None:
             return 0.5
         x = features.reshape(1, -1)
@@ -69,11 +81,14 @@ class XGBoostModel:
         return min(float(self._model.predict_proba(x)[0][1]), 0.88)
 
     def score_batch(self, X: np.ndarray) -> list[float]:
+        # Same as score() but for many rows at once (used during retrain validation).
         if not self.is_fitted or self._model is None:
             return [0.5] * len(X)
+        # positive-class proba per row, each capped at 0.88 (see score()).
         return [min(v, 0.88) for v in self._model.predict_proba(X)[:, 1].tolist()]
 
     def explain(self, features: np.ndarray) -> list[dict]:
+        # Returns the top-5 features driving this event's score, with SHAP values.
         if not self.is_fitted or self._explainer is None:
             logger.debug("[SHAP] Model not fitted — using fallback")
             return _fallback_shap(features)
@@ -100,13 +115,15 @@ class XGBoostModel:
 
             logger.debug("[SHAP] raw shap_row: %s", shap_row.tolist())
 
-            # Use fallback if all zero OR fewer than 2 features contribute meaningfully
+            # Use fallback if all zero OR fewer than 3 features contribute meaningfully
             # (catches single-feature dominance where model ignores most inputs)
             non_trivial = int(np.sum(np.abs(shap_row) > 1e-3))
             if np.all(np.abs(shap_row) < 1e-9) or non_trivial < 3:
                 logger.warning("[SHAP] Degenerate SHAP (%d non-trivial) — using fallback", non_trivial)
                 return _fallback_shap(features)
 
+            # Build one record per feature: its value, its SHAP contribution, and
+            # whether it pushed risk up (positive) or down (negative).
             contributions = []
             for name, val, feat_val in zip(FEATURE_NAMES, shap_row, features):
                 contributions.append({
@@ -116,20 +133,24 @@ class XGBoostModel:
                     "direction": "positive" if val >= 0 else "negative",
                 })
 
+            # Strongest absolute contributors first; keep the top 5 for the UI.
             contributions.sort(key=lambda c: abs(c["contribution"]), reverse=True)
             return contributions[:5]
 
         except Exception as exc:
+            # Any SHAP error must never break scoring — fall back gracefully.
             logger.warning("[SHAP] explain() exception: %s — using fallback", exc)
             return _fallback_shap(features)
 
     def save(self, path: str) -> None:
+        # Persist just the model; the explainer is rebuilt from it on load().
         joblib.dump({"model": self._model, "is_fitted": self.is_fitted}, path)
 
     def load(self, path: str) -> None:
         payload = joblib.load(path)
         self._model = payload["model"]
         self.is_fitted = bool(payload.get("is_fitted", self._model is not None))
+        # Recreate the SHAP explainer for the restored model.
         if XGB_AVAILABLE and self._model is not None:
             self._explainer = shap.TreeExplainer(self._model)
 
@@ -138,6 +159,9 @@ def _fallback_shap(features: np.ndarray) -> list[dict]:
     """Fallback when TreeExplainer is unavailable or produces zeros.
     Scales contributions by per-feature expected magnitude so values are meaningful.
     """
+    # Instead of fake/random numbers, derive each feature's contribution from its
+    # ACTUAL value divided by that feature's expected normal magnitude — so the
+    # explanation still reflects reality even when the real SHAP output is unusable.
     out = []
     for name, val, scale in zip(FEATURE_NAMES, features, _FEATURE_SCALE):
         # Contribution = how many σ-equivalents away from 0 this feature is

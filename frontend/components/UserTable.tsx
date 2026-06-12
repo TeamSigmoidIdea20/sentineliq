@@ -28,7 +28,7 @@ function MiniSparkline({ score, userId, trend }: { score: number; userId: string
   const h = 28
   const w = 60
   const path = points.map((v, i) => `${(i / 6) * w},${h - (v / max) * h}`).join(' L ')
-  const strokeColor = trend === 'up' ? '#DC2626' : trend === 'down' ? '#16A34A' : '#8B949E'
+  const strokeColor = trend === 'up' ? C.critical : trend === 'down' ? C.low : C.textMuted
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
       <polyline points={path} fill="none" stroke={strokeColor} strokeWidth="1.5" />

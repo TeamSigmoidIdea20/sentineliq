@@ -37,6 +37,7 @@ from data.feature_engineering import FeatureEngineer
 SAVED_MODEL_DIR = str(Path(__file__).resolve().parent.parent / "models" / "saved")
 
 
+# precision = of the events we flagged, how many were truly fraud (threshold 0.5).
 def _precision_from_scores(scores: list[float], labels: list[int]) -> float:
     thresh = 0.5
     tp = sum(1 for s, l in zip(scores, labels) if s >= thresh and l == 1)
@@ -44,6 +45,7 @@ def _precision_from_scores(scores: list[float], labels: list[int]) -> float:
     return round(tp / max(1, tp + fp), 3)
 
 
+# recall = of the truly-fraud events, how many we actually flagged.
 def _recall_from_scores(scores: list[float], labels: list[int]) -> float:
     thresh = 0.5
     tp = sum(1 for s, l in zip(scores, labels) if s >= thresh and l == 1)
@@ -52,6 +54,7 @@ def _recall_from_scores(scores: list[float], labels: list[int]) -> float:
 
 
 async def main() -> None:
+    # Need trained models on disk to score the seed events.
     ens = EnsembleModel()
     if not EnsembleModel.saved_files_exist(SAVED_MODEL_DIR):
         print("No saved models found. Run the backend first to train models.")
@@ -60,6 +63,7 @@ async def main() -> None:
     engineer = FeatureEngineer()
 
     async with SessionLocal() as db:
+        # If the DB already has enough labels, there's nothing to seed.
         existing = await db.scalar(
             select(func.count()).select_from(AlertModel).where(AlertModel.label.in_(["TP", "FP"]))
         ) or 0
@@ -67,6 +71,8 @@ async def main() -> None:
             print(f"Skipped — {existing} labels already in DB")
             return
 
+        # Grab a handful of real fraud + clean events (that already have features)
+        # to turn into labeled TP/FP alerts.
         from sqlalchemy import and_
         fraud_rows = (await db.execute(
             select(EventModel).where(and_(EventModel.is_fraud == 1, EventModel.features_json != '{}')).limit(10)
@@ -115,12 +121,14 @@ async def main() -> None:
         print("Too few valid features to retrain.")
         return
 
+    # Retrain XGBoost on an 80/20 split of the seeded labels, then save the models.
     X = np.array([x for x, _ in seed], dtype=np.float32)
     y = np.array([y for _, y in seed], dtype=np.int32)
     split = max(1, int(len(seed) * 0.8))
     ens.xgb_model.fit(X[:split], y[:split])
     ens.save(SAVED_MODEL_DIR)
 
+    # Evaluate P/R/F1 on the held-out 20% (fall back to the full set if it's empty).
     X_val, y_val = X[split:], y[split:]
     if len(X_val) > 0:
         scores_v = ens.xgb_model.score_batch(list(X_val))

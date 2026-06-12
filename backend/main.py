@@ -1,3 +1,8 @@
+# main.py — the FastAPI application. This is the spine of the backend: it wires the
+# database, the synthetic event generator, the feature engineer and the ML ensemble
+# together, runs the background "live event" loop, and exposes every HTTP endpoint the
+# dashboard calls. Read it top-to-bottom as: imports/config → small helpers → core
+# event processing → startup/seed/lifespan → the API route handlers grouped by area.
 from __future__ import annotations
 
 import asyncio
@@ -57,21 +62,28 @@ from schemas import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-generator = SyntheticGenerator()
-engineer = FeatureEngineer()
-ensemble = EnsembleModel()
-_events_processed = 0
-_initialized = False
-_webhook_url_cache: str = ""
-_MAX_FEED = 20
+# Module-level singletons shared by every request + the background loop.
+generator = SyntheticGenerator()   # produces synthetic events
+engineer = FeatureEngineer()       # turns events into the 8 features
+ensemble = EnsembleModel()         # the 3-model scorer
+_events_processed = 0              # running count for the health endpoint
+_initialized = False              # set True once startup finishes
+_webhook_url_cache: str = ""      # in-memory copy of the configured alert webhook
+_MAX_FEED = 20                    # how many events the live feed returns
 MODEL_VERSION = "v1.0.0"
 SAVED_MODEL_DIR = os.path.join(os.path.dirname(__file__), "models", "saved")
-_startup_mode = "fresh"
+_startup_mode = "fresh"           # "fresh" (trained now) or "cached" (loaded from disk)
 ALERT_THRESHOLD = 65  # single score threshold — no ground-truth split
 MANIFEST_PATH = os.path.join(SAVED_MODEL_DIR, "manifest.json")
 
 
 def _write_manifest(total_events: int = 0) -> None:
+    # Writes a small JSON describing the trained models (purely informational —
+    # not read back by the scoring code).
+    # NOTE: the xgboost n_estimators default and the ensemble_weights literals below
+    # are hardcoded and currently OUT OF SYNC with the real models
+    # (models/ensemble.py uses 0.4/0.4/0.2; XGBoost uses n_estimators=60). The live
+    # xgb_n_est below is read from the actual model, but the weights are not.
     import models.lstm_autoencoder as _lstm_mod
     xgb_n_est = 150
     if ensemble.xgb_model._model is not None:
@@ -99,6 +111,7 @@ _EVENT_COLS = {
 }
 
 
+# Map a 0-100 risk score to the band label the UI colours by.
 def _risk_level(score: float) -> str:
     if score >= 80:
         return "critical"
@@ -109,6 +122,8 @@ def _risk_level(score: float) -> str:
     return "low"
 
 
+# Convert a stored AlertModel row into the API response shape, parsing the JSON
+# columns (model scores + SHAP) back into typed objects.
 def _alert_from_row(row: AlertModel) -> AlertResponse:
     ms = json.loads(row.model_scores_json or "{}")
     sv = json.loads(row.shap_values_json or "[]")
@@ -135,6 +150,7 @@ def _alert_from_row(row: AlertModel) -> AlertResponse:
     )
 
 
+# Pick a human-readable case title from the mix of fraud patterns it contains.
 def _case_name(fraud_types: set[str], user_count: int = 1) -> str:
     if {"bulk_download", "cross_department_access"}.issubset(fraud_types):
         return "Data Exfiltration Attempt"
@@ -147,6 +163,8 @@ def _case_name(fraud_types: set[str], user_count: int = 1) -> str:
     return "Escalating Insider Risk"
 
 
+# Precision/recall helpers used by the retrain + intelligence endpoints.
+# precision = correct fraud flags ÷ all fraud flags; recall = caught fraud ÷ all fraud.
 def _precision_from_scores(scores: list[float], labels: list[int]) -> float:
     predicted_positive = [idx for idx, score in enumerate(scores) if score >= 0.5]
     if not predicted_positive:
@@ -165,16 +183,21 @@ def _recall_from_scores(scores: list[float], labels: list[int]) -> float:
 
 
 async def _startup() -> None:
+    # Runs once when the app boots. Ensures the 50 users exist, then either loads
+    # pre-trained models from disk (fast path) or trains them fresh on 2000
+    # synthetic events spanning the last 48h, then seeds the demo state.
     global _initialized, _startup_mode
     logger.info("Initializing SentinelIQ — generating training data…")
 
     async with SessionLocal() as db:
+        # Seed the user table on first ever boot.
         user_count = await db.scalar(select(func.count()).select_from(UserModel))
         if not user_count:
             for u in generator.users:
                 db.add(UserModel(**u))
             await db.commit()
 
+        # Fast path: models already on disk → load them and skip cold training.
         if ensemble.saved_files_exist(SAVED_MODEL_DIR):
             ensemble.load(SAVED_MODEL_DIR)
             _startup_mode = "cached"
@@ -184,11 +207,14 @@ async def _startup() -> None:
             await seed_demo_state()
             return
 
+        # Cold path: generate 48h of history to train on.
         training_events = generator.generate_batch(
             n=2000,
             base_ts=datetime.utcnow() - timedelta(hours=48),
         )
 
+        # Engineer features for every training event and persist the events,
+        # collecting X (features), y (fraud labels) and per-user sequences for the LSTM.
         X_all: list[np.ndarray] = []
         y_all: list[int] = []
         user_events: dict[str, list[np.ndarray]] = {}
@@ -211,6 +237,7 @@ async def _startup() -> None:
     X = np.array(X_all, dtype=np.float32)
     y = np.array(y_all, dtype=np.int32)
 
+    # Train all 3 models, persist them + a manifest so the next boot uses the fast path.
     logger.info("Training ensemble models…")
     ensemble.fit(X, y, user_events)
     _startup_mode = "fresh"
@@ -231,6 +258,7 @@ async def _startup() -> None:
 
 
 async def _fire_webhook(url: str, payload: dict) -> None:
+    # Best-effort POST to an external alerting webhook; failures are logged, not raised.
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             await client.post(url, json=payload)
@@ -240,31 +268,38 @@ async def _fire_webhook(url: str, payload: dict) -> None:
 
 
 async def _process_event(ev: dict) -> None:
+    # THE core pipeline — every event (live, simulated or ingested) flows through here:
+    # engineer features → score with the ensemble → persist the event → if the score
+    # clears the threshold, create an alert (+ SHAP, timeline, case) → refresh user risk.
     global _events_processed
     _events_processed += 1
 
-    force_alert = ev.pop("_force_alert", False)
+    # Private control flags travel on the dict; pop them before persisting.
+    force_alert = ev.pop("_force_alert", False)   # guarantee an alert (simulate/forced fraud)
     ev_source = ev.pop("_source", "live")
     ev["event_source"] = ev_source
     ev["source"] = ev_source
 
     now = datetime.utcnow()
-    ev["occurred_at"] = ev.get("timestamp", now)
-    ev["ingested_at"] = now
+    ev["occurred_at"] = ev.get("timestamp", now)  # when it happened
+    ev["ingested_at"] = now                        # when we processed it
 
     try:
         feat = engineer.compute_features(ev["user_id"], ev)
         scores = ensemble.predict(ev["user_id"], feat)
         ensemble_raw = scores["ensemble"]
-        risk_score = float(ensemble_raw) * 100.0
+        risk_score = float(ensemble_raw) * 100.0   # 0-1 → 0-100
+        # Forced events get floored to 75 so a demo "fraud" always lands as an alert.
         if force_alert and risk_score < 75.0:
             risk_score = 75.0
         ev["risk_score"] = risk_score
     except Exception as exc:
+        # Never let one bad event kill the live loop.
         logger.error("_process_event feature/score error for %s: %s", ev.get("user_id"), exc, exc_info=True)
         return
     ev["features_json"] = json.dumps(feat.tolist())
 
+    # Only events at/above the threshold become alerts.
     alert_id = str(uuid.uuid4()) if risk_score >= ALERT_THRESHOLD else None
 
     async with SessionLocal() as db:
@@ -275,6 +310,7 @@ async def _process_event(ev: dict) -> None:
             user.last_seen = ev["timestamp"]
 
         if alert_id:
+            # Build the alert with the per-model scores and SHAP explanation.
             shap_vals = ensemble.explain(feat)
             alert = AlertModel(
                 id=alert_id,
@@ -296,7 +332,7 @@ async def _process_event(ev: dict) -> None:
             db.add(alert)
             await db.flush()
 
-            # Write trigger timeline item
+            # Timeline item marking the moment the alert fired (the "trigger").
             db.add(TimelineItemModel(
                 id=str(uuid.uuid4()),
                 entity_type="alert",
@@ -312,7 +348,8 @@ async def _process_event(ev: dict) -> None:
                 source_record_id=alert_id,
             ))
 
-            # Write preceding 4h events as baseline/suspicious timeline items
+            # Backfill the timeline with the user's prior 4h of events so the analyst
+            # sees the lead-up: older = "baseline", last 30 min = "suspicious".
             window_start = ev["occurred_at"] - timedelta(hours=4)
             cutoff = ev["occurred_at"] - timedelta(minutes=30)
             prev_events = (
@@ -344,11 +381,14 @@ async def _process_event(ev: dict) -> None:
                     source_record_id=prev_ev.id,
                 ))
 
+            # Group this alert into a case if the user already has recent alerts.
             await _update_or_create_case(ev["user_id"], alert, db)
 
+        # Recompute the user's headline risk and commit everything atomically.
         await _refresh_user_risk(ev["user_id"], db)
         await db.commit()
 
+    # Fire the webhook only for high-severity alerts (≥80), after the commit.
     if alert_id and risk_score >= 80 and _webhook_url_cache:
         asyncio.create_task(_fire_webhook(_webhook_url_cache, {
             "alert_id": alert_id,
@@ -439,6 +479,7 @@ async def _update_or_create_case(user_id: str, alert: AlertModel, db: AsyncSessi
         )
     ).scalars().first()
 
+    # Branch 1: an open case already exists → append this alert and bump severity.
     if existing_case:
         existing_case.last_seen = alert_time
         existing_case.end_time = alert_time
@@ -467,7 +508,8 @@ async def _update_or_create_case(user_id: str, alert: AlertModel, db: AsyncSessi
         ))
         return existing_case.id
 
-    # No existing open case — check if this is the 2nd+ alert in 24h
+    # Branch 2: no open case — only open one if there's already a prior alert in 24h
+    # (i.e. this is the 2nd+ alert). A single lone alert never opens a case.
     prior_alerts = (
         await db.execute(
             select(AlertModel)
@@ -491,6 +533,8 @@ async def _update_or_create_case(user_id: str, alert: AlertModel, db: AsyncSessi
     user_row = await db.get(UserModel, user_id)
     user_name = user_row.name if user_row else alert.user_name
     case_title = _case_name(fraud_types, 1)
+    # ID is derived from user + first-alert second. (Edge case: two cases for the same
+    # user starting in the same second would collide — extremely rare in practice.)
     case_id = f"case-{user_id}-{int(first_seen.timestamp())}"
 
     db.add(CaseModel(
@@ -584,7 +628,10 @@ async def seed_demo_state() -> None:
     now = datetime.utcnow()
     rng = random.Random(42)  # fixed seed for ingested_at offsets
 
-    # Pin global random state so generator internals (random.choice, uuid4, etc.) are reproducible
+    # Save the current RNG state, force a fixed seed so the seeded demo is identical
+    # on every boot, then restore the original state afterwards (done below) so the
+    # live stream stays random. This makes the DEMO deterministic without freezing
+    # the rest of the app's randomness.
     _rand_state = random.getstate()
     _np_state = np.random.get_state()
     random.seed(42)
@@ -835,9 +882,12 @@ async def seed_demo_state() -> None:
     logger.info("seed_demo_state: done — seeded 300 normal events, 3 fraud chains, 12 standalone alerts (%s)", SEED_VERSION)
 
 
+# The 6 fraud patterns the live loop cycles through, in order.
 _LIVE_FRAUD_PATTERNS = ["off_hours_login", "bulk_download", "cross_department_access", "privilege_escalation", "velocity_spike", "account_modification"]
 
 async def _event_loop() -> None:
+    # Background task: forever emit one event every few seconds, making every 15th a
+    # forced fraud (cycling the patterns above). This is the "live monitoring" stream.
     live_count = 0
     while True:
         await asyncio.sleep(3)  # 1 live event per 3 seconds (~20/min)
@@ -855,6 +905,8 @@ async def _event_loop() -> None:
             logger.error("Event loop error: %s", exc)
 
 
+# App lifecycle: init DB + train/load models on startup, run the live loop while the
+# app is up, and cleanly cancel that loop on shutdown.
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
@@ -870,6 +922,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan, title="SentinelIQ API", version="1.0.0")
 
+# CORS: allow local dev and any *.vercel.app deployment to call the API.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
@@ -880,11 +933,13 @@ app.add_middleware(
 )
 
 
+# Liveness probe used by the uptime pinger to keep the container awake.
 @app.get("/ping")
 def ping():
     return {"status": "alive"}
 
 
+# Reports live model hyperparameters (read off the actual fitted models) for the UI.
 @app.get("/api/model-info")
 def get_model_info():
     import models.lstm_autoencoder as _lstm_mod
@@ -929,6 +984,7 @@ def get_model_info():
 # Health
 # ---------------------------------------------------------------------------
 
+# Health check: reports init state, whether models are loaded, and event count.
 @app.get("/health", response_model=HealthResponse)
 async def health():
     return HealthResponse(
@@ -945,6 +1001,8 @@ async def health():
 # Stats
 # ---------------------------------------------------------------------------
 
+# Dashboard headline stats: users, 24h alert/high-risk counts (+ vs-yesterday deltas),
+# false-positive rate from labels, last-retrain age, coordinated patterns, 24h events.
 @app.get("/api/stats", response_model=StatsResponse)
 async def get_stats(db: AsyncSession = Depends(get_db)):
     now = datetime.utcnow()
@@ -1001,7 +1059,8 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
     else:
         next_retrain_in = "Never"
 
-    # Coordinated activity: same fraud_type triggered by 3+ distinct users in last 30 min
+    # "Coordinated activity" banner: same fraud_type seen across 3+ distinct users in
+    # the last 30 min — a cheap heuristic for a possible multi-person insider campaign.
     thirty_min_ago = datetime.utcnow() - timedelta(minutes=30)
     recent_fraud = (
         await db.execute(
@@ -1049,6 +1108,8 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
 # Live feed — DB-backed, excludes training data, joins alert_id from alerts table
 # ---------------------------------------------------------------------------
 
+# Live feed: the most recent events (excluding training data), each tagged with its
+# alert_id if it triggered one. Polled by the dashboard every few seconds.
 @app.get("/api/feed", response_model=List[FeedEvent])
 async def get_feed(db: AsyncSession = Depends(get_db)):
     from sqlalchemy import func as sqlfunc
@@ -1096,6 +1157,7 @@ async def get_feed(db: AsyncSession = Depends(get_db)):
 # Alerts
 # ---------------------------------------------------------------------------
 
+# List alerts with filtering (risk level, status, time range, min score) + pagination.
 @app.get("/api/alerts", response_model=AlertListResponse)
 async def get_alerts(
     risk_level: Optional[str] = Query(None),
@@ -1154,6 +1216,7 @@ async def get_alerts(
     )
 
 
+# Full detail for one alert (scores + SHAP + status/label/notes/narrative).
 @app.get("/api/alerts/{alert_id}", response_model=AlertResponse)
 async def get_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
     row = await db.get(AlertModel, alert_id)
@@ -1174,6 +1237,7 @@ async def get_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
     return _alert_from_row(row)
 
 
+# Mark an alert resolved (analyst handled it) — removes it from the open queue.
 @app.post("/api/alerts/{alert_id}/resolve")
 async def resolve_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
     row = await db.get(AlertModel, alert_id)
@@ -1187,6 +1251,7 @@ async def resolve_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
     return {"status": "resolved"}
 
 
+# Dismiss an alert (deemed not worth pursuing) — also removes it from the queue.
 @app.post("/api/alerts/{alert_id}/dismiss")
 async def dismiss_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
     row = await db.get(AlertModel, alert_id)
@@ -1200,6 +1265,7 @@ async def dismiss_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
     return {"status": "dismissed"}
 
 
+# Label an alert TP/FP — the ground truth that feeds active learning / retrain.
 @app.post("/api/alerts/{alert_id}/label")
 async def label_alert(alert_id: str, body: LabelRequest, db: AsyncSession = Depends(get_db)):
     if body.label not in ("TP", "FP"):
@@ -1216,6 +1282,7 @@ async def label_alert(alert_id: str, body: LabelRequest, db: AsyncSession = Depe
     return {"status": "labeled", "label": body.label}
 
 
+# Attach a free-text analyst note to an alert.
 @app.post("/api/alerts/{alert_id}/note")
 async def note_alert(alert_id: str, body: NoteRequest, db: AsyncSession = Depends(get_db)):
     row = await db.get(AlertModel, alert_id)
@@ -1229,6 +1296,7 @@ async def note_alert(alert_id: str, body: NoteRequest, db: AsyncSession = Depend
     return {"status": "ok"}
 
 
+# Download a JSON "evidence package" for an alert (for offline review / records).
 @app.get("/api/alerts/{alert_id}/export")
 async def export_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
     row = await db.get(AlertModel, alert_id)
@@ -1279,6 +1347,7 @@ async def export_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
     }
 
 
+# Compare this user against same-role peers on 4 metrics — context for "is this normal?".
 @app.get("/api/alerts/{alert_id}/peer-comparison", response_model=PeerComparisonResponse)
 async def peer_comparison(alert_id: str, db: AsyncSession = Depends(get_db)):
     alert = await db.get(AlertModel, alert_id)
@@ -1360,6 +1429,7 @@ async def peer_comparison(alert_id: str, db: AsyncSession = Depends(get_db)):
     )
 
 
+# Stitched timeline for an alert: the lead-up events + the trigger, in order.
 @app.get("/api/alerts/{alert_id}/timeline", response_model=List[TimelineItem])
 async def get_alert_timeline(alert_id: str, db: AsyncSession = Depends(get_db)):
     alert = await db.get(AlertModel, alert_id)
@@ -1450,6 +1520,7 @@ async def get_alert_timeline(alert_id: str, db: AsyncSession = Depends(get_db)):
 # Users
 # ---------------------------------------------------------------------------
 
+# List all monitored users with current risk score and a recent risk trend.
 @app.get("/api/users", response_model=List[UserResponse])
 async def get_users(db: AsyncSession = Depends(get_db)):
     rows = (
@@ -1504,6 +1575,7 @@ async def get_users(db: AsyncSession = Depends(get_db)):
     ]
 
 
+# Flag a user as access-restricted (analyst containment action).
 @app.post("/api/users/{user_id}/restrict")
 async def restrict_user(user_id: str, db: AsyncSession = Depends(get_db)):
     row = await db.get(UserModel, user_id)
@@ -1517,6 +1589,7 @@ async def restrict_user(user_id: str, db: AsyncSession = Depends(get_db)):
     return {"status": "restricted", "user_id": user_id}
 
 
+# Flag a user as escalated (handed off to a higher tier / investigation).
 @app.post("/api/users/{user_id}/escalate")
 async def escalate_user(user_id: str, db: AsyncSession = Depends(get_db)):
     row = await db.get(UserModel, user_id)
@@ -1530,6 +1603,7 @@ async def escalate_user(user_id: str, db: AsyncSession = Depends(get_db)):
     return {"status": "escalated", "user_id": user_id}
 
 
+# List kill-chain cases (grouped alerts), newest first, with their linked alerts.
 @app.get("/api/cases", response_model=List[CaseResponse])
 async def get_cases(db: AsyncSession = Depends(get_db)):
     case_rows = (
@@ -1576,6 +1650,7 @@ async def get_cases(db: AsyncSession = Depends(get_db)):
     return cases[:10]
 
 
+# Stitched timeline across all alerts in a case — the full investigation narrative.
 @app.get("/api/cases/{case_id}/timeline", response_model=List[TimelineItem])
 async def get_case_timeline(case_id: str, db: AsyncSession = Depends(get_db)):
     case_row = await db.get(CaseModel, case_id)
@@ -1692,6 +1767,7 @@ async def get_case_timeline(case_id: str, db: AsyncSession = Depends(get_db)):
     return sorted(items, key=lambda x: x.timestamp)
 
 
+# Close a case as resolved.
 @app.post("/api/cases/{case_id}/resolve")
 async def resolve_case(case_id: str, db: AsyncSession = Depends(get_db)):
     case = await db.get(CaseModel, case_id)
@@ -1711,6 +1787,7 @@ async def resolve_case(case_id: str, db: AsyncSession = Depends(get_db)):
     return {"status": "resolved"}
 
 
+# Dismiss a case (not a real threat).
 @app.post("/api/cases/{case_id}/dismiss")
 async def dismiss_case(case_id: str, db: AsyncSession = Depends(get_db)):
     case = await db.get(CaseModel, case_id)
@@ -1730,6 +1807,7 @@ async def dismiss_case(case_id: str, db: AsyncSession = Depends(get_db)):
     return {"status": "dismissed"}
 
 
+# Full user profile: 30-day risk history + recent alerts for the detail page.
 @app.get("/api/users/{user_id}", response_model=UserDetailResponse)
 async def get_user(user_id: str, db: AsyncSession = Depends(get_db)):
     row = await db.get(UserModel, user_id)
@@ -1797,6 +1875,7 @@ async def get_user(user_id: str, db: AsyncSession = Depends(get_db)):
     )
 
 
+# Paginated event timeline for one user (events before a given time).
 @app.get("/api/users/{user_id}/events", response_model=List[UserEventResponse])
 async def get_user_events(
     user_id: str,
@@ -1830,6 +1909,7 @@ async def get_user_events(
     ]
 
 
+# Return the audit trail (optionally filtered) — every analyst/system action.
 @app.get("/api/audit-log")
 async def get_audit_log(
     user_id: Optional[str] = Query(None),
@@ -1863,6 +1943,8 @@ async def get_audit_log(
     ]
 
 
+# Model Intelligence page data: P/R/F1, model agreement, 7d volume, anomaly mix,
+# department risk and the false-positive-rate trend.
 @app.get("/api/intelligence", response_model=IntelligenceResponse)
 async def get_intelligence(db: AsyncSession = Depends(get_db)):
     now = datetime.utcnow()
@@ -1995,6 +2077,7 @@ async def get_intelligence(db: AsyncSession = Depends(get_db)):
 # Webhook settings
 # ---------------------------------------------------------------------------
 
+# Read the currently configured alert webhook URL.
 @app.get("/api/settings/webhook", response_model=WebhookConfigResponse)
 async def get_webhook(db: AsyncSession = Depends(get_db)):
     row = await db.get(SettingModel, "webhook_url")
@@ -2002,6 +2085,7 @@ async def get_webhook(db: AsyncSession = Depends(get_db)):
     return WebhookConfigResponse(url=url, configured=bool(url))
 
 
+# Set/clear the alert webhook URL (persisted to settings + cached in memory).
 @app.post("/api/settings/webhook", response_model=WebhookConfigResponse)
 async def set_webhook(body: WebhookConfigRequest, db: AsyncSession = Depends(get_db)):
     global _webhook_url_cache
@@ -2020,6 +2104,7 @@ async def set_webhook(body: WebhookConfigRequest, db: AsyncSession = Depends(get
 # External event ingestion
 # ---------------------------------------------------------------------------
 
+# Ingest an externally-supplied event (vs the synthetic stream) and score it.
 @app.post("/api/ingest", response_model=IngestEventResponse)
 async def ingest_event(body: IngestEventRequest):
     async with SessionLocal() as db:
@@ -2079,6 +2164,8 @@ _SCENARIO_PATTERNS: dict = {
     "account_tampering": "account_modification",
 }
 
+# Inject one forced-fraud event on demand (the dashboard "Simulate" button). Maps a
+# named scenario to a fraud pattern; returns the created alert_id (+ case_id if linked).
 @app.post("/api/simulate")
 async def simulate(body: SimulateRequest = None):
     if body is None:
@@ -2134,6 +2221,8 @@ async def simulate(body: SimulateRequest = None):
     }
 
 
+# Retrain XGBoost on the analyst's TP/FP labels (needs ≥10), report P/R/F1 on a
+# held-out validation set, and persist the updated model + metrics.
 @app.post("/api/retrain", response_model=RetrainResponse)
 async def retrain(db: AsyncSession = Depends(get_db)):
     labeled_rows = (
@@ -2256,6 +2345,7 @@ async def retrain(db: AsyncSession = Depends(get_db)):
 # Debug
 # ---------------------------------------------------------------------------
 
+# Diagnostic: compare stored vs freshly-recomputed SHAP for the latest alert.
 @app.get("/api/debug/shap")
 async def debug_shap(db: AsyncSession = Depends(get_db)):
     row = (

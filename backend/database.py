@@ -1,17 +1,22 @@
+# Database layer — defines every table (as SQLAlchemy ORM models) and the async
+# engine the whole app shares. Uses SQLite in WAL mode via aiosqlite so reads and
+# writes don't block each other. All datetimes are stored as naive UTC.
 import datetime
 from pathlib import Path
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import String, Float, DateTime, Text, Integer, text
 
+# DB file lives next to this module; the URL uses the async aiosqlite driver.
 _DB_PATH = Path(__file__).resolve().parent / "sentineliq.db"
 DATABASE_URL = f"sqlite+aiosqlite:///{_DB_PATH}"
 
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,
-    connect_args={"check_same_thread": False},
+    connect_args={"check_same_thread": False},  # needed for SQLite under async access
 )
+# Session factory; expire_on_commit=False keeps objects usable after commit.
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
@@ -19,6 +24,7 @@ class Base(DeclarativeBase):
     pass
 
 
+# An employee being monitored, plus their current risk and any restrict/escalate flags.
 class UserModel(Base):
     __tablename__ = "users"
 
@@ -34,6 +40,7 @@ class UserModel(Base):
     risk_updated_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
 
 
+# One activity event in the stream (raw fields + engineered features_json + score).
 class EventModel(Base):
     __tablename__ = "events"
 
@@ -61,6 +68,8 @@ class EventModel(Base):
     system: Mapped[str] = mapped_column(String, default="")
 
 
+# An event that crossed the alert threshold — carries model scores, SHAP, status,
+# the analyst's TP/FP label, notes, and an optional AI narrative.
 class AlertModel(Base):
     __tablename__ = "alerts"
 
@@ -83,6 +92,7 @@ class AlertModel(Base):
     ai_narrative: Mapped[str] = mapped_column(Text, nullable=True)
 
 
+# Append-only trail of every analyst/system action (resolve, label, restrict, …).
 class AuditLogModel(Base):
     __tablename__ = "audit_logs"
 
@@ -96,6 +106,7 @@ class AuditLogModel(Base):
     message: Mapped[str] = mapped_column(Text, default="")
 
 
+# One row per retrain: precision before/after, recall, F1, and how many labels were used.
 class ModelMetricModel(Base):
     __tablename__ = "model_metrics"
 
@@ -109,6 +120,8 @@ class ModelMetricModel(Base):
     labels_used: Mapped[int] = mapped_column(Integer, default=0)
 
 
+# A "kill-chain case" — multiple related alerts for a user stitched into one
+# investigation (created on the 2nd+ alert within 24h).
 class CaseModel(Base):
     __tablename__ = "cases"
 
@@ -131,6 +144,7 @@ class CaseModel(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
 
 
+# Join table linking a case to each alert that belongs to it (many-to-many).
 class CaseAlertModel(Base):
     __tablename__ = "case_alerts"
 
@@ -139,6 +153,7 @@ class CaseAlertModel(Base):
     alert_id: Mapped[str] = mapped_column(String)
 
 
+# Pre-built timeline entries that feed the stitched alert/case timelines in the UI.
 class TimelineItemModel(Base):
     __tablename__ = "timeline_items"
 
@@ -157,6 +172,7 @@ class TimelineItemModel(Base):
     source_record_id: Mapped[str] = mapped_column(String, default="")
 
 
+# Simple key/value store for runtime config (e.g. the webhook URL, seed version).
 class SettingModel(Base):
     __tablename__ = "settings"
 
@@ -166,8 +182,12 @@ class SettingModel(Base):
 
 
 async def init_db():
+    # Create all tables, then run a list of idempotent ALTER/CREATE migrations.
+    # Each statement is wrapped in try/except so re-running on an existing DB
+    # (where a column/table already exists) is harmless — this is a lightweight
+    # stand-in for a full migration tool, fine for a single-file SQLite demo.
     async with engine.begin() as conn:
-        await conn.execute(text("PRAGMA journal_mode=WAL"))
+        await conn.execute(text("PRAGMA journal_mode=WAL"))  # concurrent reads + writes
         await conn.run_sync(Base.metadata.create_all)
         for stmt in [
             # Original migrations
@@ -232,9 +252,11 @@ async def init_db():
             try:
                 await conn.execute(text(stmt))
             except Exception:
+                # Migration already applied (column/table exists) — safe to ignore.
                 pass
 
 
 async def get_db():
+    # FastAPI dependency: yields a DB session and closes it when the request ends.
     async with SessionLocal() as session:
         yield session

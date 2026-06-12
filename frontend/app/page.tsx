@@ -14,6 +14,9 @@ const C = {
   red: TOKENS.critical,
   amber: TOKENS.amber,
   green: TOKENS.low,
+  hover: TOKENS.hover,
+  bgDeep: TOKENS.bgDeep,
+  panel: TOKENS.panel,
 }
 
 const containerVariants: Variants = {
@@ -219,7 +222,7 @@ export default function LandingPage() {
                 boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
               }}>
                 <div className="mockup-scanline" />
-                <div style={{ background: '#080D13', borderBottom: `1px solid ${C.border}`, padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <div style={{ background: C.bgDeep, borderBottom: `1px solid ${C.border}`, padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 5 }}>
                   {[C.red, C.amber, C.green].map((c, i) => (
                     <div key={i} style={{ width: 9, height: 9, borderRadius: '50%', background: c, opacity: 0.7 }} />
                   ))}
@@ -239,7 +242,7 @@ export default function LandingPage() {
                       <div key={label} style={{
                         padding: '6px 12px', fontSize: 10,
                         color: active ? C.primary : C.muted,
-                        background: active ? '#1C2128' : 'transparent',
+                        background: active ? C.hover : 'transparent',
                         borderLeft: active ? `2px solid ${C.red}` : '2px solid transparent',
                       }}>{label}</div>
                     ))}
@@ -331,7 +334,7 @@ export default function LandingPage() {
                       {[{ label: 'Login hour', pct: 72, color: C.red }, { label: 'Download vol', pct: 45, color: C.amber }, { label: 'Dept access', pct: 28, color: C.green }].map(b => (
                         <div key={b.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontSize: 8, color: C.muted, width: 56, flexShrink: 0 }}>{b.label}</span>
-                          <div style={{ flex: 1, height: 4, background: '#30363D', borderRadius: 2, overflow: 'hidden' }}>
+                          <div style={{ flex: 1, height: 4, background: C.border, borderRadius: 2, overflow: 'hidden' }}>
                             <div style={{ height: '100%', width: `${b.pct}%`, background: b.color, borderRadius: 2 }} />
                           </div>
                           <span style={{ fontSize: 8, color: b.color, width: 24, textAlign: 'right' }}>{b.pct}</span>
@@ -359,7 +362,7 @@ export default function LandingPage() {
                       {SHAP_MOCK.slice(0, 3).map(s => (
                         <div key={s.feature} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span style={{ fontSize: 7, color: C.muted, fontFamily: 'monospace', width: 76, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.feature}</span>
-                          <div style={{ flex: 1, height: 3, background: '#30363D', borderRadius: 1, overflow: 'hidden' }}>
+                          <div style={{ flex: 1, height: 3, background: C.border, borderRadius: 1, overflow: 'hidden' }}>
                             <div style={{ height: '100%', width: `${Math.min((s.value / 30) * 100, 100)}%`, background: s.positive ? C.red : C.green, borderRadius: 1 }} />
                           </div>
                           <span style={{ fontSize: 7, color: s.positive ? C.red : C.green, width: 20, textAlign: 'right' }}>{s.positive ? '+' : '−'}{s.value}</span>
@@ -396,7 +399,7 @@ export default function LandingPage() {
           >
             {WORKFLOW.map(({ n, title, desc }) => (
               <motion.div key={n} variants={fadeInUp}
-                whileHover={{ backgroundColor: '#1A1F26', transition: { duration: 0.15 } }}
+                whileHover={{ backgroundColor: C.panel, transition: { duration: 0.15 } }}
                 style={{ background: C.bg, padding: '28px 22px', cursor: 'default' }}
               >
                 <p style={{ margin: '0 0 14px', fontSize: 11, fontWeight: 800, color: C.red, fontFamily: 'monospace', letterSpacing: '0.04em' }}>{n}</p>
@@ -473,7 +476,7 @@ export default function LandingPage() {
           >
             {ENVIRONMENTS.map(({ title, desc, tags }) => (
               <motion.div key={title} variants={fadeInUp}
-                whileHover={{ backgroundColor: '#1A1F26', transition: { duration: 0.15 } }}
+                whileHover={{ backgroundColor: C.panel, transition: { duration: 0.15 } }}
                 style={{ background: C.bg, padding: '28px 28px', cursor: 'default' }}
               >
                 <p style={{ margin: '0 0 10px', fontSize: 16, fontWeight: 700, color: C.primary, letterSpacing: '-0.01em' }}>{title}</p>

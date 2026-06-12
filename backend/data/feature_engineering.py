@@ -1,3 +1,7 @@
+# Feature engineering — turns a raw event into the 8 numeric features the models need.
+# The key idea: features are RELATIVE to each user's own recent history (a rolling
+# window), so "normal" is defined per-person. A teller suddenly downloading 500MB is
+# anomalous even if 500MB is normal for someone in data analytics.
 from __future__ import annotations
 
 import math
@@ -5,6 +9,7 @@ from collections import deque, defaultdict
 from dataclasses import dataclass, field
 import numpy as np
 
+# Output feature order — must stay in sync with the models' FEATURE_NAMES.
 FEATURE_NAMES = [
     "login_hour_deviation",
     "transaction_velocity_ratio",
@@ -19,6 +24,8 @@ FEATURE_NAMES = [
 WINDOW = 20  # rolling window size
 
 
+# Per-user rolling memory: the last WINDOW values of each signal, plus the user's
+# baseline profile (normal working hours, usual locations, typical tx volume).
 @dataclass
 class UserHistory:
     hours: deque = field(default_factory=lambda: deque(maxlen=WINDOW))
@@ -38,6 +45,8 @@ class FeatureEngineer:
         self._histories: dict[str, UserHistory] = {}
 
     def _get_history(self, user_id: str, event: dict) -> UserHistory:
+        # Lazily create a history the first time we see a user, seeding their
+        # baseline profile from fields carried on the event.
         if user_id not in self._histories:
             self._histories[user_id] = UserHistory(
                 normal_hours=(event.get("login_start", 9), event.get("login_end", 17)),
@@ -47,6 +56,8 @@ class FeatureEngineer:
         return self._histories[user_id]
 
     def _entropy(self, items) -> float:
+        # Shannon entropy of department access — low = focused/normal, high = the
+        # user is touching many different departments (possible recon/abuse).
         if not items:
             return 0.0
         counts: dict = defaultdict(int)
@@ -56,6 +67,8 @@ class FeatureEngineer:
         return -sum((c / total) * math.log2(c / total) for c in counts.values() if c > 0)
 
     def compute_features(self, user_id: str, event: dict) -> np.ndarray:
+        # Compute all 8 features for this event against the user's history,
+        # THEN fold the event into history (so it counts for the next event).
         h = self._get_history(user_id, event)
 
         hour = event.get("hour", 12)
@@ -108,7 +121,7 @@ class FeatureEngineer:
         off_count = sum(1 for hh in all_hours if hh < nh_start or hh > nh_end)
         off_ratio = off_count / max(1, len(all_hours))
 
-        # Update history
+        # Update history — append this event's raw values to each rolling window.
         h.hours.append(hour)
         h.tx_counts.append(tx)
         h.departments.append(dept)
@@ -128,8 +141,10 @@ class FeatureEngineer:
             off_ratio,
         ], dtype=np.float32)
 
+        # Clip to a sane range so a single extreme outlier can't blow up the models.
         return np.clip(features, -10, 10)
 
     @staticmethod
     def feature_names() -> list[str]:
+        # Expose the canonical feature order to callers (UI, SHAP labels, etc.).
         return FEATURE_NAMES

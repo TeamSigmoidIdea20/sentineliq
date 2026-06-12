@@ -1,3 +1,7 @@
+# Synthetic data generator — the heart of the demo. There is no real bank feed, so
+# this fabricates a believable stream of employee activity: 50 fixed employees with
+# realistic roles/hours/locations, mostly normal events plus occasional injected fraud.
+# Everything downstream (features, models, alerts) runs on what this produces.
 from __future__ import annotations
 
 import random
@@ -7,6 +11,7 @@ from datetime import datetime, timedelta
 
 def _clamp_past(ts: datetime) -> datetime:
     """Ensure generated timestamps are never in the future."""
+    # Guards against clock skew making "live" events appear in the future on the UI.
     now = datetime.utcnow()
     return ts if ts <= now else now.replace(microsecond=0)
 
@@ -75,6 +80,8 @@ _EMPLOYEE_SPECS = [
     ("usr_050","Mei Lin Zhang","treasury_officer","compliance",9,17,12,["compliance","treasury"],["hq"]),
 ]
 
+# Vocabulary the generator draws from: every department, event type and device
+# that can appear in a synthetic event.
 ALL_DEPARTMENTS = [
     "retail_banking","branch_ops","risk_analytics","data_science",
     "compliance","management","IT","security","operations","treasury","admin",
@@ -88,6 +95,8 @@ DEVICES = ["workstation_corp","laptop_01","laptop_02","terminal_branch","mobile_
 
 class SyntheticGenerator:
     def __init__(self):
+        # Index the employee specs by id, and pre-build the user list the API serves.
+        # _event_counter drives the "every 15th event is fraud" cadence.
         self._specs = {s[0]: s for s in _EMPLOYEE_SPECS}
         self._event_counter = 0
         self._user_ids = [s[0] for s in _EMPLOYEE_SPECS]
@@ -106,6 +115,8 @@ class SyntheticGenerator:
         ]
 
     def _normal_event(self, spec, ts: datetime) -> dict:
+        # Build a single "boring" event that fits this employee's normal profile:
+        # in-hours, typical department/location/device, modest tx + download volume.
         uid, name, role, dept, ls, le, avg_tx, typ_depts, norm_locs = spec
         hour = random.randint(ls, le - 1)
         event_ts = _clamp_past(ts.replace(hour=hour, minute=random.randint(0, 59), second=random.randint(0, 59)))
@@ -141,9 +152,13 @@ class SyntheticGenerator:
         }
 
     def _fraud_event(self, spec, ts: datetime, pattern: str) -> dict:
+        # Start from a normal event, then distort it to match a fraud pattern.
+        # Each pattern deliberately trips TWO signals (e.g. off-hours + external
+        # location) so the ensemble has more than one feature to react to.
         ev = self._normal_event(spec, ts)
         uid, name, role, dept, ls, le, avg_tx, typ_depts, norm_locs = spec
 
+        # Keep the non-distorted fields at normal baseline values.
         baseline_tx = max(1, int(random.gauss(avg_tx / 8, max(1, avg_tx / 20))))
         baseline_dl = max(0.0, random.gauss(0.5, 0.2))
 
@@ -206,6 +221,8 @@ class SyntheticGenerator:
         return ev
 
     def generate_batch(self, n: int, base_ts: datetime | None = None) -> list[dict]:
+        # Produce n events for a random mix of users. Roughly every 15th event is a
+        # random fraud pattern → ~7% fraud rate, matching the training distribution.
         if base_ts is None:
             base_ts = datetime.utcnow() - timedelta(hours=random.randint(0, 2))
 
@@ -229,9 +246,12 @@ class SyntheticGenerator:
         return events
 
     def generate_one(self) -> dict:
+        # Convenience wrapper for a single event from the live loop.
         return self.generate_batch(1)[0]
 
     def generate_forced_fraud(self, pattern: str) -> dict:
+        # Deterministically emit a fraud of the requested pattern (used by the live
+        # loop's forced-fraud cadence and by the /api/simulate endpoint).
         spec = random.choice(list(self._specs.values()))
         ts = datetime.utcnow()
         ev = self._fraud_event(spec, ts, pattern)

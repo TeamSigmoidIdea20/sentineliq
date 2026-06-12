@@ -9,6 +9,8 @@ export const C = {
   low: '#16A34A',
   hover: '#1C2128',
   amber: '#D97706',
+  bgDeep: '#080D13',
+  panel: '#1A1F26',
 } as const
 
 export function riskColor(score: number): string {

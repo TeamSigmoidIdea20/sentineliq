@@ -1,8 +1,14 @@
+# Pydantic schemas — the request/response shapes for the API. These define the exact
+# JSON the frontend sends and receives, and FastAPI validates against them automatically.
+# Grouped below by area: alerts, users, feed/events, cases, intelligence, stats, and
+# the small request bodies for actions (label, note, simulate, retrain, webhook, ingest).
 from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 
 
+# --- Alerts -----------------------------------------------------------------
+# One SHAP feature contribution, and the per-model score triple shown on an alert.
 class SHAPValue(BaseModel):
     feature: str
     value: float
@@ -16,6 +22,7 @@ class ModelScores(BaseModel):
     xgboost: float
 
 
+# Full alert payload (scores + SHAP + status/label/notes + optional AI narrative).
 class AlertResponse(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
@@ -43,6 +50,8 @@ class AlertListResponse(BaseModel):
     page_size: int
 
 
+# --- Users ------------------------------------------------------------------
+# User summary, a single risk-history point, and the detailed profile (history + alerts).
 class UserResponse(BaseModel):
     id: str
     name: str
@@ -66,6 +75,8 @@ class UserDetailResponse(UserResponse):
     recent_alerts: List[AlertResponse]
 
 
+# --- Feed & events ----------------------------------------------------------
+# A live-feed row, a single user's event-timeline row, and a stitched timeline item.
 class FeedEvent(BaseModel):
     id: str
     user_id: str
@@ -104,6 +115,8 @@ class TimelineItem(BaseModel):
     source: str        # event | alert | audit_log
 
 
+# --- Peer comparison & cases ------------------------------------------------
+# How a user compares to same-role peers on a metric, and the full case payload.
 class PeerComparisonMetric(BaseModel):
     metric: str
     user_value: float
@@ -131,6 +144,9 @@ class CaseResponse(BaseModel):
     alerts: List[AlertResponse]
 
 
+# --- Intelligence & stats ---------------------------------------------------
+# Building blocks for the Model Intelligence page (P/R/F1, volumes, breakdowns,
+# FP trend) and the dashboard's headline stat cards.
 class DailyCount(BaseModel):
     date: str
     count: int
@@ -189,6 +205,9 @@ class StatsResponse(BaseModel):
     events_24h: int = 0
 
 
+# --- Health & action requests -----------------------------------------------
+# Health probe payload, plus the small request/response bodies for analyst actions
+# (label, note, simulate, retrain, webhook config) and external event ingestion.
 class HealthResponse(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
