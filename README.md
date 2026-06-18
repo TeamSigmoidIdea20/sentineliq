@@ -71,6 +71,8 @@ sentineliq/
 │       ├── lstm_autoencoder.py        — temporal drift (PyTorch)
 │       ├── xgboost_model.py           — supervised scorer + SHAP TreeExplainer
 │       └── ensemble.py                — weighted scorer (0.4 / 0.4 / 0.2)
+├── scripts/
+│   └── cert/                          — CMU CERT r4.2 benchmark validation + insider replay
 └── frontend/
     ├── app/
     │   ├── page.tsx                   — landing page
@@ -91,6 +93,25 @@ All data is 100% synthetic — no real bank data was used at any stage.
 - Transaction counts and download volumes drawn from per-user Gaussian distributions
 - Normal department access patterns and typical locations per employee
 - 6 fraud patterns injected at ~7% rate: `off_hours_login` · `bulk_download` · `cross_department_access` · `privilege_escalation` · `velocity_spike` · `account_modification`
+
+## Benchmark Validation (CMU CERT r4.2)
+
+Because no real-world banking insider-threat dataset is public, we validated our synthetic
+behavioural distributions against **CMU CERT r4.2** — the synthetic insider-threat dataset
+used across academic UEBA research (220k+ real logon events analysed).
+
+- **Validated:** both SentinelIQ and CERT are strongly business-hours-dominant with rare
+  off-hours (night) activity — confirming our off-hours signal is well-founded.
+- **Honest finding:** CERT keeps a small ~4.5% benign night-activity background; our default
+  synthetic baseline is ~0% (idealised). We added an **optional CERT calibration** that
+  samples login hours from CERT's real distribution to close this gap (off by default).
+- **Live demo on real data:** `scripts/cert/cert_to_ingest.py` replays a documented CERT
+  malicious insider (off-hours logon → USB connect → data upload) through `POST /api/ingest`,
+  showing the pipeline flag a real-world attack pattern.
+
+Tooling lives in [`scripts/cert/`](scripts/cert/); running it regenerates the comparison charts
+into `scripts/cert/out/`. The CERT data itself is not committed (multi-GB); see that folder's
+README to reproduce.
 
 ## Model Performance (Synthetic Test Set)
 

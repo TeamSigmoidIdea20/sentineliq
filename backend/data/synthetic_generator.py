@@ -4,6 +4,8 @@
 # Everything downstream (features, models, alerts) runs on what this produces.
 from __future__ import annotations
 
+import json
+import os
 import random
 import uuid
 from datetime import datetime, timedelta
@@ -101,6 +103,11 @@ class SyntheticGenerator:
         self._event_counter = 0
         self._user_ids = [s[0] for s in _EMPLOYEE_SPECS]
 
+        # OPTIONAL CERT calibration (default OFF). This is None unless the operator
+        # explicitly sets the SENTINELIQ_CERT_PROFILE env var to a profile file.
+        # When None, the generator behaves EXACTLY as it always has.
+        self._cert_profile = self._load_cert_profile()
+
         self.users = [
             {
                 "id": s[0],
@@ -114,11 +121,58 @@ class SyntheticGenerator:
             for s in _EMPLOYEE_SPECS
         ]
 
+    def _load_cert_profile(self):
+        # OPTIONAL: load a CERT-derived login-hour profile, but ONLY if asked to.
+        #
+        # Default behavior: the env var SENTINELIQ_CERT_PROFILE is NOT set, so this
+        # returns None and the generator runs exactly as before. Nothing changes.
+        #
+        # Opt-in behavior: if the operator sets SENTINELIQ_CERT_PROFILE to the path
+        # of a readable JSON file (produced by datasets/cert/build_cert_profile.py),
+        # we load it and return its dict. The dict has a "hour_weights" list of 24
+        # numbers used to sample realistic login hours.
+        #
+        # This MUST never crash startup, so everything is wrapped in try/except and
+        # any problem simply falls back to None (off).
+
+        # Read the env var. If it is missing or empty, stay OFF.
+        path = os.environ.get("SENTINELIQ_CERT_PROFILE")
+        if not path:
+            return None
+
+        try:
+            # Open and parse the JSON profile file.
+            with open(path, "r", encoding="utf-8") as f:
+                profile = json.load(f)
+
+            # Sanity check: we need a list of exactly 24 hour weights to be useful.
+            weights = profile.get("hour_weights")
+            if not isinstance(weights, list) or len(weights) != 24:
+                return None
+
+            # Looks valid — return the whole profile dict.
+            return profile
+        except Exception:
+            # Any error at all (file missing, bad JSON, permissions) -> stay OFF.
+            return None
+
     def _normal_event(self, spec, ts: datetime) -> dict:
         # Build a single "boring" event that fits this employee's normal profile:
         # in-hours, typical department/location/device, modest tx + download volume.
         uid, name, role, dept, ls, le, avg_tx, typ_depts, norm_locs = spec
+        # DEFAULT path (CERT calibration OFF): pick an hour inside the employee's
+        # normal login window, exactly as the generator has always done.
         hour = random.randint(ls, le - 1)
+        # OPTIONAL path (CERT calibration ON): only runs when the env var pointed us
+        # at a valid profile file in __init__. When that happens, override the hour
+        # by sampling from the REAL CERT login-hour distribution. Those weights are
+        # day-heavy with a small night background, so this naturally adds a little
+        # realistic off-hours activity. With the env var unset this block is skipped
+        # entirely and the line above stands unchanged.
+        if self._cert_profile is not None:
+            weights = self._cert_profile["hour_weights"]
+            # random.choices returns a one-item list; take the single value.
+            hour = random.choices(range(24), weights=weights)[0]
         event_ts = _clamp_past(ts.replace(hour=hour, minute=random.randint(0, 59), second=random.randint(0, 59)))
         department = random.choice(typ_depts)
         # 5% of normal events originate from an atypical location — prevents
