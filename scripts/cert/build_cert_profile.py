@@ -1,5 +1,5 @@
 """
-build_cert_profile.py  —  Tier-1.5 profile builder (READ-ONLY input, writes one JSON).
+build_cert_profile.py  — profile builder (READ-ONLY input, writes one JSON).
 
 Purpose: read the real CMU CERT r4.2 logon data and measure when people actually
 log on during the day. We turn that into a tiny "profile" file the synthetic
@@ -19,14 +19,12 @@ never trains a model. It is safe to run on its own:
 """
 from __future__ import annotations
 
-# Standard-library only — keeps this script simple and dependency-free.
 import csv
 import json
 import os
 from datetime import datetime
 from pathlib import Path
 
-# Where this script lives.
 HERE = Path(__file__).resolve().parent
 
 # Where the downloaded CERT r4.2 files live. The multi-GB CERT data is NOT in git;
