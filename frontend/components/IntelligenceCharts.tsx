@@ -87,7 +87,7 @@ export default function IntelligenceCharts({ data }: { data: Intelligence }) {
         </Panel>
 
         {/* Department risk */}
-        <Panel title="Department risk" sub="7-day average">
+        <Panel title="Department risk" sub="7-day peak">
           {data.department_risk_breakdown.length === 0 ? (
             <p style={{ color: C.textMuted, fontSize: 11, margin: 0 }}>No alert data yet.</p>
           ) : (

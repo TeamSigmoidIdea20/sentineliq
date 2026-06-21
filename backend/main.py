@@ -73,7 +73,7 @@ _MAX_FEED = 20                    # how many events the live feed returns
 MODEL_VERSION = "v1.0.0"
 SAVED_MODEL_DIR = os.path.join(os.path.dirname(__file__), "models", "saved")
 _startup_mode = "fresh"           # "fresh" (trained now) or "cached" (loaded from disk)
-ALERT_THRESHOLD = 65  # single score threshold — no ground-truth split
+ALERT_THRESHOLD = 65  # single score threshold - no ground-truth split
 MANIFEST_PATH = os.path.join(SAVED_MODEL_DIR, "manifest.json")
 
 
@@ -2040,7 +2040,11 @@ async def get_intelligence(db: AsyncSession = Depends(get_db)):
         await db.execute(
             select(
                 UserModel.department,
-                func.avg(AlertModel.risk_score).label("avg_risk"),
+                # Peak (max) risk per department, not average — most alerts are forced
+                # events floored to exactly 75, so the average collapses to ~75 for every
+                # department. The peak varies and is more informative. Field name kept as
+                # "avg_risk" so the response schema / frontend type need no change.
+                func.max(AlertModel.risk_score).label("avg_risk"),
                 func.count(AlertModel.id).label("alert_count"),
             )
             .join(UserModel, AlertModel.user_id == UserModel.id)
