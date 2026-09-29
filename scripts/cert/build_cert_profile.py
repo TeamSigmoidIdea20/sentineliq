@@ -1,5 +1,5 @@
 """
-build_cert_profile.py  — profile builder (READ-ONLY input, writes one JSON).
+build_cert_profile.py  - profile builder (READ-ONLY input, writes one JSON).
 
 Purpose: read the real CMU CERT r4.2 logon data and measure when people actually
 log on during the day. We turn that into a tiny "profile" file the synthetic
@@ -68,7 +68,7 @@ def count_logon_hours(path: Path, limit: int) -> tuple[list[int], int]:
         date_col = cols.get("date")
         act_col = cols.get("activity")
 
-        # Walk the rows one at a time (streaming — low memory).
+        # Walk the rows one at a time (streaming - low memory).
         for i, row in enumerate(reader):
             # Stop once we have looked at "limit" rows.
             if i >= limit:
@@ -116,7 +116,7 @@ def night_fraction(hour_counts: list[int]) -> float:
     return night / total
 
 
-# Main: tie it all together — read, compute, write JSON, print a short summary.
+# Main: tie it all together - read, compute, write JSON, print a short summary.
 def main() -> None:
     logon_csv = _find("logon.csv")
     if logon_csv is None:

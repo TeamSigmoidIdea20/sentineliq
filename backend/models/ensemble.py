@@ -1,4 +1,4 @@
-# Ensemble — combines all 3 models into a single risk score.
+# Ensemble - combines all 3 models into a single risk score.
 # Each model looks at the event from a different angle (point anomaly, temporal
 # pattern, supervised fraud signal). We take a weighted average of their 0-1
 # scores so no single model can dominate, then expose that as the final risk.
@@ -10,7 +10,7 @@ from models.isolation_forest import IsolationForestModel
 from models.lstm_autoencoder import LSTMAutoencoderModel
 from models.xgboost_model import XGBoostModel
 
-# Blend weights — must sum to 1.0. IF and LSTM (unsupervised anomaly detectors)
+# Blend weights - must sum to 1.0. IF and LSTM (unsupervised anomaly detectors)
 # carry most of the weight; XGBoost (supervised) is weighted lower because it
 # depends on having enough labelled data to be reliable.
 IF_WEIGHT = 0.4

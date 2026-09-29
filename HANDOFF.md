@@ -1,4 +1,4 @@
-# HANDOFF — Continuing SentinelIQ on a New Laptop
+# HANDOFF - Continuing SentinelIQ on a New Laptop
 
 Read this first (human or Claude Code). `CLAUDE.md` has the full technical context;
 this file explains **what's where**, **what was moved into the repo**, and **what to do
@@ -11,12 +11,12 @@ immediately after cloning**.
 On the old laptop the git repo (`sentineliq/`) sat inside a bigger workspace folder:
 
 ```
-D:\REHAAN\1. Ml Projects\22. Idea2.0\     <- workspace root (NOT a git repo)
+<workspace root>\                         <- NOT a git repo (new laptop: D:\Projects\18. sentinel ai\)
 ├── CLAUDE.md, DESIGN.md, PRODUCT.md      <- were outside git
 ├── .claude/ (skills + local settings)    <- was outside git
 ├── .impeccable/design.json               <- was outside git
 ├── docs/ (D1, D3 docx, explainers)       <- was outside git
-├── Sigmoid_Idea2.0_submission.pdf        <- was outside git
+├── submission PDF                        <- was outside git
 ├── datasets/cert/  (4.6 GB CERT r4.2)    <- too big, NOT in git
 └── sentineliq/                           <- the git repo
 ```
@@ -37,23 +37,22 @@ gives you all of it.
 | `.impeccable/design.json` | Impeccable skill's design-token state. |
 | `.claude/skills/` | Project skills: `impeccable`, `how-i-like-my-frontend`, `gamification`, `retention-architecture`, `solo-startup-execution`. Claude Code picks these up automatically when run from the repo root. |
 | `handoff/claude-memory/` | Copy of Claude Code's auto-memory from the old laptop (user prefs, project state, known bugs, planned Alert Panel redesign). See step 4 below. |
-| `handoff/claude-settings.local.json` | Old laptop's Claude Code permission allowlist. Reference only — contains Windows paths from the old machine. |
-| `docs/D1_Problem_Solution_Brief.docx` | Deliverable D1. |
-| `docs/D3_Technical_Architecture.docx` | Deliverable D3. |
+| `docs/D1_Problem_Solution_Brief.docx` | Problem + solution brief (archive). |
+| `docs/D3_Technical_Architecture.docx` | Technical architecture doc (archive). |
 | `docs/Pexp.md` | Plain-English walkthrough of the whole project + tough Q&A (presentation prep). |
 | `docs/explanation_working.md` | Detailed file-by-file code explanation. |
-| `docs/Sigmoid_Idea2.0_submission.pdf` | The submitted iDEA 2.0 PDF. |
-| `README.md` | Public GitHub README (deliverable D4). |
+| `docs/*.pdf` | Earlier submission PDF (archive, not maintained). |
+| `README.md` | Public GitHub README, framed for CodeArambh 2.0 (Open Innovation, cybersecurity). |
 | `backend/` | FastAPI + ML (deployed to HuggingFace Spaces via subtree push). |
 | `backend/main.py` | App, all endpoints, live event loop, seeding, simulate, retrain. |
 | `backend/database.py` / `schemas.py` | SQLAlchemy async models + Pydantic schemas. |
 | `backend/data/` | Synthetic generator, feature engineering, `cert_profile.json`. |
-| `backend/models/` | Isolation Forest, LSTM AE, XGBoost (+SHAP), ensemble. `saved/` is gitignored — models retrain on first boot. |
+| `backend/models/` | Isolation Forest, LSTM AE, XGBoost (+SHAP), ensemble. `saved/` is gitignored - models retrain on first boot. |
 | `backend/scripts/seed_demo.py` | Demo seeding helper. |
 | `frontend/` | Next.js 14 app (deployed to Vercel from GitHub). |
-| `frontend/lib/tokens.ts` | `C` colour tokens — use for ALL colours. |
+| `frontend/lib/tokens.ts` | `C` colour tokens - use for ALL colours. |
 | `frontend/lib/api.ts` | Typed API client. |
-| `scripts/cert/` | CERT benchmark tooling (needs the dataset — see below). |
+| `scripts/cert/` | CERT benchmark tooling (needs the dataset - see below). |
 | `start_backend.ps1` / `start_frontend.ps1` | One-shot local run scripts (Windows). |
 
 **Not in git (recreate locally):** `datasets/cert/`, `backend/venv/`, `frontend/node_modules/`,
@@ -71,7 +70,7 @@ git remote add hf https://huggingface.co/spaces/rak2315/sentineliq-backend
 ```
 Make sure `git lfs install` is run (PNG/JPG files are tracked by LFS, see `.gitattributes`).
 
-### 3.2 Private / secret stuff — none of this is in git, set it up yourself
+### 3.2 Private / secret stuff - none of this is in git, set it up yourself
 The GitHub repo is **PUBLIC**. Never commit any of these:
 
 | Secret / private item | Where it lives | What to do |
@@ -82,7 +81,7 @@ The GitHub repo is **PUBLIC**. Never commit any of these:
 | `backend/.env` | local only | `cp backend/.env.example backend/.env` |
 | `frontend/.env.local` | local only | `cp frontend/.env.local.example frontend/.env.local` (points at `http://localhost:8000`) |
 | Vercel env `NEXT_PUBLIC_API_URL` | Vercel dashboard | Already set; nothing to do. |
-| Claude Code memory | `~/.claude/projects/<path>/memory/` | See 3.4 — it's machine-local, not synced. |
+| Claude Code memory | `~/.claude/projects/<path>/memory/` | See 3.4 - it's machine-local, not synced. |
 
 If this repo should not expose the docs/submission PDF publicly, switch the GitHub repo to
 **Private** (Settings → General → Danger Zone). Vercel keeps deploying from private repos.
@@ -100,7 +99,7 @@ cd frontend
 npm install
 npm run dev                                         # http://localhost:3000
 ```
-First backend boot trains models (no `models/saved/` yet) — takes a bit.
+First backend boot trains models (no `models/saved/` yet) - takes a bit.
 
 ### 3.4 Restore Claude Code memory
 Claude Code stores memory per absolute project path under
@@ -131,9 +130,8 @@ HF rejects binary files, hence the subtree push of `backend/` only.
 
 ---
 
-## 5. What's left (as of handoff)
+## 5. What's left (CodeArambh 2.0, Open Innovation track)
 
-- D2 demo video — not recorded (README YouTube link is a placeholder).
-- D5 pitch deck — not created.
+- PPT on the official CodeArambh template - not created (due 10 October 2026).
 - Known low-priority bugs: `handoff/claude-memory/known_bugs.md`.
 - Future features: activity heatmap, decision timer, MITRE ATT&CK chips (see `CLAUDE.md`).

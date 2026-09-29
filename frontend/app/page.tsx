@@ -48,8 +48,8 @@ const SHAP_MOCK = [
 ]
 
 const STATS = [
-  { value: '12–18', unit: 'months', label: 'Average detection lag for insider fraud' },
-  { value: '30%',   unit: '',       label: 'Of banking fraud traced to internal actors' },
+  { value: '$19.5M', unit: 'per year', label: 'Average insider risk cost per organisation (Ponemon, 2026)' },
+  { value: '67',     unit: 'days',     label: 'Average time to contain an insider incident (Ponemon, 2026)' },
   { value: '0.4%',  unit: '',       label: 'False positive rate on 3-model ensemble', red: true },
 ]
 
@@ -96,18 +96,18 @@ const WORKFLOW = [
 
 const ENVIRONMENTS = [
   {
-    title: 'Retail and corporate banking',
-    desc: 'Monitors branch tellers, loan-ops desks, and CRM access. Detects off-hours logins, bulk record queries, and payroll system anomalies against each employee\'s personal baseline.',
-    tags: ['Off-hours teller access detection', 'Bulk record download alerts', 'Velocity spikes on loan origination systems'],
+    title: 'Banking and fintech',
+    desc: 'Tellers, treasury desks, and payment operators hold access that can move money in a single action. SentinelIQ scores every transaction burst, cross-desk query, and bulk record export against that employee\'s own baseline.',
+    tags: ['Off-hours access to core banking systems', 'Bulk customer record download alerts', 'Transaction velocity spikes'],
   },
   {
-    title: 'Treasury and capital markets',
-    desc: 'A single privileged action in treasury can move crores. SentinelIQ scores every cross-desk access and privilege escalation against the trader\'s own historical activity pattern.',
-    tags: ['Transaction velocity during trading windows', 'Cross-desk access pattern detection', 'Real-time privilege escalation alerts'],
+    title: 'Privileged IT and admin accounts',
+    desc: 'Admins and service accounts are the highest-value target for insider abuse and credential theft. SentinelIQ flags privilege escalation, account tampering, and unusual device or location changes the moment they happen.',
+    tags: ['Real-time privilege escalation alerts', 'Account modification tracking', 'Device and location anomaly detection'],
   },
   {
-    title: 'Regulatory compliance and audit',
-    desc: 'Every alert maps to a MITRE ATT&CK technique. Case files include the full event chain, SHAP evidence, and analyst labels, packaged for RBI, SEBI, or internal audit handoff.',
+    title: 'Compliance and audit',
+    desc: 'Every alert maps to a MITRE ATT&CK technique. Case files include the full event chain, SHAP evidence, and analyst labels, packaged for regulator, compliance, or internal audit handoff.',
     tags: ['T1078: Valid Accounts', 'T1530: Data from Cloud Storage', 'T1087: Account Discovery'],
   },
   {
@@ -155,7 +155,7 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* ── Hero — split layout ── */}
+      {/* ── Hero - split layout ── */}
       <section style={{
         backgroundImage: `linear-gradient(to right, rgba(13,17,23,1) 55%, rgba(13,17,23,0.3) 100%), url('/hero-bg.png')`,
         backgroundSize: 'cover', backgroundPosition: 'center right', backgroundRepeat: 'no-repeat',
@@ -175,14 +175,14 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, delay: 0.07 }}
               style={{ margin: '0 0 20px', fontSize: 'clamp(32px, 4.5vw, 54px)', fontWeight: 800, color: C.primary, lineHeight: 1.08, letterSpacing: '-0.03em' }}
             >
-              Detect Insider Fraud{' '}
+              Detect Insider Threats{' '}
               <span style={{ color: C.red }}>Before the Damage Is Done.</span>
             </motion.h1>
             <motion.p
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, delay: 0.15 }}
               style={{ margin: '0 0 32px', fontSize: 16, color: C.body, lineHeight: 1.72, maxWidth: 460 }}
             >
-              SentinelIQ builds a behavioural fingerprint for every privileged employee and scores every action in real time. When behaviour deviates from baseline, investigators know within seconds, not after the damage is already done.
+              SentinelIQ is an AI-driven cybersecurity platform that builds a behavioural fingerprint for every privileged user and scores every action in real time. When behaviour deviates from baseline, the security team knows within seconds, not after data or money has already left the building.
             </motion.p>
             <motion.div
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, delay: 0.22 }}
@@ -307,7 +307,7 @@ export default function LandingPage() {
         </motion.div>
       </section>
 
-      {/* ── Features — 3 columns ── */}
+      {/* ── Features - 3 columns ── */}
       <section style={{ borderBottom: `1px solid ${C.border}` }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '80px 32px' }}>
           <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}
@@ -381,7 +381,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Analyst workflow — 4 steps ── */}
+      {/* ── Analyst workflow - 4 steps ── */}
       <section id="workflow" style={{ background: C.card, borderBottom: `1px solid ${C.border}` }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '80px 32px' }}>
           <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}
@@ -514,7 +514,7 @@ export default function LandingPage() {
         >
           <p style={{ margin: '0 0 16px', fontSize: 11, color: C.muted, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>The next incident</p>
           <h2 style={{ margin: '0 0 14px', fontSize: 'clamp(24px, 4vw, 40px)', fontWeight: 800, color: C.primary, letterSpacing: '-0.02em', lineHeight: 1.1, maxWidth: 580 }}>
-            The next insider fraud attempt is already in progress.
+            The next insider attack is already in progress.
           </h2>
           <p style={{ margin: '0 0 36px', color: C.body, fontSize: 15, maxWidth: 420, lineHeight: 1.65 }}>
             SentinelIQ surfaces it before the damage is done.
@@ -549,10 +549,10 @@ export default function LandingPage() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo.png" alt="" aria-hidden="true" style={{ height: 20, width: 'auto', display: 'block' }} />
             <span style={{ fontSize: 13, fontWeight: 700, color: C.primary }}>SentinelIQ</span>
-            <span style={{ fontSize: 12, color: C.muted, marginLeft: 8 }}>Team SIGMOID · iDEA 2.0 · Union Bank of India</span>
+            <span style={{ fontSize: 12, color: C.muted, marginLeft: 8 }}>Team SIGMOID · CodeArambh 2.0 · Open Innovation</span>
           </div>
           <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
-            <a href="#" style={{ fontSize: 12, color: C.muted, textDecoration: 'none' }}>GitHub</a>
+            <a href="https://github.com/TeamSigmoidIdea20/sentineliq" target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: C.muted, textDecoration: 'none' }}>GitHub</a>
             <Link href="/dashboard" style={{ fontSize: 12, color: C.muted, textDecoration: 'none' }}>Demo</Link>
             <span style={{ fontSize: 10, fontWeight: 700, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 2, padding: '2px 7px', letterSpacing: '0.06em' }}>ISO 27001</span>
           </div>

@@ -14,5 +14,5 @@ The local backend returns correct non-zero SHAP values. The deployed HuggingFace
 - Simulate → refresh timing gap: event processes in ~5s but toast refreshes at 3s, so new alert may not appear immediately.
 - StatStrip "Open Alerts" on alerts page counts only threshold-filtered current-page alerts, not all open alerts globally.
 - "True Positive Rate" label in StatStrip is actually specificity (1 - FPR), not true TPR. Minor mislabel.
-- Escalate Case reference number (ESC-xxxx) is frontend-generated and not persisted — different number each panel open.
+- Escalate Case reference number (ESC-xxxx) is frontend-generated and not persisted - different number each panel open.
 - Intelligence page anomaly rate: slight semantic mismatch between stats.alerts_today/events_today vs intelligence.anomaly_rate calculation.

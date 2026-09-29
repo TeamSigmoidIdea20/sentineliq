@@ -1,4 +1,4 @@
-# Optional AI narrative — turns an alert's numbers (scores + SHAP) into a plain-English
+# Optional AI narrative - turns an alert's numbers (scores + SHAP) into a plain-English
 # explanation for the analyst, via the Grok (x.ai) API. Entirely optional: with no
 # GROK_API_KEY set it returns None and the UI just shows the raw scores/SHAP instead.
 from __future__ import annotations
@@ -43,7 +43,7 @@ def generate_alert_narrative(alert: "AlertModel", shap_values: list, user: "User
         prompt = (
             f"You are a bank fraud analyst. Write 3-4 sentences in plain English explaining why this insider fraud alert fired. "
             f"Describe what the employee specifically did, why each ML model flagged it, and what the key numbers mean. "
-            f"Be concrete — reference the actual feature values and scores. Do not start with 'I' or 'This alert'.\n\n"
+            f"Be concrete - reference the actual feature values and scores. Do not start with 'I' or 'This alert'.\n\n"
             f"Employee: {user.name} | Role: {user.role} | Department: {user.department}\n"
             f"Alert type: {alert.fraud_type.replace('_', ' ')}\n"
             f"Ensemble risk score: {round(alert.risk_score)}/100\n\n"
@@ -62,5 +62,5 @@ def generate_alert_narrative(alert: "AlertModel", shap_values: list, user: "User
         )
         return response.choices[0].message.content.strip()
     except Exception:
-        # Any API/network/parse failure must never break alert creation — just skip.
+        # Any API/network/parse failure must never break alert creation - just skip.
         return None

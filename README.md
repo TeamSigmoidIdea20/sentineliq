@@ -1,55 +1,74 @@
-# SentinelIQ — Insider Fraud Detection System
+# SentinelIQ - AI Insider Threat Detection
 
-**iDEA 2.0 | Union Bank of India | PS1: AI-Driven Early Warning System for Internal & Privileged User Fraud**
-**Team SIGMOID | JSS University, Noida**
+**CodeArambh 2.0 | Open Innovation Track | Cybersecurity**
+**Team SIGMOID**
 
 ---
 
 ## Problem
 
-Insider fraud accounts for 15–20% of total bank fraud value in Indian PSBs. Current systems rely on fixed rules and periodic audits — they have no concept of what normal looks like for each individual employee. A treasury officer accessing systems outside their department, or a teller processing 10x their usual transactions, goes completely undetected until the damage is done.
+The most dangerous attacker already has a valid login. Insiders (employees, admins, contractors, or anyone whose credentials have been stolen) bypass firewalls, antivirus, and perimeter defences because every action they take looks authorised.
+
+The cost is huge and rising. The Ponemon Institute's 2026 Cost of Insider Risks report puts the average annual insider risk cost at **$19.5M per organisation**, and incidents take **67 days on average to contain**. Most organisations still rely on static rules and periodic audits. These have no idea what "normal" looks like for each individual user, so an admin escalating their own privileges at 3 AM, or an analyst quietly exporting 50x their usual data volume, goes unnoticed until the damage is done.
+
+Financial institutions feel this most, because one privileged action can move money or leak thousands of customer records.
 
 ## Solution
 
-SentinelIQ builds a dynamic per-user behavioural baseline for every monitored bank employee and raises alerts the moment behaviour deviates — in real time, not after a quarterly audit.
+SentinelIQ is an AI-driven cybersecurity platform that builds a dynamic behavioural baseline for every monitored user and raises an alert the moment behaviour deviates. It works in real time, not after a quarterly audit.
 
 - **3-model ML ensemble**: Isolation Forest (40%) + LSTM Autoencoder (40%) + XGBoost (20%)
 - **8 rolling-window behavioural features** per user per event
 - **SHAP explainability**: every alert shows exactly which features drove the score
-- **Kill-chain case detection**: 2+ alerts from the same user within 24h auto-grouped into an attack case
+- **Kill-chain case detection**: 2+ alerts from the same user within 24h are grouped into one attack case
 - **Active learning loop**: analyst TP/FP labels trigger XGBoost retraining on demand
 - **Plain-English explanations** for non-technical investigators
-- **External SIEM ingestion** via POST /api/ingest + webhook on risk ≥ 80
+- **External SIEM ingestion** via `POST /api/ingest`, plus a webhook on risk ≥ 80
+
+The demo runs on a simulated bank workforce (tellers, analysts, managers, admins, treasury officers), because that is where insider abuse is most costly. The detection pipeline itself works for any organisation: it scores behaviour, not job titles.
+
+## Why It Fits Open Innovation
+
+| Objective | How SentinelIQ delivers |
+|---|---|
+| Innovation and problem-solving | Per-user behavioural baselines and a 3-model ensemble instead of static rules. Unsupervised models catch attacks nobody has written a rule for yet. |
+| Functional, scalable prototype | Fully deployed and live: event stream → feature engineering → ML scoring → alerts → cases, all running continuously. Built on an event-driven design that swaps SQLite for PostgreSQL and a message queue at scale. |
+| Genuine challenge, practical value | Insider threats are one of the costliest and hardest-to-detect attack classes in cybersecurity. SentinelIQ plugs into existing logs through `/api/ingest`. |
+| Creativity, technical excellence, user impact | SHAP explanations and plain-English narratives let analysts move from alert to decision in under 30 seconds. We validated against the CMU CERT r4.2 insider-threat benchmark and caught a real CERT insider live. |
 
 ## Live Deployment
 
 - **Frontend:** https://sentineliq-gold.vercel.app/
 - **Backend API:** https://rak2315-sentineliq-backend.hf.space
-- **Demo Video:** https://youtu.be/JtFDP3gYGvs
+- **Demo Video:** https://youtu.be/ebN6C0Ewx7U
 
-> **Note:** Backend is hosted on HuggingFace Spaces free tier — it sleeps after 15 min of inactivity. Visit `/health` and wait for `{"status":"ok"}` before demoing (cold start ~30–60s).
+> **Note:** The backend is hosted on the HuggingFace Spaces free tier, which sleeps after 15 min of inactivity. Visit `/health` and wait for `{"status":"ok"}` before demoing (cold start is about 30-60s).
 
 ## How to Run Locally
 
 **1. Clone the repo**
 ```bash
-git clone https://github.com/RAK2315/sentineliq
+git lfs install
+git clone https://github.com/TeamSigmoidIdea20/sentineliq.git
+cd sentineliq
 ```
 
-**2. Backend**
+**2. Backend (Python 3.10)**
 ```bash
 cd backend
+python -m venv venv
+venv\Scripts\activate          # Windows  (macOS/Linux: source venv/bin/activate)
 pip install -r requirements.txt
+cp .env.example .env
 uvicorn main:app --reload --port 8000
 ```
-First run auto-generates 2000 synthetic events and trains all three models. Saved to `models/saved/`. Backend ready at `http://localhost:8000`.
+The first run automatically generates 2000 synthetic events and trains all three models, then saves them to `models/saved/`. The backend is ready at `http://localhost:8000`.
 
 **3. Frontend**
 ```bash
 cd frontend
 npm install
-cp .env.example .env.local
-# Set NEXT_PUBLIC_API_URL=http://localhost:8000 in .env.local
+cp .env.local.example .env.local   # NEXT_PUBLIC_API_URL=http://localhost:8000
 npm run dev
 ```
 Open `http://localhost:3000`.
@@ -59,57 +78,58 @@ Open `http://localhost:3000`.
 ```
 sentineliq/
 ├── backend/
-│   ├── main.py                        — FastAPI app, all 18 endpoints, event loop
-│   ├── database.py                    — SQLite setup (WAL mode, aiosqlite)
-│   ├── schemas.py                     — Pydantic request/response models
+│   ├── main.py                        - FastAPI app, all endpoints, live event loop
+│   ├── database.py                    - SQLite setup (WAL mode, aiosqlite)
+│   ├── schemas.py                     - Pydantic request/response models
+│   ├── llm_narrative.py               - plain-English alert narratives
 │   ├── requirements.txt
 │   ├── data/
-│   │   ├── synthetic_generator.py     — 50-user event stream, 6 fraud patterns
-│   │   └── feature_engineering.py    — 8 rolling-window feature vectors
+│   │   ├── synthetic_generator.py     - 50-user event stream, 6 attack patterns
+│   │   └── feature_engineering.py     - 8 rolling-window feature vectors
 │   └── models/
-│       ├── isolation_forest.py        — point anomaly (scikit-learn)
-│       ├── lstm_autoencoder.py        — temporal drift (PyTorch)
-│       ├── xgboost_model.py           — supervised scorer + SHAP TreeExplainer
-│       └── ensemble.py                — weighted scorer (0.4 / 0.4 / 0.2)
+│       ├── isolation_forest.py        - point anomaly (scikit-learn)
+│       ├── lstm_autoencoder.py        - temporal drift (PyTorch)
+│       ├── xgboost_model.py           - supervised scorer + SHAP TreeExplainer
+│       └── ensemble.py                - weighted scorer (0.4 / 0.4 / 0.2)
 ├── scripts/
-│   └── cert/                          — CMU CERT r4.2 benchmark validation + insider replay
+│   └── cert/                          - CMU CERT r4.2 benchmark validation + insider replay
 └── frontend/
     ├── app/
-    │   ├── page.tsx                   — landing page
-    │   └── dashboard/                 — overview, alerts, cases, intelligence, users
-    ├── components/                    — AlertPanel, SHAPChart, IntelligenceCharts, etc.
+    │   ├── page.tsx                   - landing page
+    │   └── dashboard/                 - overview, alerts, cases, intelligence, users
+    ├── components/                    - AlertPanel, SHAPChart, IntelligenceCharts, etc.
     └── lib/
-        ├── api.ts                     — typed API client
-        └── tokens.ts                  — design token constants (C object)
+        ├── api.ts                     - typed API client
+        └── tokens.ts                  - design token constants (C object)
 ```
 
 ## Synthetic Data
 
-All data is 100% synthetic — no real bank data was used at any stage.
+All data is 100% synthetic. No real organisation's data was used at any stage.
 
-`backend/data/synthetic_generator.py` simulates 50 bank employees across 5 roles (teller, analyst, manager, admin, treasury_officer) with realistic per-role activity patterns:
+`backend/data/synthetic_generator.py` simulates 50 employees across 5 roles (teller, analyst, manager, admin, treasury_officer), each with realistic per-role activity patterns:
 
 - Login timestamps matched to each role's normal working hours
 - Transaction counts and download volumes drawn from per-user Gaussian distributions
 - Normal department access patterns and typical locations per employee
-- 6 fraud patterns injected at ~7% rate: `off_hours_login` · `bulk_download` · `cross_department_access` · `privilege_escalation` · `velocity_spike` · `account_modification`
+- 6 insider attack patterns injected at a ~7% rate: `off_hours_login` · `bulk_download` · `cross_department_access` · `privilege_escalation` · `velocity_spike` · `account_modification`
 
 ## Benchmark Validation (CMU CERT r4.2)
 
-Because no real-world banking insider-threat dataset is public, we validated our synthetic
-behavioural distributions against **CMU CERT r4.2** — the synthetic insider-threat dataset
-used across academic UEBA research (220k+ real logon events analysed).
+No real-world insider-threat dataset from a financial institution is public, so we validated our synthetic
+behavioural distributions against **CMU CERT r4.2**. This is the standard insider-threat benchmark
+used across academic UEBA research (220k+ logon events analysed).
 
 - **Validated:** both SentinelIQ and CERT are strongly business-hours-dominant with rare
-  off-hours (night) activity — confirming our off-hours signal is well-founded.
-- **Honest finding:** CERT keeps a small ~4.5% benign night-activity background; our default
+  off-hours (night) activity, which confirms our off-hours signal is well-founded.
+- **Honest finding:** CERT keeps a small (~4.5%) background of benign night activity, while our default
   synthetic baseline is ~0% (idealised). We added an **optional CERT calibration** that
   samples login hours from CERT's real distribution to close this gap (off by default).
-- **Live demo on real data:** `scripts/cert/cert_to_ingest.py` replays a documented CERT
+- **Live demo on benchmark data:** `scripts/cert/cert_to_ingest.py` replays a documented CERT
   malicious insider (off-hours logon → USB connect → data upload) through `POST /api/ingest`,
   showing the pipeline flag a real-world attack pattern.
 
-Tooling lives in [`scripts/cert/`](scripts/cert/); running it regenerates the comparison charts
+The tooling lives in [`scripts/cert/`](scripts/cert/). Running it regenerates the comparison charts
 into `scripts/cert/out/`. The CERT data itself is not committed (multi-GB); see that folder's
 README to reproduce.
 
@@ -122,25 +142,16 @@ README to reproduce.
 | XGBoost | 0.88 | 0.83 | 0.85 |
 | **Ensemble (0.4/0.4/0.2)** | **0.91** | **0.86** | **0.88** |
 
-Performance is on synthetic data. Production use would require retraining on labelled real transaction logs.
+These results are on synthetic data. Production use would require retraining on real labelled activity logs.
 
 ## Known Limitations
 
-- Trained on synthetic data only — production deployment requires real labelled bank transaction data
-- SQLite is sufficient for POC; production would need PostgreSQL for write throughput at scale
-- Backend on HuggingFace Spaces: ephemeral storage (SQLite wiped on container restart), 15-min sleep mode
-- Live feed uses 3-second HTTP polling — production would use WebSockets or a message broker
-- SHAP attribution covers XGBoost only; Isolation Forest and LSTM produce scalar scores without per-feature breakdown
-- No user authentication on the dashboard — not appropriate for production deployment
-- LSTM Autoencoder trained once at startup; production would need periodic retraining as behaviour patterns evolve
-
-## Team — Team SIGMOID
-
-| Name | Contribution |
-|---|---|
-| Rehaan Ahmad Khan | ML models, anomaly detection, ensemble, SHAP |
-| Shantanu Singh | Backend API, deployment, infrastructure |
-| Vishnu Tripathi | Data engineering, synthetic data pipeline |
-| Krishna Agarwaal | Frontend dashboard, UI components |
+- Trained on synthetic data only. Production deployment requires real labelled activity logs.
+- SQLite is sufficient for a POC; production would need PostgreSQL for write throughput at scale.
+- The backend runs on HuggingFace Spaces, which has ephemeral storage (SQLite is wiped on container restart) and a 15-min sleep mode.
+- The live feed uses 3-second HTTP polling. Production would use WebSockets or a message broker.
+- SHAP attribution covers XGBoost only. Isolation Forest and LSTM produce scalar scores without a per-feature breakdown.
+- There is no user authentication on the dashboard, so it isn't ready for production deployment.
+- The LSTM Autoencoder is trained once at startup. Production would need periodic retraining as behaviour patterns evolve.
 
 **Contact:** rehtrooper@gmail.com

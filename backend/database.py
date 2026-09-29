@@ -1,4 +1,4 @@
-# Database layer — defines every table (as SQLAlchemy ORM models) and the async
+# Database layer - defines every table (as SQLAlchemy ORM models) and the async
 # engine the whole app shares. Uses SQLite in WAL mode via aiosqlite so reads and
 # writes don't block each other. All datetimes are stored as naive UTC.
 import datetime
@@ -68,7 +68,7 @@ class EventModel(Base):
     system: Mapped[str] = mapped_column(String, default="")
 
 
-# An event that crossed the alert threshold — carries model scores, SHAP, status,
+# An event that crossed the alert threshold - carries model scores, SHAP, status,
 # the analyst's TP/FP label, notes, and an optional AI narrative.
 class AlertModel(Base):
     __tablename__ = "alerts"
@@ -120,7 +120,7 @@ class ModelMetricModel(Base):
     labels_used: Mapped[int] = mapped_column(Integer, default=0)
 
 
-# A "kill-chain case" — multiple related alerts for a user stitched into one
+# A "kill-chain case" - multiple related alerts for a user stitched into one
 # investigation (created on the 2nd+ alert within 24h).
 class CaseModel(Base):
     __tablename__ = "cases"
@@ -184,7 +184,7 @@ class SettingModel(Base):
 async def init_db():
     # Create all tables, then run a list of idempotent ALTER/CREATE migrations.
     # Each statement is wrapped in try/except so re-running on an existing DB
-    # (where a column/table already exists) is harmless — this is a lightweight
+    # (where a column/table already exists) is harmless - this is a lightweight
     # stand-in for a full migration tool, fine for a single-file SQLite demo.
     async with engine.begin() as conn:
         await conn.execute(text("PRAGMA journal_mode=WAL"))  # concurrent reads + writes
@@ -252,7 +252,7 @@ async def init_db():
             try:
                 await conn.execute(text(stmt))
             except Exception:
-                # Migration already applied (column/table exists) — safe to ignore.
+                # Migration already applied (column/table exists) - safe to ignore.
                 pass
 
 

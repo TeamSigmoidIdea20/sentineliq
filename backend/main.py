@@ -1,4 +1,4 @@
-# main.py — the FastAPI application. This is the spine of the backend: it wires the
+# main.py - the FastAPI application. This is the spine of the backend: it wires the
 # database, the synthetic event generator, the feature engineer and the ML ensemble
 # together, runs the background "live event" loop, and exposes every HTTP endpoint the
 # dashboard calls. Read it top-to-bottom as: imports/config → small helpers → core
@@ -78,7 +78,7 @@ MANIFEST_PATH = os.path.join(SAVED_MODEL_DIR, "manifest.json")
 
 
 def _write_manifest(total_events: int = 0) -> None:
-    # Writes a small JSON describing the trained models (purely informational —
+    # Writes a small JSON describing the trained models (purely informational -
     # not read back by the scoring code).
     # NOTE: the xgboost n_estimators default and the ensemble_weights literals below
     # are hardcoded and currently OUT OF SYNC with the real models
@@ -187,7 +187,7 @@ async def _startup() -> None:
     # pre-trained models from disk (fast path) or trains them fresh on 2000
     # synthetic events spanning the last 48h, then seeds the demo state.
     global _initialized, _startup_mode
-    logger.info("Initializing SentinelIQ — generating training data…")
+    logger.info("Initializing SentinelIQ - generating training data…")
 
     async with SessionLocal() as db:
         # Seed the user table on first ever boot.
@@ -202,7 +202,7 @@ async def _startup() -> None:
             ensemble.load(SAVED_MODEL_DIR)
             _startup_mode = "cached"
             _initialized = True
-            logger.info("Models loaded from disk — rebuilding runtime state")
+            logger.info("Models loaded from disk - rebuilding runtime state")
             await _rebuild_runtime_state()
             await seed_demo_state()
             return
@@ -241,7 +241,7 @@ async def _startup() -> None:
     logger.info("Training ensemble models…")
     ensemble.fit(X, y, user_events)
     _startup_mode = "fresh"
-    logger.info("Models trained fresh — saving to disk")
+    logger.info("Models trained fresh - saving to disk")
     ensemble.save(SAVED_MODEL_DIR)
     _write_manifest(total_events=len(X_all))
     _initialized = True
@@ -268,7 +268,7 @@ async def _fire_webhook(url: str, payload: dict) -> None:
 
 
 async def _process_event(ev: dict) -> None:
-    # THE core pipeline — every event (live, simulated or ingested) flows through here:
+    # THE core pipeline - every event (live, simulated or ingested) flows through here:
     # engineer features → score with the ensemble → persist the event → if the score
     # clears the threshold, create an alert (+ SHAP, timeline, case) → refresh user risk.
     global _events_processed
@@ -342,7 +342,7 @@ async def _process_event(ev: dict) -> None:
                 occurred_at=ev["occurred_at"],
                 ingested_at=now,
                 kind="trigger",
-                title=f"Alert triggered — {(ev.get('fraud_type') or 'anomalous_behavior').replace('_', ' ').title()}",
+                title=f"Alert triggered - {(ev.get('fraud_type') or 'anomalous_behavior').replace('_', ' ').title()}",
                 explanation=f"Ensemble risk score: {int(risk_score)}. Threshold: {ALERT_THRESHOLD}.",
                 severity=_risk_level(risk_score),
                 source_record_id=alert_id,
@@ -501,14 +501,14 @@ async def _update_or_create_case(user_id: str, alert: AlertModel, db: AsyncSessi
             occurred_at=alert_time,
             ingested_at=alert_ingested,
             kind="case_opened",
-            title=f"Alert added — {(alert.fraud_type or 'anomalous_behavior').replace('_', ' ').title()}",
+            title=f"Alert added - {(alert.fraud_type or 'anomalous_behavior').replace('_', ' ').title()}",
             explanation=f"Risk score: {int(alert.risk_score)}. Case now has {existing_case.alert_count} alerts.",
             severity=_risk_level(alert.risk_score),
             source_record_id=alert.id,
         ))
         return existing_case.id
 
-    # Branch 2: no open case — only open one if there's already a prior alert in 24h
+    # Branch 2: no open case - only open one if there's already a prior alert in 24h
     # (i.e. this is the 2nd+ alert). A single lone alert never opens a case.
     prior_alerts = (
         await db.execute(
@@ -523,7 +523,7 @@ async def _update_or_create_case(user_id: str, alert: AlertModel, db: AsyncSessi
     ).scalars().all()
 
     if not prior_alerts:
-        return None  # first alert — no case yet
+        return None  # first alert - no case yet
 
     all_alerts = list(prior_alerts) + [alert]
     fraud_types = {a.fraud_type for a in all_alerts if a.fraud_type}
@@ -534,7 +534,7 @@ async def _update_or_create_case(user_id: str, alert: AlertModel, db: AsyncSessi
     user_name = user_row.name if user_row else alert.user_name
     case_title = _case_name(fraud_types, 1)
     # ID is derived from user + first-alert second. (Edge case: two cases for the same
-    # user starting in the same second would collide — extremely rare in practice.)
+    # user starting in the same second would collide - extremely rare in practice.)
     case_id = f"case-{user_id}-{int(first_seen.timestamp())}"
 
     db.add(CaseModel(
@@ -568,7 +568,7 @@ async def _update_or_create_case(user_id: str, alert: AlertModel, db: AsyncSessi
         occurred_at=alert_time,
         ingested_at=alert_ingested,
         kind="case_opened",
-        title=f"Case opened — {case_title}",
+        title=f"Case opened - {case_title}",
         explanation=f"{len(all_alerts)} alerts in 24h window. Max risk: {int(max_risk)}.",
         severity=severity,
         source_record_id=case_id,
@@ -644,26 +644,26 @@ async def seed_demo_state() -> None:
     )
 
     # --- Fraud chains: events spread across the day for realistic demo timeline ---
-    # Chain 1: bulk download — activity at now-6h, now-2h, now-20min
-    # Chain 2: privilege escalation — now-7h, now-3h, now-45min
-    # Chain 3: velocity spike — now-8h, now-4h, now-30min
+    # Chain 1: bulk download - activity at now-6h, now-2h, now-20min
+    # Chain 2: privilege escalation - now-7h, now-3h, now-45min
+    # Chain 3: velocity spike - now-8h, now-4h, now-30min
     chains = [
         {
-            "user_id": "usr_003",  # Robert Chen — teller
+            "user_id": "usr_003",  # Robert Chen - teller
             "pattern": "bulk_download",
             "offsets_minutes": [360, 120, 20],
             "target_risk": 84,
             "label": "TP",
         },
         {
-            "user_id": "usr_007",  # Michael Torres — teller
+            "user_id": "usr_007",  # Michael Torres - teller
             "pattern": "privilege_escalation",
             "offsets_minutes": [420, 180, 45],
             "target_risk": 79,
             "label": "TP",
         },
         {
-            "user_id": "usr_012",  # Jennifer Kim — analyst
+            "user_id": "usr_012",  # Jennifer Kim - analyst
             "pattern": "velocity_spike",
             "offsets_minutes": [480, 240, 30],
             "target_risk": 88,
@@ -671,7 +671,7 @@ async def seed_demo_state() -> None:
         },
     ]
 
-    # Restore global random state — live event loop uses its own entropy after this point
+    # Restore global random state - live event loop uses its own entropy after this point
     random.setstate(_rand_state)
     np.random.set_state(_np_state)
 
@@ -749,7 +749,7 @@ async def seed_demo_state() -> None:
                         occurred_at=ev["occurred_at"],
                         ingested_at=ev["ingested_at"],
                         kind="trigger",
-                        title=f"Alert triggered — {chain['pattern'].replace('_', ' ').title()}",
+                        title=f"Alert triggered - {chain['pattern'].replace('_', ' ').title()}",
                         explanation=f"Risk score: {int(risk_score)}",
                         severity=_risk_level(risk_score),
                         source_record_id=alert_id,
@@ -849,7 +849,7 @@ async def seed_demo_state() -> None:
                 occurred_at=ev["occurred_at"],
                 ingested_at=ev["ingested_at"],
                 kind="trigger",
-                title=f"Alert triggered — {pattern.replace('_', ' ').title()}",
+                title=f"Alert triggered - {pattern.replace('_', ' ').title()}",
                 explanation=f"Risk score: {int(target_risk)}",
                 severity=_risk_level(float(target_risk)),
                 source_record_id=alert_id,
@@ -860,7 +860,7 @@ async def seed_demo_state() -> None:
         for uid, alert_obj in standalone_alert_objs:
             await _update_or_create_case(uid, alert_obj, db)
 
-        # Version marker — presence of this event indicates seed_v3 has run
+        # Version marker - presence of this event indicates seed_v3 has run
         db.add(EventModel(
             id=str(uuid.uuid5(uuid.NAMESPACE_DNS, f"seed-version-marker-{SEED_VERSION}")),
             user_id="usr_001",
@@ -879,7 +879,7 @@ async def seed_demo_state() -> None:
         ))
         await db.commit()
 
-    logger.info("seed_demo_state: done — seeded 300 normal events, 3 fraud chains, 12 standalone alerts (%s)", SEED_VERSION)
+    logger.info("seed_demo_state: done - seeded 300 normal events, 3 fraud chains, 12 standalone alerts (%s)", SEED_VERSION)
 
 
 # The 6 fraud patterns the live loop cycles through, in order.
@@ -1060,7 +1060,7 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
         next_retrain_in = "Never"
 
     # "Coordinated activity" banner: same fraud_type seen across 3+ distinct users in
-    # the last 30 min — a cheap heuristic for a possible multi-person insider campaign.
+    # the last 30 min - a cheap heuristic for a possible multi-person insider campaign.
     thirty_min_ago = datetime.utcnow() - timedelta(minutes=30)
     recent_fraud = (
         await db.execute(
@@ -1105,7 +1105,7 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
-# Live feed — DB-backed, excludes training data, joins alert_id from alerts table
+# Live feed - DB-backed, excludes training data, joins alert_id from alerts table
 # ---------------------------------------------------------------------------
 
 # Live feed: the most recent events (excluding training data), each tagged with its
@@ -1237,7 +1237,7 @@ async def get_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
     return _alert_from_row(row)
 
 
-# Mark an alert resolved (analyst handled it) — removes it from the open queue.
+# Mark an alert resolved (analyst handled it) - removes it from the open queue.
 @app.post("/api/alerts/{alert_id}/resolve")
 async def resolve_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
     row = await db.get(AlertModel, alert_id)
@@ -1251,7 +1251,7 @@ async def resolve_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
     return {"status": "resolved"}
 
 
-# Dismiss an alert (deemed not worth pursuing) — also removes it from the queue.
+# Dismiss an alert (deemed not worth pursuing) - also removes it from the queue.
 @app.post("/api/alerts/{alert_id}/dismiss")
 async def dismiss_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
     row = await db.get(AlertModel, alert_id)
@@ -1265,7 +1265,7 @@ async def dismiss_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
     return {"status": "dismissed"}
 
 
-# Label an alert TP/FP — the ground truth that feeds active learning / retrain.
+# Label an alert TP/FP - the ground truth that feeds active learning / retrain.
 @app.post("/api/alerts/{alert_id}/label")
 async def label_alert(alert_id: str, body: LabelRequest, db: AsyncSession = Depends(get_db)):
     if body.label not in ("TP", "FP"):
@@ -1347,7 +1347,7 @@ async def export_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
     }
 
 
-# Compare this user against same-role peers on 4 metrics — context for "is this normal?".
+# Compare this user against same-role peers on 4 metrics - context for "is this normal?".
 @app.get("/api/alerts/{alert_id}/peer-comparison", response_model=PeerComparisonResponse)
 async def peer_comparison(alert_id: str, db: AsyncSession = Depends(get_db)):
     alert = await db.get(AlertModel, alert_id)
@@ -1490,7 +1490,7 @@ async def get_alert_timeline(alert_id: str, db: AsyncSession = Depends(get_db)):
             id=alert.id,
             timestamp=alert.timestamp,
             kind="trigger",
-            title=f"Alert triggered — {alert.fraud_type.replace('_', ' ').title()}",
+            title=f"Alert triggered - {alert.fraud_type.replace('_', ' ').title()}",
             explanation=f"Ensemble risk score: {int(alert.risk_score)}. Threshold: {ALERT_THRESHOLD}.",
             risk_delta=f"+{int(alert.risk_score)}",
             source="alert",
@@ -1650,7 +1650,7 @@ async def get_cases(db: AsyncSession = Depends(get_db)):
     return cases[:10]
 
 
-# Stitched timeline across all alerts in a case — the full investigation narrative.
+# Stitched timeline across all alerts in a case - the full investigation narrative.
 @app.get("/api/cases/{case_id}/timeline", response_model=List[TimelineItem])
 async def get_case_timeline(case_id: str, db: AsyncSession = Depends(get_db)):
     case_row = await db.get(CaseModel, case_id)
@@ -1689,7 +1689,7 @@ async def get_case_timeline(case_id: str, db: AsyncSession = Depends(get_db)):
             seen_ids.add(si.id)
             # Baseline/suspicious events are written once per alert in the case.
             # When multiple alerts share overlapping 4h windows, the same underlying
-            # event gets a timeline row for each alert — deduplicate by source_record_id.
+            # event gets a timeline row for each alert - deduplicate by source_record_id.
             if si.kind in ("baseline", "suspicious") and si.source_record_id:
                 if si.source_record_id in seen_source_ids:
                     continue
@@ -1909,7 +1909,7 @@ async def get_user_events(
     ]
 
 
-# Return the audit trail (optionally filtered) — every analyst/system action.
+# Return the audit trail (optionally filtered) - every analyst/system action.
 @app.get("/api/audit-log")
 async def get_audit_log(
     user_id: Optional[str] = Query(None),
@@ -1958,7 +1958,7 @@ async def get_intelligence(db: AsyncSession = Depends(get_db)):
         )
     ).scalars().all()
 
-    # P/R/F1 computed from analyst labels only — never from generator is_fraud ground truth
+    # P/R/F1 computed from analyst labels only - never from generator is_fraud ground truth
     labeled_alerts = [a for a in alert_rows if a.label in ("TP", "FP")]
     label_tp = sum(1 for a in labeled_alerts if a.label == "TP")
     label_fp = sum(1 for a in labeled_alerts if a.label == "FP")
@@ -2040,7 +2040,7 @@ async def get_intelligence(db: AsyncSession = Depends(get_db)):
         await db.execute(
             select(
                 UserModel.department,
-                # Peak (max) risk per department, not average — most alerts are forced
+                # Peak (max) risk per department, not average - most alerts are forced
                 # events floored to exactly 75, so the average collapses to ~75 for every
                 # department. The peak varies and is more informative. Field name kept as
                 # "avg_risk" so the response schema / frontend type need no change.
@@ -2313,7 +2313,7 @@ async def retrain(db: AsyncSession = Depends(get_db)):
         ensemble.load(SAVED_MODEL_DIR)
         return RetrainResponse(
             status="skipped",
-            message=f"Retrain rejected — precision dropped {precision_before:.3f}→{precision_after:.3f} (>0.1). Old model restored.",
+            message=f"Retrain rejected - precision dropped {precision_before:.3f}→{precision_after:.3f} (>0.1). Old model restored.",
             precision_before=precision_before,
             precision_after=round(precision_after, 3),
             recall_after=recall_after,
@@ -2336,7 +2336,7 @@ async def retrain(db: AsyncSession = Depends(get_db)):
     await db.commit()
     return RetrainResponse(
         status="ok",
-        message=f"XGBoost retrained on {len(X)} labels. Validation — Precision: {precision_after:.3f} | Recall: {recall_after:.3f} | F1: {f1_after:.3f}",
+        message=f"XGBoost retrained on {len(X)} labels. Validation - Precision: {precision_after:.3f} | Recall: {recall_after:.3f} | F1: {f1_after:.3f}",
         precision_before=precision_before,
         precision_after=round(precision_after, 3),
         recall_after=recall_after,

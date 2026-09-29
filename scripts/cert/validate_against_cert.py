@@ -1,8 +1,8 @@
 """
-validate_against_cert.py  —  Tier-1 benchmark validation (READ-ONLY).
+validate_against_cert.py  -  Tier-1 benchmark validation (READ-ONLY).
 
 Purpose: show that SentinelIQ's synthetic behavioural distributions look like the
-CMU CERT r4.2 insider-threat benchmark — the dataset most insider-threat papers use.
+CMU CERT r4.2 insider-threat benchmark - the dataset most insider-threat papers use.
 
 It does NOT change anything in the app. It:
   1. reads CERT r4.2 logon.csv (sampled) + LDAP role files (already extracted here),
@@ -53,7 +53,7 @@ DEVICE_CSV = _find("device.csv")
 
 # "Off-hours" = genuine night activity, matching how SentinelIQ's off_hours_login
 # fraud pattern is defined (hours 0-5 and 22-23). NOTE: an earlier 8-18 window was
-# misleading — it counted CERT's normal 7am arrival-logon spike as "off-hours". Night
+# misleading - it counted CERT's normal 7am arrival-logon spike as "off-hours". Night
 # (hour < 6 OR hour >= 22) is the fraud-relevant definition and is fair to both sides.
 WORK_START, WORK_END = 6, 22
 CERT_SAMPLE_ROWS = 400_000   # cap so we never load the whole file into memory
@@ -126,7 +126,7 @@ def _norm_hist(hours: list[int]) -> np.ndarray:
 
 def main() -> None:
     if not LOGON_CSV:
-        print("ERROR: logon.csv not found under", HERE, "— run the extraction first.")
+        print("ERROR: logon.csv not found under", HERE, "- run the extraction first.")
         return
     print(f"CERT logon.csv : {LOGON_CSV}")
     print(f"Sampling up to {CERT_SAMPLE_ROWS:,} rows...")
@@ -173,7 +173,7 @@ def main() -> None:
         return f"n={len(a):,}  mean_hour={a.mean():.1f}  off_hours%={100*np.mean((a<WORK_START)|(a>=WORK_END)):.1f}"
 
     lines = [
-        "SentinelIQ vs CERT r4.2 — behavioural distribution validation",
+        "SentinelIQ vs CERT r4.2 - behavioural distribution validation",
         "=" * 62,
         f"CERT logon events sampled : {len(cert_hours):,}",
         f"Synthetic events generated: {len(syn_hours):,}",

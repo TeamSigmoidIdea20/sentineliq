@@ -26,7 +26,7 @@ metadata:
 |------|--------|
 | `components/AlertPanel.tsx` | Full restructure: centered overlay, two-column layout, threat border, pinned action footer, Escape key handler |
 | `app/dashboard/alerts/page.tsx` | Remove `inline` prop, remove right-side panel div, use same overlay |
-| Everything else | No change — same alertId/onClose/onResolved props API |
+| Everything else | No change - same alertId/onClose/onResolved props API |
 
 ## What stays the same
 

@@ -1,4 +1,4 @@
-# Pydantic schemas — the request/response shapes for the API. These define the exact
+# Pydantic schemas - the request/response shapes for the API. These define the exact
 # JSON the frontend sends and receives, and FastAPI validates against them automatically.
 # Grouped below by area: alerts, users, feed/events, cases, intelligence, stats, and
 # the small request bodies for actions (label, note, simulate, retrain, webhook, ingest).

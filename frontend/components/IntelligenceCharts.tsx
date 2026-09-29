@@ -43,7 +43,7 @@ export default function IntelligenceCharts({ data }: { data: Intelligence }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
 
       {/* Alert volume line chart */}
-      <Panel title="Alert Volume — Last 7 Days" sub={`${data.alert_volume_last_7_days.reduce((s, d) => s + d.count, 0)} total alerts`}>
+      <Panel title="Alert Volume - Last 7 Days" sub={`${data.alert_volume_last_7_days.reduce((s, d) => s + d.count, 0)} total alerts`}>
         <div role="img" aria-label="Line chart showing alert volume over the last 7 days">
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={data.alert_volume_last_7_days}>

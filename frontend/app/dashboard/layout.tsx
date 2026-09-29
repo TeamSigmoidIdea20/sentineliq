@@ -72,7 +72,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           fontSize: 11, color: '#FEF2F2', fontFamily: 'inherit',
         }}>
           <span style={{ fontWeight: 700 }}>BACKEND OFFLINE</span>
-          <span style={{ color: '#FECACA' }}>— data may be stale. Retrying every 30s.</span>
+          <span style={{ color: '#FECACA' }}>- data may be stale. Retrying every 30s.</span>
         </div>
       )}
       {backendStatus === 'initializing' && (
@@ -83,7 +83,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           fontSize: 11, color: '#FEF3C7', fontFamily: 'inherit',
         }}>
           <span style={{ fontWeight: 700, color: C.amber }}>INITIALIZING</span>
-          <span style={{ color: '#FDE68A' }}>— training ML models, seeding demo data (~30s). Dashboard will populate automatically.</span>
+          <span style={{ color: '#FDE68A' }}>- training ML models, seeding demo data (~30s). Dashboard will populate automatically.</span>
         </div>
       )}
       {children}

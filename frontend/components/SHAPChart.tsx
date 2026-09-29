@@ -112,7 +112,7 @@ export default function SHAPChart({ values }: Props) {
           Top driver <span style={{ color: C.textPrimary, fontFamily: 'monospace', fontWeight: 600 }}>{LABELS[top.feature] || top.feature}</span>
           {' '}recorded a value of{' '}
           <span style={{ color: C.textPrimary, fontWeight: 600 }}>{(top.value ?? 0).toFixed(2)}</span>
-          {' '}— contributing{' '}
+          {' '}- contributing{' '}
           <span style={{ color: top.contribution >= 0 ? C.critical : C.low, fontWeight: 600 }}>
             {top.contribution >= 0 ? '+' : ''}{(top.contribution ?? 0).toFixed(3)}
           </span>

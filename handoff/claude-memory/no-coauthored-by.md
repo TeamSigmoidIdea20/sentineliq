@@ -9,6 +9,6 @@ metadata:
 
 Never include a `Co-Authored-By: Claude ...` trailer (or any Claude/Anthropic attribution) in git commit messages or PR descriptions, ever.
 
-**Why:** The user does not want commits to show they were made with Claude. The user-level setting `includeCoAuthoredBy: false` + `attribution.commit/pr: ""` is already set, but those only stop the AUTO-added trailer — they do NOT stop me from manually typing the line into a commit message. The trailer kept appearing because I was hand-writing it.
+**Why:** The user does not want commits to show they were made with Claude. The user-level setting `includeCoAuthoredBy: false` + `attribution.commit/pr: ""` is already set, but those only stop the AUTO-added trailer - they do NOT stop me from manually typing the line into a commit message. The trailer kept appearing because I was hand-writing it.
 
 **How to apply:** When writing any commit message or PR body, do NOT add a Co-Authored-By line or any "made with Claude" text. Plain message only.

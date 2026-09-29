@@ -1,27 +1,24 @@
 ---
 name: project-state
-description: SentinelIQ iDEA 2.0 POC — current build status and remaining deliverables
-metadata: 
+description: "SentinelIQ - cybersecurity insider threat detection POC for CodeArambh 2.0 (Open Innovation); build status and what's left"
+metadata:
   node_type: memory
   type: project
-  originSessionId: ed80e215-9e9a-4529-9557-805f1ba4fad4
+  originSessionId: c41d852b-3ea7-4996-b5a2-cd0760f82b62
+  modified: 2026-09-29T16:36:06.981Z
 ---
 
-SentinelIQ is a working insider fraud detection POC for iDEA 2.0 Round 2. All code is built and deployed.
+SentinelIQ is a working, deployed insider threat detection POC. As of 2026-09-29 it is framed for **CodeArambh 2.0** (HIET Ghaziabad, 24h national hackathon), **Open Innovation** track, domain **Cybersecurity** (banks/fintech as the flagship use case). All code is built and deployed.
 
 **Live URLs:**
 - Frontend: https://sentineliq-gold.vercel.app/
 - Backend: https://rak2315-sentineliq-backend.hf.space
-- GitHub: https://github.com/RAK2315/sentineliq.git
+- GitHub: https://github.com/TeamSigmoidIdea20/sentineliq.git (remote `origin`; remote `hf` = https://huggingface.co/spaces/rak2315/sentineliq-backend)
+- Demo video: https://youtu.be/ebN6C0Ewx7U
 
-**What's fully built:** 5 dashboard pages, 3-model ML ensemble (IF + LSTM + XGBoost), SHAP explanations, active learning retrain loop, simulate dropdown (3 fraud scenarios), kill-chain cases, model intelligence page with training log, user monitoring with restrict/escalate, peer comparison, evidence export, coordinated activity banners. Full backend redesign completed 2026-05-22: dual-timestamp architecture (occurred_at/ingested_at), LLM narrative via Grok API (grok-3-mini, requires GROK_API_KEY HuggingFace secret), deterministic seed_demo_state() with idempotency guard, TimelineItemModel table, 8 performance indexes, min_score slider on alerts page, AI Analysis card in AlertPanel.
+**What's fully built:** 5 dashboard pages, 3-model ML ensemble (IF + LSTM + XGBoost), SHAP explanations, active learning retrain loop, simulate dropdown, kill-chain cases, model intelligence page with training log, user monitoring with restrict/escalate, peer comparison, evidence export, coordinated activity banners, dual-timestamp backend, LLM narrative via Grok (grok-3-mini, GROK_API_KEY HF secret), deterministic seed_demo_state().
 
-**Deliverables status:**
-- D1 Problem Brief: docs/D1_Problem_Solution_Brief.docx ✓
-- D2 Live demo: deployed ✓, video: NOT RECORDED YET
-- D3 Technical Architecture: docs/D3_Technical_Architecture.docx ✓
-- D4 GitHub README: sentineliq/README.md ✓ (YouTube URL placeholder needs filling)
-- D5 Pitch deck: NOT CREATED YET (slide deck + video both required)
+**Submission status:** live demo ✓, demo video ✓, README reframed ✓. PPT on the official CodeArambh template: TODO (registration + PPT deadline 10 October 2026).
 
-**Why:** iDEA 2.0 Phase 2 submission requires all 5 deliverables. Videos and pitch deck are the remaining blockers.
-**How to apply:** When working on new features, note that the POC is already feature-complete. Priority is submission prep (D2 video, D5 deck + video).
+**Why:** Reusing the project for a new hackathon. The previous hackathon and its sponsor must not be mentioned anywhere.
+**How to apply:** Frame all copy around cybersecurity and the Open Innovation objectives (innovation, functional scalable prototype, genuine challenge, technical excellence and user impact). Use normal dashes, never em or en dashes. See [[next-hackathon]].

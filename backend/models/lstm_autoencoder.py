@@ -1,4 +1,4 @@
-# LSTM Autoencoder — the "temporal" member of the 3-model ensemble.
+# LSTM Autoencoder - the "temporal" member of the 3-model ensemble.
 # Where Isolation Forest looks at one event in isolation, this looks at a SEQUENCE
 # of a user's recent events and learns what "normal" sequences look like. It tries
 # to reconstruct the sequence; a high reconstruction error means the recent pattern
@@ -8,7 +8,7 @@ from __future__ import annotations
 import numpy as np
 from collections import deque
 
-# PyTorch is optional — if it isn't installed the model degrades gracefully to a
+# PyTorch is optional - if it isn't installed the model degrades gracefully to a
 # neutral 0.5 score instead of crashing (see the TORCH_AVAILABLE guards below).
 try:
     import torch
@@ -108,7 +108,7 @@ class LSTMAutoencoderModel:
             loss.backward()
             optimizer.step()
 
-        # Set the "normal" threshold at the 90th percentile of training errors —
+        # Set the "normal" threshold at the 90th percentile of training errors -
         # anything reconstructed worse than this looks anomalous at scoring time.
         net.eval()
         with torch.no_grad():

@@ -1,6 +1,6 @@
 ---
 name: SentinelIQ
-description: AI-powered insider fraud detection platform for financial institutions
+description: AI-driven cybersecurity platform for real-time insider threat detection, with banks and fintech as the flagship use case
 colors:
   deep-void: "#0D1117"
   absolute-void: "#080D13"
@@ -112,15 +112,15 @@ components:
 
 **Creative North Star: "The Operations Room"**
 
-SentinelIQ's visual system is built around a single scene: a 24/7 security command centre running under controlled light. Every analyst knows exactly where to look. Every indicator has a single meaning. Nothing decorates; everything informs. The surface is calm because the system is always watching, and it interrupts that calm — precisely, surgically — only when threat demands it.
+SentinelIQ's visual system is built around a single scene: a 24/7 security command centre running under controlled light. Every analyst knows exactly where to look. Every indicator has a single meaning. Nothing decorates; everything informs. The surface is calm because the system is always watching, and it interrupts that calm - precisely, surgically - only when threat demands it.
 
-The system uses four tonal dark layers to convey depth without shadows. Color appears exactly three times: red for threat, amber for watch, green for clear. These are not accent colours. They are the data. Their rarity is what makes them legible — on a screen full of near-black surfaces, a single red badge stops the eye immediately. No gradients, no glows, no glassmorphism dilute that signal.
+The system uses four tonal dark layers to convey depth without shadows. Color appears exactly three times: red for threat, amber for watch, green for clear. These are not accent colours. They are the data. Their rarity is what makes them legible - on a screen full of near-black surfaces, a single red badge stops the eye immediately. No gradients, no glows, no glassmorphism dilute that signal.
 
-Typography is Geist throughout: a system sans with optical engineering built in. Display weights at 800 create authority without decoration. Section labels run small, uppercase, tracked wide — the visual grammar of a data readout, not a marketing page. Everything else is functional, precise, and as sparse as the actual information requires.
+Typography is Geist throughout: a system sans with optical engineering built in. Display weights at 800 create authority without decoration. Section labels run small, uppercase, tracked wide - the visual grammar of a data readout, not a marketing page. Everything else is functional, precise, and as sparse as the actual information requires.
 
 **Key Characteristics:**
 - Four tonal dark layers as the entire depth vocabulary
-- Red, amber, green as semantic signals — never decorative
+- Red, amber, green as semantic signals - never decorative
 - Sharp corners (2-4px radius) everywhere except avatars
 - Uppercase tracked labels as the visual grammar for data headers
 - Live pulse indicators as the only ambient motion
@@ -135,7 +135,7 @@ Four surface layers plus three semantic risk signals. Every other colour is seco
 
 ### Secondary
 - **Amber Watch** (`#D97706`): Medium risk. Elevated attention, not immediate action. Appears in badges, progress bars, and peer comparison bars at medium threat levels.
-- **Clear Green** (`#16A34A`): Low risk and confirmed-safe states. Also the live monitoring indicator — a permanently pulsing dot that signals the system is running.
+- **Clear Green** (`#16A34A`): Low risk and confirmed-safe states. Also the live monitoring indicator - a permanently pulsing dot that signals the system is running.
 
 ### Tertiary
 - **Auth Blue** (`#4472C4`): Login event dot in the event timeline only. Semantic, not branded.
@@ -152,7 +152,7 @@ Four surface layers plus three semantic risk signals. Every other colour is seco
 - **Absolute Void** (`#080D13`): Used for the deepest background layer (browser chrome mockup). Reserve for surfaces below Surface One.
 - **Deep Void** (`#0D1117`): The page background. Every surface lifts off this floor.
 
-**The One Interruption Rule.** Threat Red appears on less than 10% of any given screen during normal operating conditions. At high alert density it increases — that increase is the signal. Never use red for decoration, emphasis, or branding on product surfaces.
+**The One Interruption Rule.** Threat Red appears on less than 10% of any given screen during normal operating conditions. At high alert density it increases - that increase is the signal. Never use red for decoration, emphasis, or branding on product surfaces.
 
 **The Semantic Lock Rule.** Red means critical/high. Amber means medium. Green means low or live. These assignments are immutable. No other UI purpose may borrow these colors.
 
@@ -160,7 +160,7 @@ Four surface layers plus three semantic risk signals. Every other colour is seco
 
 **Display / Body Font:** Geist (fallback: ui-sans-serif, system-ui, -apple-system, sans-serif)
 
-A single typeface throughout. Geist is optically engineered for interfaces: sharp at small sizes, authoritative at large ones. No serif contrast, no script flourish — this is a readout, not a publication.
+A single typeface throughout. Geist is optically engineered for interfaces: sharp at small sizes, authoritative at large ones. No serif contrast, no script flourish - this is a readout, not a publication.
 
 **Character:** Controlled restraint. The same typeface reads as military precision at 800 weight and 58px, then as dense data at 400 weight and 11px. The hierarchy is built entirely through scale and weight contrast, not variety.
 
@@ -171,7 +171,7 @@ A single typeface throughout. Geist is optically engineered for interfaces: shar
 - **Body** (400-500 weight, 13-15px, line-height 1.65-1.72): Primary content, descriptions, alert explanations. Line length capped at 65-75ch.
 - **Label** (600-700 weight, 10-11px, uppercase, letter-spacing 0.06-0.08em): Section headers within the dashboard, metadata keys, risk badge text, nav category labels. The visual grammar of a data readout.
 
-**The Stat Weight Rule.** Numeric data values (risk scores, transaction counts, stat card numbers) use weight 700-800 at 28-42px with letter-spacing -0.02 to -0.03em. They are display-class typography applied at data scale — the number is the most important thing on that surface.
+**The Stat Weight Rule.** Numeric data values (risk scores, transaction counts, stat card numbers) use weight 700-800 at 28-42px with letter-spacing -0.02 to -0.03em. They are display-class typography applied at data scale - the number is the most important thing on that surface.
 
 **The Label Doctrine.** All section-level headers inside the dashboard use the Label style: small, uppercase, tracked. Never sentence case or title case for these. The visual distinction between a label and a value is non-negotiable.
 
@@ -179,9 +179,9 @@ A single typeface throughout. Geist is optically engineered for interfaces: shar
 
 This system is flat. Depth is expressed through four tonal steps in the neutral stack, not shadows.
 
-- **Floor**: Deep Void (`#0D1117`) — page background
-- **Surface 1**: Surface One (`#161B22`) — cards, panels, sidebars
-- **Surface 2**: Surface Two (`#1C2128`) — hover states, selected rows, lightly elevated containers
+- **Floor**: Deep Void (`#0D1117`) - page background
+- **Surface 1**: Surface One (`#161B22`) - cards, panels, sidebars
+- **Surface 2**: Surface Two (`#1C2128`) - hover states, selected rows, lightly elevated containers
 
 Shadows appear in exactly three circumstances and are never decorative:
 
@@ -191,18 +191,18 @@ Shadows appear in exactly three circumstances and are never decorative:
 - **Hero Depth** (`0 32px 96px rgba(0,0,0,0.6)`): Browser mockup on the landing page only. Decorative, contained to the brand surface.
 - **Threat Glow** (`0 0 6px #DC262688`): Fraud event dots in the event timeline. Semantic: a soft pulse that draws the eye to a confirmed fraud event without animation.
 
-**The Flat-By-Default Rule.** Data surfaces are flat at rest. Surface Two (`#1C2128`) is the hover state — it communicates interactivity through tonal shift, not shadow. If you're adding a shadow to a card or row, you're adding it to the wrong thing.
+**The Flat-By-Default Rule.** Data surfaces are flat at rest. Surface Two (`#1C2128`) is the hover state - it communicates interactivity through tonal shift, not shadow. If you're adding a shadow to a card or row, you're adding it to the wrong thing.
 
 ## 5. Components
 
 ### Buttons
 Four variants, each with a distinct authority level.
 
-- **Shape:** Minimally rounded (3px). Barely perceptible curve — corners read as sharp in context.
-- **Primary (CTA):** Background `#F0F6FC`, text `#0D1117`, padding 12px 28px, font-size 14px, weight 700, letter-spacing 0.02em. The highest-contrast element on any dark surface. Used for "View Live Demo", "Get a Demo" — primary conversion actions.
+- **Shape:** Minimally rounded (3px). Barely perceptible curve - corners read as sharp in context.
+- **Primary (CTA):** Background `#F0F6FC`, text `#0D1117`, padding 12px 28px, font-size 14px, weight 700, letter-spacing 0.02em. The highest-contrast element on any dark surface. Used for "View Live Demo", "Get a Demo" - primary conversion actions.
 - **Primary hover:** Background shifts to `#8B949E`. No scale, no shadow.
 - **Ghost:** Transparent background, `1px solid #30363D` border, text `#F0F6FC`. Same padding. Secondary actions alongside a Primary.
-- **Danger:** Background `#DC2626`, text `#FFFFFF`, no border. Used for "MARK RESOLVED" — destructive or high-commitment actions in the analyst workflow. Full-width inside the alert panel.
+- **Danger:** Background `#DC2626`, text `#FFFFFF`, no border. Used for "MARK RESOLVED" - destructive or high-commitment actions in the analyst workflow. Full-width inside the alert panel.
 - **Muted Ghost:** Transparent, `1px solid #30363D`, text `#8B949E`. Tertiary actions (Dismiss, Export) that should not compete with the primary action.
 - **Text treatment:** Uppercase with tracked letter-spacing (`0.05-0.06em`) on short utility labels (e.g. "MARK RESOLVED"). Sentence case on longer CTA labels (e.g. "View Live Demo"). Never mix within a single button group.
 
@@ -231,7 +231,7 @@ The most important component in the system. A risk badge tells an analyst what t
 
 ### Navigation (Sidebar)
 - **Default item:** Transparent background, text Muted Signal, 13px, weight 400, padding 8px 10px, 4px radius.
-- **Active item:** Background Surface Two (`#1C2128`), text Signal White, weight 600. Left border `2px solid #DC2626` — the only intentional side-stripe in the system. Justified: the sidebar is a navigation rail, not a data card, and the vertical accent directly marks position.
+- **Active item:** Background Surface Two (`#1C2128`), text Signal White, weight 600. Left border `2px solid #DC2626` - the only intentional side-stripe in the system. Justified: the sidebar is a navigation rail, not a data card, and the vertical accent directly marks position.
 - **Category label:** Muted Signal, 10px, uppercase, letter-spacing 0.08em, weight 600. Treated as a Label, not a heading.
 
 ### Section Labels (Dashboard)

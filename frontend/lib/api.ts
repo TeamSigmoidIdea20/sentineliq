@@ -354,7 +354,7 @@ export function timeAgo(iso: string): string {
       if (futureS < 60) return `in ${futureS}s`
       return `in ${Math.floor(futureS / 60)}m`
     }
-    // Large skew (≥ 5 min): server clock issue — show absolute date so it's readable
+    // Large skew (≥ 5 min): server clock issue - show absolute date so it's readable
     const d = new Date(normalised)
     return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
   }

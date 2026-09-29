@@ -1,4 +1,4 @@
-# Isolation Forest model — one of the 3 ensemble members.
+# Isolation Forest model - one of the 3 ensemble members.
 # Detects "point anomalies": single events that look unusual on their own,
 # regardless of the user's history. Wraps scikit-learn's IsolationForest and
 # converts its raw output into a clean 0-1 risk score for the ensemble.

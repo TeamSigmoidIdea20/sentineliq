@@ -177,10 +177,10 @@ export default function AlertsPage() {
     setSimToast(`Simulating ${label}…`)
     try {
       await api.simulate(scenario)
-      setSimToast(`${label} injected — refreshing`)
+      setSimToast(`${label} injected - refreshing`)
       setTimeout(() => { setSimToast(''); setPage(1); setStatus('open'); fetchAlerts() }, 2000)
     } catch {
-      setSimToast('Simulate failed — backend may be starting')
+      setSimToast('Simulate failed - backend may be starting')
       setTimeout(() => setSimToast(''), 4000)
     }
     setSimBusy(false)
@@ -322,7 +322,7 @@ export default function AlertsPage() {
           )}
         </div>
 
-        {/* Alert grid — scrollable */}
+        {/* Alert grid - scrollable */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {loading && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>

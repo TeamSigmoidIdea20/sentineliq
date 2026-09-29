@@ -156,7 +156,7 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
       setAlert({ ...alert, status: 'resolved' })
       onResolved?.(alert.id, 'resolved')
     } catch {
-      showToast('Failed to resolve — please try again')
+      showToast('Failed to resolve - please try again')
     } finally { setActing(false) }
   }
 
@@ -168,7 +168,7 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
       setAlert({ ...alert, status: 'dismissed' })
       onResolved?.(alert.id, 'dismissed')
     } catch {
-      showToast('Failed to dismiss — please try again')
+      showToast('Failed to dismiss - please try again')
     } finally { setActing(false) }
   }
 
@@ -178,7 +178,7 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
     await api.labelAlert(alert.id, label).catch(() => null)
     setAlert({ ...alert, label })
     setActing(false)
-    showToast('Feedback recorded — queued for next retraining cycle')
+    showToast('Feedback recorded - queued for next retraining cycle')
   }
 
   const saveNote = async () => {
@@ -200,7 +200,7 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
       a.click()
       URL.revokeObjectURL(url)
     } catch {
-      showToast('Export failed — please try again')
+      showToast('Export failed - please try again')
     }
   }
 
@@ -426,7 +426,7 @@ export default function AlertPanel({ alertId, onClose, onResolved }: Props) {
               {/* Scrollable: analysis + timeline + audit log */}
               <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-                {/* Analysis block — top of right column, always visible on open */}
+                {/* Analysis block - top of right column, always visible on open */}
                 <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 3 }}>
                   <div style={{ padding: '9px 14px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ fontSize: 11, color: C.amber }}>✦</span>

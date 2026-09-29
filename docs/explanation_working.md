@@ -1,4 +1,4 @@
-# SentinelIQ — How every file works (code walkthrough)
+# SentinelIQ - How every file works (code walkthrough)
 
 *This is a deep, file-by-file walkthrough. For each file you get: **what it's for**, the
 **main lines of code shown and explained in plain English**, and a **"How it connects"**
@@ -22,11 +22,11 @@ synthetic_generator.py  →  feature_engineering.py  →  isolation_forest.py �
 
 ---
 
-# PART 1 — THE BACKEND (the brain, Python + FastAPI)
+# PART 1 - THE BACKEND (the brain, Python + FastAPI)
 
 ---
 
-## `backend/main.py` — the spine
+## `backend/main.py` - the spine
 
 This one file boots everything, runs the live loop, and defines every API endpoint. It's
 ~2,400 lines, so we'll walk the **key pieces** in the order they matter.
@@ -45,7 +45,7 @@ These three objects are created **once** and shared by every request and by the 
 loop. Think of them as three permanent staff members: one invents data, one translates it,
 one scores it. `ALERT_THRESHOLD = 65` is the single cut-off that decides "is this an alert."
 
-### 1b. `_process_event()` — THE core pipeline (every event goes through here)
+### 1b. `_process_event()` - THE core pipeline (every event goes through here)
 
 This is the most important function in the whole backend. Live events, the Simulate button,
 and external/CERT events **all** flow through it.
@@ -54,7 +54,7 @@ and external/CERT events **all** flow through it.
 async def _process_event(ev: dict) -> None:
     feat = engineer.compute_features(ev["user_id"], ev)   # step 1: event → 8 numbers
     scores = ensemble.predict(ev["user_id"], feat)        # step 2: 3 models score it
-    risk_score = float(scores["ensemble"]) * 100.0        # step 3: 0–1 blended → 0–100
+    risk_score = float(scores["ensemble"]) * 100.0        # step 3: 0-1 blended → 0-100
     if force_alert and risk_score < 75.0:                 # Simulate/forced fraud floor
         risk_score = 75.0
     ...
@@ -62,7 +62,7 @@ async def _process_event(ev: dict) -> None:
 ```
 
 - It asks `feature_engineering.py` to turn the raw event into the 8 features.
-- It asks `ensemble.py` to score those features → a blended 0–1 number, ×100 → 0–100.
+- It asks `ensemble.py` to score those features → a blended 0-1 number, ×100 → 0-100.
 - `force_alert` is a flag set by the Simulate button / forced fraud so a demo "fraud" is
   guaranteed to land as an alert (floored to 75).
 - If the score clears **65**, it makes a unique `alert_id`; otherwise `None` (just an event).
@@ -88,7 +88,7 @@ explanation, a timeline, and maybe a case:
 helpers below. Everything upstream (the generator, the API endpoints) ends here; everything
 the frontend shows was written by this function.
 
-### 1c. `_event_loop()` — the "live" stream
+### 1c. `_event_loop()` - the "live" stream
 
 ```python
 async def _event_loop() -> None:
@@ -113,7 +113,7 @@ the dashboard feel "live."
 into `_process_event`. The frontend's `LiveFeed.tsx` polling `/api/feed` every 3s shows
 exactly what this loop produces.
 
-### 1d. `_startup()` — train or load the models, then seed
+### 1d. `_startup()` - train or load the models, then seed
 
 ```python
 if ensemble.saved_files_exist(SAVED_MODEL_DIR):   # fast path: models already on disk
@@ -141,7 +141,7 @@ events, turn each into features, collect **X** (features), **y** (the `is_fraud`
 `synthetic_generator.py` for data and `feature_engineering.py` for the numbers. It runs once,
 at startup, triggered by `lifespan`.
 
-### 1e. `_refresh_user_risk()` — a user's headline number
+### 1e. `_refresh_user_risk()` - a user's headline number
 
 ```python
 max_recent = await db.scalar(select(func.max(AlertModel.risk_score))
@@ -155,7 +155,7 @@ else:
 A user's risk = their highest alert score in the last 7 days. If they've had no alerts, it
 **cools down by 5** each event. So risk rises sharply and falls slowly.
 
-### 1f. `_update_or_create_case()` — the "kill chain"
+### 1f. `_update_or_create_case()` - the "kill chain"
 
 ```python
 if existing_case:                         # already an open case in 24h → append
@@ -177,7 +177,7 @@ one story.
 **How it connects:** called from `_process_event` right after an alert is made. It writes to
 the `cases` and `case_alerts` tables (`database.py`) that the frontend `cases` page reads.
 
-### 1g. `seed_demo_state()` — deterministic demo data
+### 1g. `seed_demo_state()` - deterministic demo data
 
 ```python
 SEED_VERSION = "v6"
@@ -216,18 +216,18 @@ Then ~30 endpoints, each a small function. Examples:
 @app.post("/api/ingest")                                   # accept an EXTERNAL event (CERT)
 ```
 
-`/api/simulate` and `/api/ingest` both just build an event dict and call `_process_event` —
+`/api/simulate` and `/api/ingest` both just build an event dict and call `_process_event` -
 the same pipeline as the live loop. `/api/retrain` pulls the analyst's TP/FP labels, refits
 XGBoost, checks precision didn't drop, and saves.
 
-**How `main.py` connects to everything:** it imports and drives every other backend file —
+**How `main.py` connects to everything:** it imports and drives every other backend file -
 `database.py` (storage), `schemas.py` (the JSON shapes it returns), `synthetic_generator.py`
 (data), `feature_engineering.py` (features), `ensemble.py`/the 3 models (scoring),
 `llm_narrative.py` (optional text). The frontend only ever talks to these endpoints.
 
 ---
 
-## `backend/database.py` — the storage layer
+## `backend/database.py` - the storage layer
 
 Defines every table as a Python class and opens the database connection.
 
@@ -259,7 +259,7 @@ class EventModel(Base):
 
 The full set of tables: `users`, `events`, `alerts`, `audit_logs`, `model_metrics`, `cases`,
 `case_alerts`, `timeline_items`, `settings`. Notice **the 8 features are stored as a JSON
-string** (`features_json`) on each event — that's how retrain later re-reads them.
+string** (`features_json`) on each event - that's how retrain later re-reads them.
 
 `init_db()` creates the tables and runs harmless "migrations":
 
@@ -272,7 +272,7 @@ for stmt in [ "ALTER TABLE alerts ADD COLUMN notes TEXT DEFAULT ''", ... ]:
 ```
 
 WAL mode lets reads and writes happen at the same time. The `try/except` migrations mean you
-can add a column to an old database without crashing — a lightweight stand-in for a real
+can add a column to an old database without crashing - a lightweight stand-in for a real
 migration tool.
 
 **How it connects:** every `db.add(...)`, `db.get(...)`, `select(...)` in `main.py` uses
@@ -280,9 +280,9 @@ these classes and `SessionLocal`. The data the frontend sees is literally rows f
 
 ---
 
-## `backend/schemas.py` — the shapes of the JSON
+## `backend/schemas.py` - the shapes of the JSON
 
-These are **Pydantic** models — they define the exact JSON the API sends and receives, and
+These are **Pydantic** models - they define the exact JSON the API sends and receives, and
 FastAPI checks data against them automatically.
 
 ```python
@@ -317,12 +317,12 @@ class IngestEventRequest(BaseModel):
 ```
 
 **How it connects:** `main.py` imports these and tags each endpoint with one. The frontend's
-TypeScript interfaces in `lib/api.ts` are the **mirror image** of these — they must match, or
+TypeScript interfaces in `lib/api.ts` are the **mirror image** of these - they must match, or
 the website would mis-read the data.
 
 ---
 
-## `backend/data/synthetic_generator.py` — the fake-data factory
+## `backend/data/synthetic_generator.py` - the fake-data factory
 
 There's no real bank feed, so this fabricates believable activity for 50 fixed employees.
 
@@ -344,7 +344,7 @@ def _normal_event(self, spec, ts):
     return { "user_id": uid, "hour": hour, "tx_count": ..., "is_fraud": 0, ... }
 ```
 
-The 5% "external" noise is deliberate — it stops location from being a perfect fraud giveaway
+The 5% "external" noise is deliberate - it stops location from being a perfect fraud giveaway
 during training. A **fraud** event starts from a normal one and distorts it, each pattern
 tripping **two** signals:
 
@@ -374,7 +374,7 @@ live loop, and on Simulate. Its output is a plain dict that goes straight into
 
 ---
 
-## `backend/data/feature_engineering.py` — event → 8 numbers
+## `backend/data/feature_engineering.py` - event → 8 numbers
 
 Turns one raw event into the 8 behavioural numbers, **measured against that user's own recent
 history** (last 20 events).
@@ -390,8 +390,8 @@ class UserHistory:
     avg_tx: float = 10.0
 ```
 
-Each user gets a rolling buffer. New users start with safe defaults (9–17, HQ, modest volume)
-— that's the **cold-start** handling. The features are computed, then the event is folded into
+Each user gets a rolling buffer. New users start with safe defaults (9-17, HQ, modest volume)
+and that's the **cold-start** handling. The features are computed, then the event is folded into
 history:
 
 ```python
@@ -425,7 +425,7 @@ retrain can reuse it. The feature order here must match `FEATURE_NAMES` in the m
 
 ---
 
-## `backend/models/isolation_forest.py` — Model 1 (point anomalies)
+## `backend/models/isolation_forest.py` - Model 1 (point anomalies)
 
 Catches single weird events, unsupervised.
 
@@ -449,7 +449,7 @@ class IsolationForestModel:
 - It builds **100 random trees**. An outlier gets "fenced off" in very few random cuts, so it
   has a shallow average depth → flagged. Normal points sit in the crowd → deep → safe.
 - `decision_function` returns positive for normal, negative for odd. The line
-  `1.0 - (raw + 0.5)` flips that so **anomalous = a high 0–1 score**.
+  `1.0 - (raw + 0.5)` flips that so **anomalous = a high 0-1 score**.
 - Before training (or on error) it returns a neutral `0.5`.
 
 **How it connects:** owned by `ensemble.py`, trained in `_startup` on the feature matrix X,
@@ -457,7 +457,7 @@ and its score is 40% of the blend.
 
 ---
 
-## `backend/models/lstm_autoencoder.py` — Model 2 (behaviour over time)
+## `backend/models/lstm_autoencoder.py` - Model 2 (behaviour over time)
 
 Catches when the *recent pattern* of someone's activity stops looking like them. It reads a
 **sequence of the last 10 events**, not one event.
@@ -504,7 +504,7 @@ events. If PyTorch isn't installed, every method safely returns `0.5`.
 
 ---
 
-## `backend/models/xgboost_model.py` — Model 3 (supervised) + SHAP
+## `backend/models/xgboost_model.py` - Model 3 (supervised) + SHAP
 
 The only model told which past events were fraud. Two jobs: score, and explain.
 
@@ -545,14 +545,14 @@ return contributions[:5]                                   # top 5 drivers
 
 If SHAP returns junk (e.g. fewer than 3 features actually contribute), the fallback computes
 each feature's contribution from its **actual value ÷ that feature's expected size**
-(`_FEATURE_SCALE = [2.0, 1.0, 1.5, 1.0, 1.0, 0.5, 0.5, 0.5]`) — never random numbers.
+(`_FEATURE_SCALE = [2.0, 1.0, 1.5, 1.0, 1.0, 0.5, 0.5, 0.5]`) - never random numbers.
 
 **How it connects:** owned by `ensemble.py`, 20% of the blend, and the source of every alert's
 SHAP chart. `/api/retrain` calls `.fit` again on analyst labels.
 
 ---
 
-## `backend/models/ensemble.py` — the blender
+## `backend/models/ensemble.py` - the blender
 
 Holds all three models and combines them.
 
@@ -583,7 +583,7 @@ explaining (`ensemble.explain`). It hides the 3 models behind one clean door.
 
 ---
 
-## `backend/llm_narrative.py` — optional plain-English summary
+## `backend/llm_narrative.py` - optional plain-English summary
 
 ```python
 def generate_alert_narrative(alert, shap_values, user):
@@ -607,7 +607,7 @@ shows it if present.
 
 ---
 
-## `backend/scripts/seed_demo.py` — local dev helper
+## `backend/scripts/seed_demo.py` - local dev helper
 
 A **standalone** script (run by hand: `python -m scripts.seed_demo`). It grabs some real
 fraud + clean events, turns them into labelled TP/FP alerts, and retrains XGBoost so the
@@ -622,44 +622,44 @@ ens.xgb_model.fit(X[:split], y[:split]); ens.save(SAVED_MODEL_DIR)
 ```
 
 **How it connects:** uses the same `ensemble.py`, `feature_engineering.py`, and `database.py`
-as the app, but is **not** part of normal startup — it's a convenience for local demos.
+as the app, but is **not** part of normal startup - it's a convenience for local demos.
 
 ---
 
 ## Small backend files
 
-- **`backend/data/__init__.py`** and **`backend/models/__init__.py`** — empty marker files
+- **`backend/data/__init__.py`** and **`backend/models/__init__.py`** - empty marker files
   that make those folders importable as `data.*` / `models.*`. They do nothing else but are
   required for the imports in `main.py` and `ensemble.py` to work.
-- **`backend/requirements.txt`** — the exact library versions (FastAPI, SQLAlchemy,
+- **`backend/requirements.txt`** - the exact library versions (FastAPI, SQLAlchemy,
   scikit-learn, torch, xgboost, shap, …). Used by `pip install` locally and inside the
   Dockerfile. If a version here is wrong, the models won't load.
-- **`backend/Dockerfile`** — the build recipe HuggingFace uses:
+- **`backend/Dockerfile`** - the build recipe HuggingFace uses:
   ```dockerfile
   FROM python:3.10-slim
   RUN pip install --no-cache-dir -r requirements.txt
   EXPOSE 7860
   CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
   ```
-  Runs `main.py` on port 7860 — the entry point in production.
-- **`backend/.env.example`** — a template of environment variables (`DATABASE_URL`,
+  Runs `main.py` on port 7860 - the entry point in production.
+- **`backend/.env.example`** - a template of environment variables (`DATABASE_URL`,
   `CORS_ORIGINS`). You copy it to a real `.env`. Not loaded automatically.
-- **`backend/README.md`** — the HuggingFace Space "card" (YAML header: emoji, `sdk: docker`).
+- **`backend/README.md`** - the HuggingFace Space "card" (YAML header: emoji, `sdk: docker`).
   Tells HuggingFace how to display and build the Space.
-- **`backend/data/cert_profile.json`** — 24 real login-hour weights from CERT. Only read if
+- **`backend/data/cert_profile.json`** - 24 real login-hour weights from CERT. Only read if
   the optional CERT-calibration env var is set (otherwise ignored). Produced by the CERT
   script below.
 
 ---
 
-# PART 2 — THE FRONTEND (the screen, Next.js + TypeScript)
+# PART 2 - THE FRONTEND (the screen, Next.js + TypeScript)
 
 The golden rule: **the frontend has no brain.** Every number it shows came from a backend
 endpoint, fetched through one file.
 
 ---
 
-## `frontend/lib/api.ts` — the single phone line to the backend
+## `frontend/lib/api.ts` - the single phone line to the backend
 
 Every call to the backend goes through here. It defines the TypeScript types (mirrors of
 `schemas.py`) and one helper per endpoint.
@@ -691,11 +691,11 @@ export const api = {
   don't render as "in the future" in your timezone.
 
 **How it connects:** every page/component imports `api` and calls these. Nothing else in the
-frontend ever calls `fetch` directly — this is the only door to the backend.
+frontend ever calls `fetch` directly - this is the only door to the backend.
 
 ---
 
-## `frontend/lib/tokens.ts` — the brand colours
+## `frontend/lib/tokens.ts` - the brand colours
 
 ```ts
 export const C = { bg:'#0D1117', card:'#161B22', border:'#30363D',
@@ -705,16 +705,16 @@ export function riskLevel(score) { if (score>=80) return 'critical'; if (score>=
 ```
 
 Every component imports `C` and uses `C.critical` etc. instead of raw hex, so colours stay
-consistent. `riskColor`/`riskLevel` turn a 0–100 number into a colour/label.
+consistent. `riskColor`/`riskLevel` turn a 0-100 number into a colour/label.
 
 **How it connects:** imported by basically every `.tsx` file. It's the visual single-source-of-truth.
 
 ---
 
-## `frontend/app/layout.tsx` + `globals.css` — the shell
+## `frontend/app/layout.tsx` + `globals.css` - the shell
 
 ```tsx
-export const metadata = { title: 'SentinelIQ — Insider Fraud Detection', icons:{icon:'/logo.png'} }
+export const metadata = { title: 'SentinelIQ - Insider Fraud Detection', icons:{icon:'/logo.png'} }
 export default function RootLayout({ children }) {
   return <html lang="en"><body>{children}</body></html>
 }
@@ -728,7 +728,7 @@ alert rows, the pulsing "live" dot, the responsive mobile rules).
 
 ---
 
-## `frontend/app/page.tsx` — the landing page (URL `/`)
+## `frontend/app/page.tsx` - the landing page (URL `/`)
 
 ```tsx
 export default function LandingPage() {
@@ -736,14 +736,14 @@ export default function LandingPage() {
 }
 ```
 
-A static marketing/intro page. No data fetching — just text, the hero image, and links into
+A static marketing/intro page. No data fetching - just text, the hero image, and links into
 `/dashboard`.
 
 **How it connects:** the public front door; sends people to the dashboard.
 
 ---
 
-## `frontend/app/dashboard/layout.tsx` — the dashboard wrapper
+## `frontend/app/dashboard/layout.tsx` - the dashboard wrapper
 
 Wraps every `/dashboard/*` page and adds global behaviour:
 
@@ -767,7 +767,7 @@ pages. Each page still imports its own `Sidebar`.
 
 ---
 
-## `frontend/app/dashboard/page.tsx` — the Overview (URL `/dashboard`)
+## `frontend/app/dashboard/page.tsx` - the Overview (URL `/dashboard`)
 
 ```tsx
 const fetchStats  = useCallback(async () => setStats(await api.stats()), [])
@@ -795,7 +795,7 @@ all fed via `api.ts`.
 
 ---
 
-## `frontend/components/LiveFeed.tsx` — the live event stream
+## `frontend/components/LiveFeed.tsx` - the live event stream
 
 ```tsx
 const poll = async () => {
@@ -817,7 +817,7 @@ matches the loop's 3s rhythm.
 
 ---
 
-## `frontend/components/StatCard.tsx` & `RiskBadge.tsx` — tiny display blocks
+## `frontend/components/StatCard.tsx` & `RiskBadge.tsx` - tiny display blocks
 
 ```tsx
 // StatCard: one big number tile
@@ -837,7 +837,7 @@ colour is consistent everywhere.
 
 ---
 
-## `frontend/components/UserTable.tsx` — the user list
+## `frontend/components/UserTable.tsx` - the user list
 
 ```tsx
 const level = riskLevel(user.risk_score)
@@ -854,7 +854,7 @@ seeded sparkline. Clicking a row opens that user's profile.
 
 ---
 
-## `frontend/components/Sidebar.tsx` — the nav rail
+## `frontend/components/Sidebar.tsx` - the nav rail
 
 ```tsx
 const NAV = [ {href:'/dashboard', label:'Overview'}, {href:'/dashboard/alerts', label:'Alerts'}, ... ]
@@ -870,7 +870,7 @@ listens for to open the command palette. Active link is highlighted via `usePath
 
 ---
 
-## `frontend/components/CommandPalette.tsx` — the ⌘K overlay
+## `frontend/components/CommandPalette.tsx` - the ⌘K overlay
 
 ```tsx
 const actions = [ {label:'Go to Alerts', hint:'G A', run:()=>router.push('/dashboard/alerts')}, ... ]
@@ -883,11 +883,11 @@ A search box over navigation + open alerts + users, with arrow-key navigation. T
 and `users` arrays are passed in from `dashboard/layout.tsx` (which polls them).
 
 **How it connects:** opened by the layout (⌘K or the sidebar button); navigates via Next's
-router. It doesn't fetch — it's given already-fetched data.
+router. It doesn't fetch - it's given already-fetched data.
 
 ---
 
-## `frontend/app/dashboard/alerts/page.tsx` — the alert queue (URL `/dashboard/alerts`)
+## `frontend/app/dashboard/alerts/page.tsx` - the alert queue (URL `/dashboard/alerts`)
 
 ```tsx
 const fetchAlerts = useCallback(async () => {
@@ -909,7 +909,7 @@ Retrain, and refresh.
 
 ---
 
-## `frontend/components/AlertPanel.tsx` — the alert detail modal
+## `frontend/components/AlertPanel.tsx` - the alert detail modal
 
 The richest component. When given an `alertId` it loads everything about that alert:
 
@@ -934,13 +934,13 @@ const handleExport  = async () => { const data = await api.exportAlert(alert.id)
 If the backend produced an `ai_narrative` it shows it; otherwise it builds a plain-English
 explanation in the browser from the fraud type + top SHAP features (`generatePlainExplanation`).
 
-**How it connects:** the hub of the alert experience — pulls from 4 endpoints, embeds
+**How it connects:** the hub of the alert experience - pulls from 4 endpoints, embeds
 `SHAPChart` and `RiskBadge`, and calls back to the parent page when an alert is resolved so the
 list updates.
 
 ---
 
-## `frontend/components/SHAPChart.tsx` — the "why" bar chart
+## `frontend/components/SHAPChart.tsx` - the "why" bar chart
 
 ```tsx
 const absMax = values.reduce((m,v) => Math.max(m, Math.abs(v.contribution)), 1e-9)
@@ -960,7 +960,7 @@ top driver.
 
 ---
 
-## `frontend/app/dashboard/users/page.tsx` — user monitoring (URL `/dashboard/users`)
+## `frontend/app/dashboard/users/page.tsx` - user monitoring (URL `/dashboard/users`)
 
 ```tsx
 const fetchUsers = async () => setUsers(await api.users())
@@ -980,7 +980,7 @@ endpoints that set flags in the `users` table.
 
 ---
 
-## `frontend/app/dashboard/cases/page.tsx` — kill-chain cases (URL `/dashboard/cases`)
+## `frontend/app/dashboard/cases/page.tsx` - kill-chain cases (URL `/dashboard/cases`)
 
 ```tsx
 api.cases().then(setCases)                                   // list of grouped-alert cases
@@ -992,7 +992,7 @@ const handleDismiss = async () => await api.dismissCase(selectedCaseId)
 Shows the cases that `_update_or_create_case` built on the backend (case list on the left, a
 stitched timeline on the right), with resolve/dismiss.
 
-**How it connects:** the visual end of the case logic in `main.py` — reads the `cases` /
+**How it connects:** the visual end of the case logic in `main.py` - reads the `cases` /
 `timeline_items` tables via `api.cases`/`api.caseTimeline`.
 
 ---
@@ -1023,23 +1023,23 @@ the `recharts` library:
 
 ## Frontend config files (what they do, briefly)
 
-- **`package.json`** — the library shopping list (React, Next, recharts, framer-motion,
+- **`package.json`** - the library shopping list (React, Next, recharts, framer-motion,
   lucide-react) and the `dev`/`build`/`start` scripts. Used by `npm`.
-- **`package-lock.json`** — exact locked versions so installs are reproducible. Auto-managed.
-- **`next.config.js`** — Next settings; turns on strict mode and adds `X-Frame-Options: DENY`.
-- **`tsconfig.json`** — TypeScript settings, including the `@/...` import shortcut used everywhere.
-- **`tailwind.config.ts`** + **`postcss.config.js`** — plumbing so Tailwind CSS works (mostly
+- **`package-lock.json`** - exact locked versions so installs are reproducible. Auto-managed.
+- **`next.config.js`** - Next settings; turns on strict mode and adds `X-Frame-Options: DENY`.
+- **`tsconfig.json`** - TypeScript settings, including the `@/...` import shortcut used everywhere.
+- **`tailwind.config.ts`** + **`postcss.config.js`** - plumbing so Tailwind CSS works (mostly
   the project uses inline `C` colours, but base CSS resets run through here).
-- **`.env.example`** / **`.env.local.example`** — templates for `NEXT_PUBLIC_API_URL` (prod HF
+- **`.env.example`** / **`.env.local.example`** - templates for `NEXT_PUBLIC_API_URL` (prod HF
   URL / local `localhost:8000`). You copy one to `.env.local`.
-- **`next-env.d.ts`** — auto-generated TypeScript helper. "Do not edit."
-- **`public/logo.png`, `hero-bg.png`, `ops-room.png`** — static images (favicon, landing hero,
+- **`next-env.d.ts`** - auto-generated TypeScript helper. "Do not edit."
+- **`public/logo.png`, `hero-bg.png`, `ops-room.png`** - static images (favicon, landing hero,
   landing decoration). These PNGs are why the backend is pushed to HuggingFace as a *subtree*
   (HF blocks pushes containing binary images).
 
 ---
 
-# PART 3 — THE CERT RESEARCH SCRIPTS (`scripts/cert/`)
+# PART 3 - THE CERT RESEARCH SCRIPTS (`scripts/cert/`)
 
 These are **separate** from the running app. They use the real CMU CERT r4.2 dataset to prove
 our synthetic data is realistic and to demo on a real attacker.
@@ -1092,34 +1092,34 @@ them through `POST /api/ingest`, so the real attack flows through our ML and lig
 dashboard. `--dry-run` (default) makes no network calls; `--send` actually posts.
 
 **How it connects:** feeds real data into the same `_process_event` pipeline as everything
-else, via the `/api/ingest` endpoint — proving the system works on real attack data.
+else, via the `/api/ingest` endpoint - proving the system works on real attack data.
 
 ## Other CERT files
 
-- **`scripts/cert/README.md`** — how to place the CERT data and the `CERT_DATA_DIR` variable.
-- **`out/login_hour_distribution.png`, `out/off_hours_ratio.png`, `out/validation_summary.txt`**
-  — the generated comparison evidence.
+- **`scripts/cert/README.md`** - how to place the CERT data and the `CERT_DATA_DIR` variable.
+- **`out/login_hour_distribution.png`, `out/off_hours_ratio.png`, `out/validation_summary.txt`** - the
+  generated comparison evidence.
 
 ---
 
-# PART 4 — DATA + ROOT FILES (briefly)
+# PART 4 - DATA + ROOT FILES (briefly)
 
-- **`datasets/cert/r4.2/logon.csv`, `device.csv`, `LDAP/*.csv`** — the real CERT activity +
+- **`datasets/cert/r4.2/logon.csv`, `device.csv`, `LDAP/*.csv`** - the real CERT activity +
   role data the scripts read. **Not in git** (multi-GB).
-- **`datasets/cert/answers/…`** — the answer keys: which users were insiders and their exact
+- **`datasets/cert/answers/…`** - the answer keys: which users were insiders and their exact
   events (e.g. `r4.2-1/r4.2-1-CAH0936.csv`).
-- **`sentineliq/README.md`** — the GitHub front page (problem, solution, run steps, live links).
-- **`sentineliq/start_backend.ps1` / `start_frontend.ps1`** — local one-command start scripts.
-- **`sentineliq/.gitignore`** — keeps the DB, trained models, `node_modules`, `.env` out of git.
-- **`sentineliq/.gitattributes`** — stores images via Git LFS.
-- **Root `CLAUDE.md`, `PRODUCT.md`, `DESIGN.md`, `Pexp.md`, this file** — documentation.
+- **`sentineliq/README.md`** - the GitHub front page (problem, solution, run steps, live links).
+- **`sentineliq/start_backend.ps1` / `start_frontend.ps1`** - local one-command start scripts.
+- **`sentineliq/.gitignore`** - keeps the DB, trained models, `node_modules`, `.env` out of git.
+- **`sentineliq/.gitattributes`** - stores images via Git LFS.
+- **Root `CLAUDE.md`, `PRODUCT.md`, `DESIGN.md`, `Pexp.md`, this file** - documentation.
 - **Root `.env`, `skills-lock.json`, `.claude/`, `.impeccable/`, `docs/*.docx`,
-  `Sigmoid_Idea2.0_submission.pdf`** — notes, assistant config, and the deliverable documents.
+  `docs/*.pdf`** - notes, assistant config, and archived documents.
   None of these run as part of the app.
 
 ---
 
-# PART 5 — HOW IT ALL CONNECTS AS ONE SYSTEM
+# PART 5 - HOW IT ALL CONNECTS AS ONE SYSTEM
 
 Now the whole machine in one story. Follow a single event:
 
@@ -1127,9 +1127,9 @@ Now the whole machine in one story. Follow a single event:
    `synthetic_generator.py` for one event (every 15th is a forced fraud).
 2. **Translate.** `main.py` passes it to `feature_engineering.py` → the **8 numbers**, measured
    against that user's last-20-events history.
-3. **Score.** `main.py` calls `ensemble.py`'s `predict`, which asks the three model files —
+3. **Score.** `main.py` calls `ensemble.py`'s `predict`, which asks the three model files -
    `isolation_forest.py` (rare?), `lstm_autoencoder.py` (off-pattern?), `xgboost_model.py`
-   (fraud-like?) — and blends them `0.4/0.4/0.2` into a 0–100 score.
+   (fraud-like?) - and blends them `0.4/0.4/0.2` into a 0-100 score.
 4. **Decide.** Back in `_process_event`, if score ≥ 65 it makes an alert, asks
    `xgboost_model.py` for the SHAP "why," builds a timeline, and (on a 2nd alert in 24h) opens
    a case.

@@ -75,7 +75,7 @@ function ActivityHeatmap({ userId }: { userId: string }) {
             return (
               <div
                 key={h}
-                title={`${String(h).padStart(2, '0')}:00 — ${count} event${count !== 1 ? 's' : ''}`}
+                title={`${String(h).padStart(2, '0')}:00 - ${count} event${count !== 1 ? 's' : ''}`}
                 style={{
                   height: 20, background: bg, opacity,
                   borderRadius: 2, cursor: 'default',

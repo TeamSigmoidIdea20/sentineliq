@@ -7,12 +7,12 @@ import { api, type Alert, type CaseItem, type TimelineItem, formatFraudType, tim
 import { C } from '@/lib/tokens'
 
 const CASE_EXPLANATIONS: Record<string, string> = {
-  'Coordinated Insider Threat': 'Multiple fraud patterns detected across several users in a 24-hour window — suggesting coordinated insider activity.',
-  'Multi-Pattern Insider Threat': 'Three or more distinct fraud patterns detected from a single user within a 24-hour window — indicating deliberate, multi-vector insider activity.',
-  'Data Exfiltration Attempt': 'Bulk downloads combined with cross-department access — consistent with data aggregation before extraction.',
-  'Privilege Abuse Sequence': 'Repeated privilege escalation combined with off-hours access — indicates active boundary probing.',
-  'Treasury Manipulation': 'Velocity spikes combined with account modifications in treasury — consistent with financial manipulation.',
-  'Escalating Insider Risk': 'Risk score trending upward across multiple sessions — cumulative pattern warrants heightened monitoring.',
+  'Coordinated Insider Threat': 'Multiple fraud patterns detected across several users in a 24-hour window - suggesting coordinated insider activity.',
+  'Multi-Pattern Insider Threat': 'Three or more distinct fraud patterns detected from a single user within a 24-hour window - indicating deliberate, multi-vector insider activity.',
+  'Data Exfiltration Attempt': 'Bulk downloads combined with cross-department access - consistent with data aggregation before extraction.',
+  'Privilege Abuse Sequence': 'Repeated privilege escalation combined with off-hours access - indicates active boundary probing.',
+  'Treasury Manipulation': 'Velocity spikes combined with account modifications in treasury - consistent with financial manipulation.',
+  'Escalating Insider Risk': 'Risk score trending upward across multiple sessions - cumulative pattern warrants heightened monitoring.',
 }
 
 
@@ -159,7 +159,7 @@ export default function CasesPage() {
     if (!selectedCaseId || acting) return
     setActing(true)
     await api.resolveCase(selectedCaseId).catch(() => null)
-    setBanner({ text: 'Case closed. Investigation marked resolved — audit trail preserved.', color: C.low })
+    setBanner({ text: 'Case closed. Investigation marked resolved - audit trail preserved.', color: C.low })
     setTimeout(() => { removeCase(selectedCaseId) }, 1400)
     setActing(false)
   }
@@ -168,7 +168,7 @@ export default function CasesPage() {
     if (!selectedCaseId || acting) return
     setActing(true)
     await api.dismissCase(selectedCaseId).catch(() => null)
-    setBanner({ text: 'Case dismissed. Marked as false cluster — no further action required.', color: C.textMuted })
+    setBanner({ text: 'Case dismissed. Marked as false cluster - no further action required.', color: C.textMuted })
     setTimeout(() => { removeCase(selectedCaseId) }, 1400)
     setActing(false)
   }

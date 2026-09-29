@@ -146,12 +146,12 @@ export default function DashboardPage() {
                         setSimToast(`Simulating ${label}…`)
                         try {
                           await api.simulate(scenario)
-                          setSimToast(`${label} injected — alert incoming`)
+                          setSimToast(`${label} injected - alert incoming`)
                           // Force an immediate poll to catch the new alert
                           setTimeout(() => { fetchAlerts(); fetchStats() }, 1500)
                           setTimeout(() => { fetchAlerts(); fetchStats() }, 4000)
                         } catch {
-                          setSimToast('Simulate failed — backend may be starting up')
+                          setSimToast('Simulate failed - backend may be starting up')
                         }
                         setTimeout(() => setSimToast(''), 8000)
                       }}
@@ -205,7 +205,7 @@ export default function DashboardPage() {
               >
                 <span style={{ width: 7, height: 7, borderRadius: '50%', background: newAlertNotif.risk_level === 'critical' || newAlertNotif.risk_level === 'high' ? C.critical : newAlertNotif.risk_level === 'medium' ? C.medium : C.low, flexShrink: 0, display: 'inline-block' }} />
                 <p style={{ margin: 0, fontSize: 12, color: C.textPrimary, fontWeight: 600, flex: 1 }}>
-                  New alert — <span style={{ fontWeight: 700 }}>{newAlertNotif.user_name}</span>
+                  New alert - <span style={{ fontWeight: 700 }}>{newAlertNotif.user_name}</span>
                   {' · '}{newAlertNotif.fraud_type.replace(/_/g, ' ')}
                   {' · '}score <span style={{ fontWeight: 800, color: newAlertNotif.risk_level === 'critical' || newAlertNotif.risk_level === 'high' ? C.critical : newAlertNotif.risk_level === 'medium' ? C.medium : C.low }}>{Math.round(newAlertNotif.risk_score)}</span>
                 </p>
@@ -292,13 +292,13 @@ export default function DashboardPage() {
           <div className="stat-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
             <StatCard
               label="Users Monitored"
-              value={stats?.users_monitored ?? '—'}
+              value={stats?.users_monitored ?? '-'}
               sub="active employees"
               loading={statsLoading}
             />
             <StatCard
               label="Alerts 24h"
-              value={stats != null ? (stats.alerts_24h ?? stats.alerts_today ?? 0) : '—'}
+              value={stats != null ? (stats.alerts_24h ?? stats.alerts_today ?? 0) : '-'}
               change={stats?.alerts_change}
               sub="vs prior 24h"
               loading={statsLoading}
@@ -306,7 +306,7 @@ export default function DashboardPage() {
             />
             <StatCard
               label="High Risk"
-              value={stats?.high_risk_count ?? '—'}
+              value={stats?.high_risk_count ?? '-'}
               change={stats?.high_risk_change}
               sub="open alerts ≥65"
               loading={statsLoading}
@@ -314,7 +314,7 @@ export default function DashboardPage() {
             />
             <StatCard
               label="False Positive Rate"
-              value={stats ? `${stats.false_positive_rate}%` : '—'}
+              value={stats ? `${stats.false_positive_rate}%` : '-'}
               sub={stats ? `${stats.labels_collected} labels collected · last retrain ${stats.next_retrain_in}` : 'from labeled alerts'}
               loading={statsLoading}
               accent="green"
@@ -329,7 +329,7 @@ export default function DashboardPage() {
             }}>
               <span style={{ fontSize: 11, color: C.textMuted }}>
                 <span style={{ color: C.textPrimary, fontWeight: 700 }}>{stats.labels_collected}</span>
-                {' '}analyst labels collected — last retrain{' '}
+                {' '}analyst labels collected - last retrain{' '}
                 <span style={{ color: C.textPrimary, fontWeight: 700 }}>{stats.next_retrain_in}</span>
               </span>
               <span style={{ fontSize: 10, padding: '2px 7px', border: `1px solid ${C.border}`, borderRadius: 2, color: C.textMuted, marginLeft: 'auto' }}>

@@ -1,4 +1,4 @@
-# Feature engineering — turns a raw event into the 8 numeric features the models need.
+# Feature engineering - turns a raw event into the 8 numeric features the models need.
 # The key idea: features are RELATIVE to each user's own recent history (a rolling
 # window), so "normal" is defined per-person. A teller suddenly downloading 500MB is
 # anomalous even if 500MB is normal for someone in data analytics.
@@ -9,7 +9,7 @@ from collections import deque, defaultdict
 from dataclasses import dataclass, field
 import numpy as np
 
-# Output feature order — must stay in sync with the models' FEATURE_NAMES.
+# Output feature order - must stay in sync with the models' FEATURE_NAMES.
 FEATURE_NAMES = [
     "login_hour_deviation",
     "transaction_velocity_ratio",
@@ -56,7 +56,7 @@ class FeatureEngineer:
         return self._histories[user_id]
 
     def _entropy(self, items) -> float:
-        # Shannon entropy of department access — low = focused/normal, high = the
+        # Shannon entropy of department access - low = focused/normal, high = the
         # user is touching many different departments (possible recon/abuse).
         if not items:
             return 0.0
@@ -106,7 +106,7 @@ class FeatureEngineer:
         # location_mismatch
         loc_mismatch = 0.0 if location in h.normal_locations else 1.0
 
-        # privilege_use_ratio — include current event so a single privilege_use fires immediately
+        # privilege_use_ratio - include current event so a single privilege_use fires immediately
         all_event_types = list(h.event_types) + [etype]
         priv_count = sum(1 for e in all_event_types if e == "privilege_use")
         priv_ratio = priv_count / max(1, len(all_event_types))
@@ -115,13 +115,13 @@ class FeatureEngineer:
         unique_devices = len(set(list(h.devices) + [device]))
         device_freq = unique_devices / max(1, len(h.devices) + 1)
 
-        # off_hours_ratio — include current event so an off-hours login fires immediately
+        # off_hours_ratio - include current event so an off-hours login fires immediately
         nh_start, nh_end = h.normal_hours
         all_hours = list(h.hours) + [hour]
         off_count = sum(1 for hh in all_hours if hh < nh_start or hh > nh_end)
         off_ratio = off_count / max(1, len(all_hours))
 
-        # Update history — append this event's raw values to each rolling window.
+        # Update history - append this event's raw values to each rolling window.
         h.hours.append(hour)
         h.tx_counts.append(tx)
         h.departments.append(dept)

@@ -73,7 +73,7 @@
       "name": "Risk Badge Critical",
       "kind": "chip",
       "refersTo": "risk-badge-critical",
-      "description": "Signals critical/high risk. The most important component in the system — stops the eye before the analyst reads anything else.",
+      "description": "Signals critical/high risk. The most important component in the system - stops the eye before the analyst reads anything else.",
       "html": "<span class=\"ds-risk-badge ds-risk-critical\"><span class=\"ds-risk-dot\"></span>CRITICAL<span class=\"ds-risk-score\">94</span></span>",
       "css": ".ds-risk-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; border-radius: 2px; white-space: nowrap; font-family: ui-sans-serif, system-ui, sans-serif; } .ds-risk-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex-shrink: 0; } .ds-risk-score { opacity: 0.8; margin-left: 2px; } .ds-risk-critical { border: 1px solid #DC2626; color: #DC2626; } .ds-risk-critical .ds-risk-dot { background: #DC2626; }"
     },
@@ -89,7 +89,7 @@
       "name": "Risk Badge Low",
       "kind": "chip",
       "refersTo": "risk-badge-low",
-      "description": "Signals low risk. Clear — no action required.",
+      "description": "Signals low risk. Clear - no action required.",
       "html": "<span class=\"ds-risk-badge ds-risk-low\"><span class=\"ds-risk-dot\"></span>LOW<span class=\"ds-risk-score\">28</span></span>",
       "css": ".ds-risk-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; border-radius: 2px; white-space: nowrap; font-family: ui-sans-serif, system-ui, sans-serif; } .ds-risk-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex-shrink: 0; } .ds-risk-score { opacity: 0.8; margin-left: 2px; } .ds-risk-low { border: 1px solid #16A34A; color: #16A34A; } .ds-risk-low .ds-risk-dot { background: #16A34A; }"
     },
@@ -128,10 +128,10 @@
   ],
   "narrative": {
     "northStar": "The Operations Room",
-    "overview": "SentinelIQ's visual system is built around a single scene: a 24/7 security command centre running under controlled light. Every analyst knows exactly where to look. Every indicator has a single meaning. Nothing decorates; everything informs. The surface is calm because the system is always watching, and it interrupts that calm — precisely, surgically — only when threat demands it.\n\nThe system uses four tonal dark layers to convey depth without shadows. Color appears exactly three times: red for threat, amber for watch, green for clear. These are not accent colours. They are the data. Their rarity is what makes them legible — on a screen full of near-black surfaces, a single red badge stops the eye immediately.\n\nTypography is Geist throughout: a system sans with optical engineering built in. Display weights at 800 create authority without decoration. Section labels run small, uppercase, tracked wide — the visual grammar of a data readout, not a marketing page.",
+    "overview": "SentinelIQ's visual system is built around a single scene: a 24/7 security command centre running under controlled light. Every analyst knows exactly where to look. Every indicator has a single meaning. Nothing decorates; everything informs. The surface is calm because the system is always watching, and it interrupts that calm - precisely, surgically - only when threat demands it.\n\nThe system uses four tonal dark layers to convey depth without shadows. Color appears exactly three times: red for threat, amber for watch, green for clear. These are not accent colours. They are the data. Their rarity is what makes them legible - on a screen full of near-black surfaces, a single red badge stops the eye immediately.\n\nTypography is Geist throughout: a system sans with optical engineering built in. Display weights at 800 create authority without decoration. Section labels run small, uppercase, tracked wide - the visual grammar of a data readout, not a marketing page.",
     "keyCharacteristics": [
       "Four tonal dark layers as the entire depth vocabulary",
-      "Red, amber, green as semantic signals — never decorative",
+      "Red, amber, green as semantic signals - never decorative",
       "Sharp corners (2-4px radius) everywhere except avatars",
       "Uppercase tracked labels as the visual grammar for data headers",
       "Live pulse indicators as the only ambient motion",
@@ -142,7 +142,7 @@
       { "name": "The Semantic Lock Rule",       "body": "Red means critical/high. Amber means medium. Green means low or live. These assignments are immutable. No other UI purpose may borrow these colors.",                                                                           "section": "colors" },
       { "name": "The Stat Weight Rule",         "body": "Numeric data values use weight 700-800 at 28-42px with letter-spacing -0.02 to -0.03em. The number is the most important thing on that surface.",                                                                             "section": "typography" },
       { "name": "The Label Doctrine",           "body": "All section-level headers inside the dashboard use the Label style: small, uppercase, tracked. Never sentence case. The visual distinction between a label and a value is non-negotiable.",                                    "section": "typography" },
-      { "name": "The Flat-By-Default Rule",     "body": "Data surfaces are flat at rest. Surface Two (#1C2128) is the hover state — it communicates interactivity through tonal shift, not shadow. If you're adding a shadow to a card or row, you're adding it to the wrong thing.", "section": "elevation" },
+      { "name": "The Flat-By-Default Rule",     "body": "Data surfaces are flat at rest. Surface Two (#1C2128) is the hover state - it communicates interactivity through tonal shift, not shadow. If you're adding a shadow to a card or row, you're adding it to the wrong thing.", "section": "elevation" },
       { "name": "The Dot Requirement",          "body": "The 6px filled circle before a risk badge label is non-negotiable. Color alone does not meet WCAG AA. The dot provides a redundant non-color signal. Never remove it.",                                                       "section": "components" }
     ],
     "dos": [
@@ -159,11 +159,11 @@
       "Don't use red (#DC2626) for decoration, hover states, emphasis, or any purpose other than critical/high risk and primary CTAs.",
       "Don't add shadows to cards, table rows, or any data surface.",
       "Don't use gradient text (background-clip: text).",
-      "Don't use glassmorphism as decoration — the landing nav blur is the only acceptable instance.",
+      "Don't use glassmorphism as decoration - the landing nav blur is the only acceptable instance.",
       "Don't use border-radius greater than 4px on any card, button, or data container.",
-      "Don't add padding to screens to make them look clean — whitespace is earned at the data level.",
+      "Don't add padding to screens to make them look clean - whitespace is earned at the data level.",
       "Don't animate CSS layout properties (width, height, margin, padding). Animate opacity and transform only.",
-      "Don't build modals as a first-choice pattern — use fixed sidebar drawers or inline disclosure first.",
+      "Don't build modals as a first-choice pattern - use fixed sidebar drawers or inline disclosure first.",
       "Don't use consumer fintech visual language: friendly rounded corners, warm background tints, onboarding illustrations, playful copy.",
       "Don't use cyberpunk aesthetics: neon green terminals, matrix-style motion, high-chroma color schemes."
     ]

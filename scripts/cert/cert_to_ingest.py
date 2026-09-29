@@ -1,5 +1,5 @@
 """
-cert_to_ingest.py  —  Tier-2 demo: replay a REAL CERT malicious insider through
+cert_to_ingest.py  -  Tier-2 demo: replay a REAL CERT malicious insider through
 SentinelIQ's /api/ingest endpoint.
 
 The idea: take one of CMU CERT r4.2's known malicious users (default CAH0936, the
@@ -17,7 +17,7 @@ Examples (safe):
     python cert_to_ingest.py            # dry run, prints payloads only
     python cert_to_ingest.py --dry-run  # same as above
 
-To actually send (requires a running backend — not used in this build step):
+To actually send (requires a running backend - not used in this build step):
     python cert_to_ingest.py --send --url http://localhost:8000
 
 This script ONLY reads CSVs. In --dry-run mode it makes no network calls at all.
@@ -119,7 +119,7 @@ def build_payloads(user_id: str, role: str, dept: str) -> list[dict]:
         return []
 
     payloads = []
-    # These answer files have NO header — they are raw rows like:
+    # These answer files have NO header - they are raw rows like:
     #   <type>,<id>,<MM/DD/YYYY HH:MM:SS>,<user>,<pc>,<detail...>
     # The http detail itself contains commas, so we read columns by position and
     # do NOT rely on a fixed column count beyond the first five fields.
@@ -178,7 +178,7 @@ def build_payloads(user_id: str, role: str, dept: str) -> list[dict]:
 
             elif ev_type == "device":
                 # Device rows are Connect or Disconnect. Only a Connect (USB plug-in)
-                # is interesting — that is the exfiltration step. Skip Disconnect.
+                # is interesting - that is the exfiltration step. Skip Disconnect.
                 if "connect" in detail.lower() and "disconnect" not in detail.lower():
                     payload = {
                         "user_id": user_id,
@@ -190,7 +190,7 @@ def build_payloads(user_id: str, role: str, dept: str) -> list[dict]:
                         # Realistic bulk USB copy volume.
                         "download_mb": 120.0,
                         "tx_count": 1,
-                        "description": "CERT USB device connected on {} — possible exfiltration".format(pc),
+                        "description": "CERT USB device connected on {} - possible exfiltration".format(pc),
                         "system": "CERT-r4.2",
                     }
                 else:
@@ -206,10 +206,10 @@ def build_payloads(user_id: str, role: str, dept: str) -> list[dict]:
                     "location": "external",
                     "hour": hour,
                     "device": "mobile_vpn",
-                    # Upload to an external site — elevated volume.
+                    # Upload to an external site - elevated volume.
                     "download_mb": 90.0,
                     "tx_count": 1,
-                    "description": "CERT http upload to external site (wikileaks) — data exfiltration",
+                    "description": "CERT http upload to external site (wikileaks) - data exfiltration",
                     "system": "CERT-r4.2",
                 }
 
@@ -230,7 +230,7 @@ def build_payloads(user_id: str, role: str, dept: str) -> list[dict]:
 def build_baseline_payloads(user_id: str, role: str, dept: str, want: int = 4) -> list[dict]:
     logon_csv = _find("logon.csv")
     if logon_csv is None:
-        # Not fatal — baseline is just a nicety.
+        # Not fatal - baseline is just a nicety.
         return []
 
     baseline = []
@@ -333,7 +333,7 @@ def main() -> None:
     # Step 2: build the malicious-event payloads.
     payloads = build_payloads(user_id, role, dept)
     if not payloads:
-        print("No payloads built — nothing to do.")
+        print("No payloads built - nothing to do.")
         return
 
     # Step 3 (nicety): build a few baseline daytime logons first.
@@ -341,7 +341,7 @@ def main() -> None:
     if baseline:
         print("Baseline daytime logons to send first:", len(baseline))
     else:
-        print("Baseline daytime logons: none found (skipped — baseline is optional).")
+        print("Baseline daytime logons: none found (skipped - baseline is optional).")
     print("Malicious events mapped:", len(payloads))
     print("")
 

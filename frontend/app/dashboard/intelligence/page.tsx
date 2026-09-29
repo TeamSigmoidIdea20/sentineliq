@@ -118,7 +118,7 @@ export default function IntelligencePage() {
     setTraining(true)
     setLogLines([])
 
-    // Fire retrain — real API call
+    // Fire retrain - real API call
     setLogLines(['[00:00] Requesting retrain...'])
     const retrainPromise = api.retrain().catch(() => null)
     await new Promise((r) => setTimeout(r, 200))
@@ -129,20 +129,20 @@ export default function IntelligencePage() {
     const labelsN = result?.labels_used ?? 0
     const skipped = result?.status === 'skipped' || result === null
 
-    const precisionVal = result?.precision_after != null ? result.precision_after.toFixed(3) : '—'
-    const recallVal    = result?.recall_after    != null ? result.recall_after.toFixed(3)    : '—'
-    const f1Val        = result?.f1_after        != null ? result.f1_after.toFixed(3)        : '—'
+    const precisionVal = result?.precision_after != null ? result.precision_after.toFixed(3) : '-'
+    const recallVal    = result?.recall_after    != null ? result.recall_after.toFixed(3)    : '-'
+    const f1Val        = result?.f1_after        != null ? result.f1_after.toFixed(3)        : '-'
 
-    // Tail lines — reflect real outcome
+    // Tail lines - reflect real outcome
     const tailLines: string[] = skipped
       ? [
-          `[00:07] Loading analyst labels from SQLite — ${labelsN} labels found (need ≥10)`,
-          '[00:08] Skipping XGBoost retrain — insufficient labeled data',
+          `[00:07] Loading analyst labels from SQLite - ${labelsN} labels found (need ≥10)`,
+          '[00:08] Skipping XGBoost retrain - insufficient labeled data',
           '[00:09] Pipeline complete. Label more alerts and retry.',
         ]
       : [
-          `[00:07] Loading analyst labels from SQLite — ${labelsN} labels found...`,
-          '[00:08] Retraining XGBoost — n_estimators=100, 5 fraud classes...',
+          `[00:07] Loading analyst labels from SQLite - ${labelsN} labels found...`,
+          '[00:08] Retraining XGBoost - n_estimators=100, 5 fraud classes...',
           `[00:09] XGBoost retrained. Precision: ${precisionVal} | Recall: ${recallVal} | F1: ${f1Val}`,
           '[00:10] Ensemble weights applied: IF(0.4) + LSTM(0.4) + XGB(0.2)',
           '[00:11] Models saved to disk. Pipeline complete.',
@@ -165,7 +165,7 @@ export default function IntelligencePage() {
       } : prev)
     }
 
-    // Re-fetch all data — 500ms delay to ensure SQLite write completes
+    // Re-fetch all data - 500ms delay to ensure SQLite write completes
     await new Promise((r) => setTimeout(r, 500))
     await loadAll()
     setTraining(false)
@@ -180,11 +180,11 @@ export default function IntelligencePage() {
 
   const detectDisplay = data
     ? data.mean_time_to_detect == null
-      ? '—'
+      ? '-'
       : data.mean_time_to_detect < 1
         ? 'Real-time'
         : `${data.mean_time_to_detect.toFixed(1)}s`
-    : '—'
+    : '-'
 
   return (
     <div style={{ display: 'flex', height: '100vh', background: C.bg, overflow: 'hidden' }}>
@@ -227,7 +227,7 @@ export default function IntelligencePage() {
                   <ModelCard
                     name="Isolation Forest"
                     weight="40%"
-                    description="Trained on synthetic events at startup. Contamination parameter set to 0.1 — the model expects ~10% of events to be anomalous. Scores each incoming event by how isolated it is from the normal cluster. No labels required — fully unsupervised."
+                    description="Trained on synthetic events at startup. Contamination parameter set to 0.1 - the model expects ~10% of events to be anomalous. Scores each incoming event by how isolated it is from the normal cluster. No labels required - fully unsupervised."
                     params={[
                       { label: 'contamination', value: modelInfo ? String(modelInfo.isolation_forest.contamination) : '0.1' },
                       { label: 'n_estimators', value: modelInfo ? String(modelInfo.isolation_forest.n_estimators) : '100' },
@@ -240,16 +240,16 @@ export default function IntelligencePage() {
                     weight="40%"
                     description="Trained on sequences of consecutive events per user. Learns to reconstruct normal behavioural sequences. When reconstruction error exceeds threshold, the event is flagged. Detects slow behavioural drift that point anomaly models miss."
                     params={[
-                      { label: 'seq_len', value: modelInfo ? String(modelInfo.lstm.seq_len) : '—' },
-                      { label: 'hidden_size', value: modelInfo ? String(modelInfo.lstm.hidden_size) : '—' },
-                      { label: 'n_features', value: modelInfo ? String(modelInfo.lstm.n_features) : '—' },
+                      { label: 'seq_len', value: modelInfo ? String(modelInfo.lstm.seq_len) : '-' },
+                      { label: 'hidden_size', value: modelInfo ? String(modelInfo.lstm.hidden_size) : '-' },
+                      { label: 'n_features', value: modelInfo ? String(modelInfo.lstm.n_features) : '-' },
                     ]}
                     metric={{ label: 'Model agreement rate', value: `${data.model_agreement_rate.toFixed(1)}%` }}
                   />
                   <ModelCard
                     name="XGBoost Classifier"
                     weight="20%"
-                    description="Trained on labeled synthetic data with 5 fraud pattern classes. Retrains when investigators label alerts as True Positive or False Positive — active learning loop. Each retrain incorporates analyst feedback to improve precision."
+                    description="Trained on labeled synthetic data with 5 fraud pattern classes. Retrains when investigators label alerts as True Positive or False Positive - active learning loop. Each retrain incorporates analyst feedback to improve precision."
                     params={[
                       { label: 'n_estimators', value: modelInfo ? String(modelInfo.xgboost.n_estimators) : '150' },
                       { label: 'max_depth', value: modelInfo ? String(modelInfo.xgboost.max_depth) : '3' },
@@ -269,14 +269,14 @@ export default function IntelligencePage() {
                   Precision and recall computed from analyst-labeled alerts (TP/FP) · {data.training_events || 0} total events processed
                 </p>
                 <div className="stat-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
-                  <Stat label="Precision" value={data.precision != null ? `${(data.precision * 100).toFixed(1)}%` : '—'} sub={data.precision == null ? 'need ≥10 labels' : undefined} />
-                  <Stat label="Recall" value={data.recall != null ? `${(data.recall * 100).toFixed(1)}%` : '—'} sub={data.recall == null ? 'need ≥10 labels' : undefined} />
-                  <Stat label="F1 Score" value={data.f1 != null ? `${(data.f1 * 100).toFixed(1)}%` : '—'} sub={data.f1 == null ? 'need ≥10 labels' : undefined} />
+                  <Stat label="Precision" value={data.precision != null ? `${(data.precision * 100).toFixed(1)}%` : '-'} sub={data.precision == null ? 'need ≥10 labels' : undefined} />
+                  <Stat label="Recall" value={data.recall != null ? `${(data.recall * 100).toFixed(1)}%` : '-'} sub={data.recall == null ? 'need ≥10 labels' : undefined} />
+                  <Stat label="F1 Score" value={data.f1 != null ? `${(data.f1 * 100).toFixed(1)}%` : '-'} sub={data.f1 == null ? 'need ≥10 labels' : undefined} />
                   <Stat label="Mean Detect Time" value={detectDisplay} sub="event scored to alert created" />
                 </div>
               </div>
 
-              {/* Training log — own full-width section, below ensemble performance */}
+              {/* Training log - own full-width section, below ensemble performance */}
               {logLines.length > 0 && (
                 <div>
                   <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>

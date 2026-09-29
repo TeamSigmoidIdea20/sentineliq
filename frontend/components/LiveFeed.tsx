@@ -90,7 +90,7 @@ export default function LiveFeed({ onAlertClick }: { onAlertClick?: (alertId: st
         setNewIds(incoming)
         setTimeout(() => setNewIds(new Set()), 800)
       } catch {
-        // backend not ready yet — silently skip
+        // backend not ready yet - silently skip
       }
     }
 

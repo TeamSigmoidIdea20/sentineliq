@@ -17,8 +17,8 @@ real documented insider.
 
 | Script | What it does | Safe to run? |
 |---|---|---|
-| `build_cert_profile.py` | Reads CERT `logon.csv`, measures the real login-hour distribution + night rate, writes `backend/data/cert_profile.json`. | Yes — reads CSV, writes one small JSON. |
-| `validate_against_cert.py` | Compares SentinelIQ's synthetic login-hour / off-hours distributions against CERT and writes comparison charts to `out/`. | Yes — read-only + writes PNGs. |
+| `build_cert_profile.py` | Reads CERT `logon.csv`, measures the real login-hour distribution + night rate, writes `backend/data/cert_profile.json`. | Yes - reads CSV, writes one small JSON. |
+| `validate_against_cert.py` | Compares SentinelIQ's synthetic login-hour / off-hours distributions against CERT and writes comparison charts to `out/`. | Yes - read-only + writes PNGs. |
 | `cert_to_ingest.py` | Replays a real CERT malicious insider (default `CAH0936`) through `POST /api/ingest`. `--dry-run` (default) only prints payloads; `--send` posts to a backend. | Yes in dry-run (no network). `--send` needs a running backend. |
 
 ## Quick use
@@ -40,7 +40,7 @@ python cert_to_ingest.py --send --url http://localhost:8000
 ## Findings (see `out/validation_summary.txt`)
 
 1. Both CERT and SentinelIQ are strongly business-hours-dominant with rare night
-   activity — validating the off-hours behavioural signal.
+   activity - validating the off-hours behavioural signal.
 2. CERT keeps a small ~4.5% benign night-activity background; SentinelIQ's baseline
    is ~0% (idealised). The optional **CERT calibration** (Tier 1.5) closes this gap.
 

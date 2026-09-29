@@ -68,7 +68,7 @@ async def main() -> None:
             select(func.count()).select_from(AlertModel).where(AlertModel.label.in_(["TP", "FP"]))
         ) or 0
         if existing >= 10:
-            print(f"Skipped — {existing} labels already in DB")
+            print(f"Skipped - {existing} labels already in DB")
             return
 
         # Grab a handful of real fraud + clean events (that already have features)
@@ -83,7 +83,7 @@ async def main() -> None:
 
         seed_rows = fraud_rows + clean_rows
         if len(seed_rows) < 5:
-            print("Not enough events with features — run the backend first.")
+            print("Not enough events with features - run the backend first.")
             return
 
         seed: list[tuple[np.ndarray, int]] = []

@@ -1,4 +1,4 @@
-# Synthetic data generator — the heart of the demo. There is no real bank feed, so
+# Synthetic data generator - the heart of the demo. There is no real bank feed, so
 # this fabricates a believable stream of employee activity: 50 fixed employees with
 # realistic roles/hours/locations, mostly normal events plus occasional injected fraud.
 # Everything downstream (features, models, alerts) runs on what this produces.
@@ -150,7 +150,7 @@ class SyntheticGenerator:
             if not isinstance(weights, list) or len(weights) != 24:
                 return None
 
-            # Looks valid — return the whole profile dict.
+            # Looks valid - return the whole profile dict.
             return profile
         except Exception:
             # Any error at all (file missing, bad JSON, permissions) -> stay OFF.
@@ -175,7 +175,7 @@ class SyntheticGenerator:
             hour = random.choices(range(24), weights=weights)[0]
         event_ts = _clamp_past(ts.replace(hour=hour, minute=random.randint(0, 59), second=random.randint(0, 59)))
         department = random.choice(typ_depts)
-        # 5% of normal events originate from an atypical location — prevents
+        # 5% of normal events originate from an atypical location - prevents
         # location_mismatch from being a perfect fraud separator in XGBoost training.
         location = "external" if random.random() < 0.05 else random.choice(norm_locs)
         event_type = random.choice(EVENT_TYPES)
@@ -198,7 +198,7 @@ class SyntheticGenerator:
             "description": f"{name} performed {event_type.replace('_', ' ')} in {department}",
             "risk_score": 0.0,
             "features_json": "{}",
-            # Baseline metadata for FeatureEngineer._get_history — not stored to DB
+            # Baseline metadata for FeatureEngineer._get_history - not stored to DB
             "login_start": ls,
             "login_end": le,
             "avg_daily_tx": avg_tx,
@@ -224,14 +224,14 @@ class SyntheticGenerator:
             ev["tx_count"] = baseline_tx
             ev["download_mb"] = baseline_dl
             ev["location"] = "external"          # location_mismatch signal
-            ev["description"] = f"{name} logged in at {hour:02d}:00 — outside normal hours"
+            ev["description"] = f"{name} logged in at {hour:02d}:00 - outside normal hours"
 
         elif pattern == "bulk_download":
             ev["event_type"] = "data_export"
             ev["download_mb"] = random.uniform(50, 200)
             ev["tx_count"] = baseline_tx
             ev["location"] = "external"          # location_mismatch signal
-            ev["description"] = f"{name} exported {ev['download_mb']:.0f} MB — anomalous volume"
+            ev["description"] = f"{name} exported {ev['download_mb']:.0f} MB - anomalous volume"
 
         elif pattern == "cross_department_access":
             foreign_depts = [d for d in ALL_DEPARTMENTS if d not in typ_depts]
@@ -241,7 +241,7 @@ class SyntheticGenerator:
             ev["tx_count"] = baseline_tx
             ev["download_mb"] = baseline_dl
             ev["location"] = "external"          # location_mismatch signal
-            ev["description"] = f"{name} accessed {foreign} — outside normal scope"
+            ev["description"] = f"{name} accessed {foreign} - outside normal scope"
 
         elif pattern == "privilege_escalation":
             hour = random.choice([0, 1, 2, 3, 4, 5, 22, 23])  # off-hours adds second signal
@@ -250,14 +250,14 @@ class SyntheticGenerator:
             ev["timestamp"] = _clamp_past(ev["timestamp"].replace(hour=hour))
             ev["tx_count"] = baseline_tx
             ev["download_mb"] = baseline_dl
-            ev["description"] = f"{name} invoked elevated privileges — not typical for {role}"
+            ev["description"] = f"{name} invoked elevated privileges - not typical for {role}"
 
         elif pattern == "velocity_spike":
             ev["tx_count"] = int(avg_tx * random.uniform(8, 15))
             ev["event_type"] = "transaction"
             ev["department"] = random.choice(typ_depts)
             ev["download_mb"] = random.uniform(20, 80)  # elevated download adds second signal
-            ev["description"] = f"{name} processed {ev['tx_count']} transactions — {ev['tx_count'] // max(1, avg_tx)}x normal rate"
+            ev["description"] = f"{name} processed {ev['tx_count']} transactions - {ev['tx_count'] // max(1, avg_tx)}x normal rate"
 
         elif pattern == "account_modification":
             foreign_depts = [d for d in ALL_DEPARTMENTS if d not in typ_depts]
@@ -266,9 +266,9 @@ class SyntheticGenerator:
             ev["department"] = foreign
             ev["tx_count"] = int(avg_tx * random.uniform(3, 6))  # elevated record access
             ev["download_mb"] = random.uniform(5, 30)            # exporting modified records
-            ev["description"] = f"{name} modified account records in {foreign} — abnormal access for {role}"
+            ev["description"] = f"{name} modified account records in {foreign} - abnormal access for {role}"
 
-        # All fraud patterns use an anomalous device — gives device_change_frequency signal
+        # All fraud patterns use an anomalous device - gives device_change_frequency signal
         ev["device"] = random.choice(["mobile_vpn", "tablet_remote"])
         ev["fraud_type"] = pattern
         ev["is_fraud"] = 1

@@ -1,4 +1,4 @@
-# XGBoost model — the supervised ("learn from labelled fraud") member of the ensemble.
+# XGBoost model - the supervised ("learn from labelled fraud") member of the ensemble.
 # Two jobs:
 #   1. score()   → probability that an event is fraud, used in the blended risk.
 #   2. explain()  → SHAP values that tell the analyst WHICH features drove the score.
@@ -31,7 +31,7 @@ FEATURE_NAMES = [
     "off_hours_ratio",
 ]
 
-# Expected magnitude for each feature when "normal" — used to scale fallback contributions
+# Expected magnitude for each feature when "normal" - used to scale fallback contributions
 _FEATURE_SCALE = [2.0, 1.0, 1.5, 1.0, 1.0, 0.5, 0.5, 0.5]
 
 
@@ -76,7 +76,7 @@ class XGBoostModel:
         if not self.is_fitted or self._model is None:
             return 0.5
         x = features.reshape(1, -1)
-        # Cap at 0.88 — XGBoost probabilities are uncalibrated on imbalanced data
+        # Cap at 0.88 - XGBoost probabilities are uncalibrated on imbalanced data
         # and saturate toward 1.0; capping keeps ensemble contributions realistic.
         return min(float(self._model.predict_proba(x)[0][1]), 0.88)
 
@@ -90,7 +90,7 @@ class XGBoostModel:
     def explain(self, features: np.ndarray) -> list[dict]:
         # Returns the top-5 features driving this event's score, with SHAP values.
         if not self.is_fitted or self._explainer is None:
-            logger.debug("[SHAP] Model not fitted — using fallback")
+            logger.debug("[SHAP] Model not fitted - using fallback")
             return _fallback_shap(features)
 
         x = features.reshape(1, -1)
@@ -108,7 +108,7 @@ class XGBoostModel:
                 arr = np.array(sv)
 
             if arr.ndim == 3:
-                # (n_samples, n_features, n_classes) — take positive class
+                # (n_samples, n_features, n_classes) - take positive class
                 arr = arr[:, :, 1]
 
             shap_row = arr[0]  # shape (n_features,)
@@ -119,7 +119,7 @@ class XGBoostModel:
             # (catches single-feature dominance where model ignores most inputs)
             non_trivial = int(np.sum(np.abs(shap_row) > 1e-3))
             if np.all(np.abs(shap_row) < 1e-9) or non_trivial < 3:
-                logger.warning("[SHAP] Degenerate SHAP (%d non-trivial) — using fallback", non_trivial)
+                logger.warning("[SHAP] Degenerate SHAP (%d non-trivial) - using fallback", non_trivial)
                 return _fallback_shap(features)
 
             # Build one record per feature: its value, its SHAP contribution, and
@@ -138,8 +138,8 @@ class XGBoostModel:
             return contributions[:5]
 
         except Exception as exc:
-            # Any SHAP error must never break scoring — fall back gracefully.
-            logger.warning("[SHAP] explain() exception: %s — using fallback", exc)
+            # Any SHAP error must never break scoring - fall back gracefully.
+            logger.warning("[SHAP] explain() exception: %s - using fallback", exc)
             return _fallback_shap(features)
 
     def save(self, path: str) -> None:
@@ -160,7 +160,7 @@ def _fallback_shap(features: np.ndarray) -> list[dict]:
     Scales contributions by per-feature expected magnitude so values are meaningful.
     """
     # Instead of fake/random numbers, derive each feature's contribution from its
-    # ACTUAL value divided by that feature's expected normal magnitude — so the
+    # ACTUAL value divided by that feature's expected normal magnitude - so the
     # explanation still reflects reality even when the real SHAP output is unusable.
     out = []
     for name, val, scale in zip(FEATURE_NAMES, features, _FEATURE_SCALE):
