@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-13T00:00:00.000Z",
+  "title": "Design System: SentinelIQ",
+  "extensions": {
+    "colorMeta": {
+      "deep-void":       { "role": "neutral",   "displayName": "Deep Void",       "canonical": "#0D1117", "tonalRamp": ["#020304", "#040608", "#070B10", "#0D1117", "#161B22", "#1C2128", "#2D333B", "#444C56"] },
+      "absolute-void":   { "role": "neutral",   "displayName": "Absolute Void",   "canonical": "#080D13", "tonalRamp": ["#020304", "#040608", "#080D13", "#0D1117", "#121820", "#161B22", "#1C2128", "#2D333B"] },
+      "surface-one":     { "role": "neutral",   "displayName": "Surface One",     "canonical": "#161B22", "tonalRamp": ["#050709", "#0A0E13", "#0D1117", "#161B22", "#1C2128", "#242B34", "#2D333B", "#3C444E"] },
+      "surface-two":     { "role": "neutral",   "displayName": "Surface Two",     "canonical": "#1C2128", "tonalRamp": ["#070A0D", "#0D1117", "#141A20", "#1C2128", "#242B34", "#2D333B", "#3C444E", "#4D5562"] },
+      "steel-grid":      { "role": "neutral",   "displayName": "Steel Grid",      "canonical": "#30363D", "tonalRamp": ["#0D1117", "#161B22", "#1C2128", "#242B34", "#30363D", "#3C444E", "#4D5562", "#636E7B"] },
+      "dormant":         { "role": "neutral",   "displayName": "Dormant",         "canonical": "#444C56", "tonalRamp": ["#1C2128", "#242B34", "#2D333B", "#3C444E", "#444C56", "#545E6A", "#636E7B", "#7D8793"] },
+      "focus-boundary":  { "role": "neutral",   "displayName": "Focus Boundary",  "canonical": "#4D5562", "tonalRamp": ["#1C2128", "#2D333B", "#3C444E", "#444C56", "#4D5562", "#636E7B", "#7D8793", "#8B949E"] },
+      "muted-signal":    { "role": "neutral",   "displayName": "Muted Signal",    "canonical": "#8B949E", "tonalRamp": ["#30363D", "#3C444E", "#4D5562", "#636E7B", "#7D8793", "#8B949E", "#A3ADB8", "#C4CBD4"] },
+      "signal-white":    { "role": "neutral",   "displayName": "Signal White",    "canonical": "#F0F6FC", "tonalRamp": ["#636E7B", "#7D8793", "#8B949E", "#A3ADB8", "#C4CBD4", "#D9E1EA", "#E8EFF6", "#F0F6FC"] },
+      "threat-red":      { "role": "primary",   "displayName": "Threat Red",      "canonical": "#DC2626", "tonalRamp": ["#7F1D1D", "#991B1B", "#B91C1C", "#DC2626", "#EF4444", "#F87171", "#FCA5A5", "#FEE2E2"] },
+      "amber-watch":     { "role": "secondary", "displayName": "Amber Watch",     "canonical": "#D97706", "tonalRamp": ["#78350F", "#92400E", "#B45309", "#D97706", "#F59E0B", "#FBBF24", "#FDE68A", "#FEF3C7"] },
+      "clear-green":     { "role": "tertiary",  "displayName": "Clear Green",     "canonical": "#16A34A", "tonalRamp": ["#14532D", "#166534", "#15803D", "#16A34A", "#22C55E", "#4ADE80", "#86EFAC", "#DCFCE7"] },
+      "auth-blue":       { "role": "tertiary",  "displayName": "Auth Blue",       "canonical": "#4472C4", "tonalRamp": ["#1E3A5F", "#1E4080", "#2353A4", "#4472C4", "#6091D4", "#86AFDF", "#AECBEE", "#D5E4F6"] },
+      "access-violet":   { "role": "tertiary",  "displayName": "Access Violet",   "canonical": "#8B49C4", "tonalRamp": ["#3B1263", "#4C1780", "#6424A0", "#8B49C4", "#A66DD4", "#C299E2", "#D9BEF0", "#F0E5FA"] }
+    },
+    "typographyMeta": {
+      "display":  { "displayName": "Display",  "purpose": "Landing page hero headline only. Maximum authority." },
+      "headline": { "displayName": "Headline", "purpose": "Section headings across landing and dashboard." },
+      "title":    { "displayName": "Title",    "purpose": "Component and feature card titles." },
+      "body":     { "displayName": "Body",     "purpose": "Primary content, alert explanations, descriptions. Cap at 65-75ch." },
+      "label":    { "displayName": "Label",    "purpose": "Dashboard section headers, metadata keys, badge text, nav category labels. Always uppercase." }
+    },
+    "shadows": [
+      { "name": "overlay-mask",  "value": "rgba(0,0,0,0.5) full-screen fixed", "purpose": "Alert panel backdrop. Signals modal-level interruption." },
+      { "name": "float",         "value": "0 8px 32px rgba(0,0,0,0.5)",        "purpose": "Toast notifications. Top-layer temporary messaging only." },
+      { "name": "hero-depth",    "value": "0 32px 96px rgba(0,0,0,0.6)",       "purpose": "Browser mockup on landing page. Decorative, brand surface only." },
+      { "name": "threat-glow",   "value": "0 0 6px #DC262688",                 "purpose": "Fraud event dots in event timeline. Semantic: marks a confirmed fraud event." }
+    ],
+    "motion": [
+      { "name": "state-transition", "value": "background 0.15s ease",                                   "purpose": "Hover/active state changes on interactive rows and nav items." },
+      { "name": "entry-slide",      "value": "opacity 0 to 1, translateY 22px to 0, duration 0.5s, easeOut", "purpose": "Section entry animation on landing page. Not used on dashboard." },
+      { "name": "entry-stagger",    "value": "0.13s delay between children",                             "purpose": "Staggered entry for landing page feature grids and stat strips." },
+      { "name": "live-pulse",       "value": "opacity [1, 0.2, 1], duration 1.8-2s, infinite, ease-in-out", "purpose": "Live monitoring indicator. Ambient confirmation the system is running." },
+      { "name": "bar-fill",         "value": "width 0.4s ease",                                          "purpose": "Progress bar fill transition for risk scores and peer comparison bars." },
+      { "name": "new-alert-slide",  "value": "opacity 0 to 1, translateY -8px to 0, duration 0.3s, ease-out", "purpose": "New event sliding into the live feed from top." }
+    ],
+    "breakpoints": [
+      { "name": "max-content", "value": "1200px", "purpose": "Max-width container for landing page sections." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Button Primary",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary CTA. Highest-contrast element on any dark surface. Used for 'View Live Demo', 'Get a Demo'.",
+      "html": "<button class=\"ds-btn-primary\">VIEW LIVE DEMO</button>",
+      "css": ".ds-btn-primary { background: #F0F6FC; color: #0D1117; padding: 12px 28px; font-size: 14px; font-weight: 700; letter-spacing: 0.02em; border: none; border-radius: 3px; cursor: pointer; font-family: ui-sans-serif, system-ui, sans-serif; transition: background 0.15s; } .ds-btn-primary:hover { background: #8B949E; } .ds-btn-primary:focus-visible { outline: 2px solid #F0F6FC; outline-offset: 2px; }"
+    },
+    {
+      "name": "Button Ghost",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary action alongside a primary CTA. Equal padding, lower visual weight.",
+      "html": "<button class=\"ds-btn-ghost\">See How It Works</button>",
+      "css": ".ds-btn-ghost { background: transparent; color: #F0F6FC; padding: 12px 28px; font-size: 14px; font-weight: 600; letter-spacing: 0.02em; border: 1px solid #30363D; border-radius: 3px; cursor: pointer; font-family: ui-sans-serif, system-ui, sans-serif; transition: background 0.15s, border-color 0.15s; } .ds-btn-ghost:hover { background: #1C2128; border-color: #4D5562; } .ds-btn-ghost:focus-visible { outline: 2px solid #F0F6FC; outline-offset: 2px; }"
+    },
+    {
+      "name": "Button Danger",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Destructive or high-commitment analyst action. 'MARK RESOLVED' in the alert panel.",
+      "html": "<button class=\"ds-btn-danger\">MARK RESOLVED</button>",
+      "css": ".ds-btn-danger { background: #DC2626; color: #FFFFFF; padding: 10px 16px; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; border: none; border-radius: 3px; cursor: pointer; font-family: ui-sans-serif, system-ui, sans-serif; transition: opacity 0.15s; } .ds-btn-danger:hover { opacity: 0.88; } .ds-btn-danger:disabled { opacity: 0.6; cursor: not-allowed; } .ds-btn-danger:focus-visible { outline: 2px solid #DC2626; outline-offset: 2px; }"
+    },
+    {
+      "name": "Risk Badge Critical",
+      "kind": "chip",
+      "refersTo": "risk-badge-critical",
+      "description": "Signals critical/high risk. The most important component in the system — stops the eye before the analyst reads anything else.",
+      "html": "<span class=\"ds-risk-badge ds-risk-critical\"><span class=\"ds-risk-dot\"></span>CRITICAL<span class=\"ds-risk-score\">94</span></span>",
+      "css": ".ds-risk-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; border-radius: 2px; white-space: nowrap; font-family: ui-sans-serif, system-ui, sans-serif; } .ds-risk-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex-shrink: 0; } .ds-risk-score { opacity: 0.8; margin-left: 2px; } .ds-risk-critical { border: 1px solid #DC2626; color: #DC2626; } .ds-risk-critical .ds-risk-dot { background: #DC2626; }"
+    },
+    {
+      "name": "Risk Badge Medium",
+      "kind": "chip",
+      "refersTo": "risk-badge-medium",
+      "description": "Signals medium risk. Elevated attention, not immediate action.",
+      "html": "<span class=\"ds-risk-badge ds-risk-medium\"><span class=\"ds-risk-dot\"></span>MEDIUM<span class=\"ds-risk-score\">61</span></span>",
+      "css": ".ds-risk-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; border-radius: 2px; white-space: nowrap; font-family: ui-sans-serif, system-ui, sans-serif; } .ds-risk-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex-shrink: 0; } .ds-risk-score { opacity: 0.8; margin-left: 2px; } .ds-risk-medium { border: 1px solid #D97706; color: #D97706; } .ds-risk-medium .ds-risk-dot { background: #D97706; }"
+    },
+    {
+      "name": "Risk Badge Low",
+      "kind": "chip",
+      "refersTo": "risk-badge-low",
+      "description": "Signals low risk. Clear — no action required.",
+      "html": "<span class=\"ds-risk-badge ds-risk-low\"><span class=\"ds-risk-dot\"></span>LOW<span class=\"ds-risk-score\">28</span></span>",
+      "css": ".ds-risk-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; border-radius: 2px; white-space: nowrap; font-family: ui-sans-serif, system-ui, sans-serif; } .ds-risk-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex-shrink: 0; } .ds-risk-score { opacity: 0.8; margin-left: 2px; } .ds-risk-low { border: 1px solid #16A34A; color: #16A34A; } .ds-risk-low .ds-risk-dot { background: #16A34A; }"
+    },
+    {
+      "name": "Stat Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Dashboard stat card. Label top, large numeric value, optional delta and sub-label.",
+      "html": "<div class=\"ds-stat-card\"><p class=\"ds-stat-label\">ALERTS TODAY</p><p class=\"ds-stat-value\" style=\"color:#DC2626\">7</p><span class=\"ds-stat-sub\">+3 from yesterday</span></div>",
+      "css": ".ds-stat-card { background: #161B22; border: 1px solid #30363D; border-radius: 4px; padding: 20px 24px; } .ds-stat-label { margin: 0 0 10px; font-size: 11px; color: #8B949E; letter-spacing: 0.08em; font-weight: 600; text-transform: uppercase; font-family: ui-sans-serif, system-ui, sans-serif; } .ds-stat-value { margin: 0 0 4px; font-size: 28px; font-weight: 700; line-height: 1; letter-spacing: -0.02em; font-family: ui-sans-serif, system-ui, sans-serif; } .ds-stat-sub { font-size: 11px; color: #8B949E; font-family: ui-sans-serif, system-ui, sans-serif; }"
+    },
+    {
+      "name": "Live Indicator",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Pulsing green dot confirming the system is actively monitoring. Appears in sidebar and live feed header.",
+      "html": "<div class=\"ds-live-indicator\"><span class=\"ds-live-dot\"></span><span class=\"ds-live-label\">LIVE MONITORING</span></div>",
+      "css": ".ds-live-indicator { display: flex; align-items: center; gap: 5px; } .ds-live-dot { width: 6px; height: 6px; border-radius: 50%; background: #16A34A; display: inline-block; flex-shrink: 0; animation: ds-pulse 1.8s ease-in-out infinite; } .ds-live-label { font-size: 10px; color: #16A34A; letter-spacing: 0.06em; font-weight: 600; font-family: ui-sans-serif, system-ui, sans-serif; } @keyframes ds-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }"
+    },
+    {
+      "name": "Section Label",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Dashboard section header. The visual grammar that separates data from metadata. Always uppercase, always tracked.",
+      "html": "<p class=\"ds-section-label\">FEATURE ATTRIBUTION (SHAP)</p>",
+      "css": ".ds-section-label { margin: 0; font-size: 11px; color: #8B949E; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; font-family: ui-sans-serif, system-ui, sans-serif; line-height: 1.4; }"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": null,
+      "description": "Standard text input. Sits visually below the card surface it lives in.",
+      "html": "<textarea class=\"ds-input\" placeholder=\"Add investigator notes…\"></textarea>",
+      "css": ".ds-input { background: #0D1117; border: 1px solid #30363D; border-radius: 4px; color: #F0F6FC; font-size: 12px; font-family: ui-sans-serif, system-ui, sans-serif; line-height: 1.6; padding: 10px 12px; width: 100%; box-sizing: border-box; outline: none; resize: vertical; transition: border-color 0.15s; } .ds-input::placeholder { color: #8B949E; } .ds-input:focus { border-color: #4D5562; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Operations Room",
+    "overview": "SentinelIQ's visual system is built around a single scene: a 24/7 security command centre running under controlled light. Every analyst knows exactly where to look. Every indicator has a single meaning. Nothing decorates; everything informs. The surface is calm because the system is always watching, and it interrupts that calm — precisely, surgically — only when threat demands it.\n\nThe system uses four tonal dark layers to convey depth without shadows. Color appears exactly three times: red for threat, amber for watch, green for clear. These are not accent colours. They are the data. Their rarity is what makes them legible — on a screen full of near-black surfaces, a single red badge stops the eye immediately.\n\nTypography is Geist throughout: a system sans with optical engineering built in. Display weights at 800 create authority without decoration. Section labels run small, uppercase, tracked wide — the visual grammar of a data readout, not a marketing page.",
+    "keyCharacteristics": [
+      "Four tonal dark layers as the entire depth vocabulary",
+      "Red, amber, green as semantic signals — never decorative",
+      "Sharp corners (2-4px radius) everywhere except avatars",
+      "Uppercase tracked labels as the visual grammar for data headers",
+      "Live pulse indicators as the only ambient motion",
+      "Maximum information density at the data level; no cosmetic padding"
+    ],
+    "rules": [
+      { "name": "The One Interruption Rule",    "body": "Threat Red appears on less than 10% of any given screen during normal operating conditions. Its rarity is the signal. Never use red for decoration, emphasis, or branding on product surfaces.",                               "section": "colors" },
+      { "name": "The Semantic Lock Rule",       "body": "Red means critical/high. Amber means medium. Green means low or live. These assignments are immutable. No other UI purpose may borrow these colors.",                                                                           "section": "colors" },
+      { "name": "The Stat Weight Rule",         "body": "Numeric data values use weight 700-800 at 28-42px with letter-spacing -0.02 to -0.03em. The number is the most important thing on that surface.",                                                                             "section": "typography" },
+      { "name": "The Label Doctrine",           "body": "All section-level headers inside the dashboard use the Label style: small, uppercase, tracked. Never sentence case. The visual distinction between a label and a value is non-negotiable.",                                    "section": "typography" },
+      { "name": "The Flat-By-Default Rule",     "body": "Data surfaces are flat at rest. Surface Two (#1C2128) is the hover state — it communicates interactivity through tonal shift, not shadow. If you're adding a shadow to a card or row, you're adding it to the wrong thing.", "section": "elevation" },
+      { "name": "The Dot Requirement",          "body": "The 6px filled circle before a risk badge label is non-negotiable. Color alone does not meet WCAG AA. The dot provides a redundant non-color signal. Never remove it.",                                                       "section": "components" }
+    ],
+    "dos": [
+      "Do use the four tonal dark surfaces as the entire depth vocabulary.",
+      "Do pair every risk color with a text label and the filled dot in RiskBadge.",
+      "Do use uppercase tracked labels (10-11px, weight 600, letter-spacing 0.06-0.08em) for all section headers inside the dashboard.",
+      "Do apply transition: background 0.15s on interactive rows and nav items.",
+      "Do use easeOut curves for all entry animations. Never bounce, elastic, or spring.",
+      "Do stagger child entry animations at 0.13s intervals on landing sections.",
+      "Do reserve the pulsing live indicator (Clear Green, opacity loop) for components that represent real-time system state."
+    ],
+    "donts": [
+      "Don't use generic SaaS dashboard patterns: blue gradients, rounded pill badges, hero metric cards with gradient accents, identical icon-heading-text card grids.",
+      "Don't use red (#DC2626) for decoration, hover states, emphasis, or any purpose other than critical/high risk and primary CTAs.",
+      "Don't add shadows to cards, table rows, or any data surface.",
+      "Don't use gradient text (background-clip: text).",
+      "Don't use glassmorphism as decoration — the landing nav blur is the only acceptable instance.",
+      "Don't use border-radius greater than 4px on any card, button, or data container.",
+      "Don't add padding to screens to make them look clean — whitespace is earned at the data level.",
+      "Don't animate CSS layout properties (width, height, margin, padding). Animate opacity and transform only.",
+      "Don't build modals as a first-choice pattern — use fixed sidebar drawers or inline disclosure first.",
+      "Don't use consumer fintech visual language: friendly rounded corners, warm background tints, onboarding illustrations, playful copy.",
+      "Don't use cyberpunk aesthetics: neon green terminals, matrix-style motion, high-chroma color schemes."
+    ]
+  }
+}
