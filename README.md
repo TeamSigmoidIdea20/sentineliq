@@ -1,157 +1,104 @@
-<div align="center">
+<p align="center">
+  <img src="frontend/public/logo.png" alt="SentinelIQ" width="80" />
+</p>
 
-<img src="frontend/public/logo.png" alt="SentinelIQ logo" width="96" />
+<h1 align="center">SentinelIQ</h1>
 
-# SentinelIQ
+<p align="center">
+  Real-time insider threat detection with a 3-model ML ensemble and explainable alerts.
+</p>
 
-### AI-Powered Insider Threat Detection for the Modern SOC
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.10-3776AB?logo=python&logoColor=white" alt="Python 3.10" />
+  <img src="https://img.shields.io/badge/FastAPI-0.104-009688?logo=fastapi&logoColor=white" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/PyTorch-2.1-EE4C2C?logo=pytorch&logoColor=white" alt="PyTorch" />
+  <img src="https://img.shields.io/badge/scikit--learn-1.3-F7931E?logo=scikitlearn&logoColor=white" alt="scikit-learn" />
+  <img src="https://img.shields.io/badge/XGBoost-2.0-189FDD" alt="XGBoost" />
+  <img src="https://img.shields.io/badge/Next.js-14-000000?logo=nextdotjs&logoColor=white" alt="Next.js 14" />
+</p>
 
-**Catch the attacker who already has a valid login - in seconds, not months.**
+<p align="center">
+  <a href="https://sentineliq-gold.vercel.app/">Live demo</a> ·
+  <a href="https://youtu.be/ebN6C0Ewx7U">Demo video</a> ·
+  <a href="https://rak2315-sentineliq-backend.hf.space/health">Backend API</a>
+</p>
 
-[![CodeArambh 2.0](https://img.shields.io/badge/CodeArambh-2.0-DC2626?style=for-the-badge)](https://github.com/TeamSigmoidIdea20/sentineliq)
-[![Track](https://img.shields.io/badge/Track-Open_Innovation-161B22?style=for-the-badge&labelColor=30363D)](#-why-it-fits-open-innovation)
-[![Domain](https://img.shields.io/badge/Domain-Cybersecurity-D97706?style=for-the-badge)](#-the-problem)
-[![Status](https://img.shields.io/badge/Status-Live-16A34A?style=for-the-badge)](https://sentineliq-gold.vercel.app/)
+<p align="center">
+  <img src="docs/images/landing.png" alt="SentinelIQ landing page" width="100%" />
+</p>
 
-[![Python](https://img.shields.io/badge/Python-3.10-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.1-EE4C2C?style=flat-square&logo=pytorch&logoColor=white)](https://pytorch.org/)
-[![scikit-learn](https://img.shields.io/badge/scikit--learn-1.3-F7931E?style=flat-square&logo=scikitlearn&logoColor=white)](https://scikit-learn.org/)
-[![XGBoost](https://img.shields.io/badge/XGBoost-2.0-189FDD?style=flat-square)](https://xgboost.ai/)
-[![SHAP](https://img.shields.io/badge/SHAP-Explainable_AI-8B949E?style=flat-square)](https://shap.readthedocs.io/)
-[![Next.js](https://img.shields.io/badge/Next.js-14-000000?style=flat-square&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![SQLite](https://img.shields.io/badge/SQLite-WAL-003B57?style=flat-square&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
-[![Vercel](https://img.shields.io/badge/Frontend-Vercel-000000?style=flat-square&logo=vercel&logoColor=white)](https://sentineliq-gold.vercel.app/)
-[![Hugging Face](https://img.shields.io/badge/Backend-HF_Spaces-FFD21E?style=flat-square&logo=huggingface&logoColor=black)](https://rak2315-sentineliq-backend.hf.space/health)
+Built by Team SIGMOID for CodeArambh 2.0 (Open Innovation track, cybersecurity).
 
-**[🌐 Live Demo](https://sentineliq-gold.vercel.app/)** &nbsp;·&nbsp;
-**[🎬 Demo Video](https://youtu.be/ebN6C0Ewx7U)** &nbsp;·&nbsp;
-**[⚙️ Backend API](https://rak2315-sentineliq-backend.hf.space/health)** &nbsp;·&nbsp;
-**[🏗️ Architecture](#%EF%B8%8F-architecture)**
+## Contents
 
-<br/>
+- [Problem](#problem)
+- [What SentinelIQ does](#what-sentineliq-does)
+- [Screenshots](#screenshots)
+- [Architecture](#architecture)
+- [Models and features](#models-and-features)
+- [Validation against CMU CERT](#validation-against-cmu-cert)
+- [Tech stack](#tech-stack)
+- [Running locally](#running-locally)
+- [Trying the demo](#trying-the-demo)
+- [API](#api)
+- [Project structure](#project-structure)
+- [Limitations](#limitations)
+- [What's next](#whats-next)
+- [The idea in short](#the-idea-in-short)
 
-<img src="docs/images/landing.png" alt="SentinelIQ landing page" width="100%" />
+## Problem
 
-</div>
+Most security tooling is built to keep attackers out. Insiders are already in. An employee, an admin, a contractor, or anyone using stolen credentials can do real damage while every action they take looks authorised, so firewalls and antivirus never fire.
 
----
+The Ponemon Institute's 2026 Cost of Insider Risks report puts the average cost at $19.5M per organisation per year, and the average incident takes 67 days to contain.
 
-> **SentinelIQ** learns what "normal" looks like for every privileged user, scores every action they take in real time with a **3-model ML ensemble**, and explains every alert with **SHAP feature attribution** and a plain-English narrative. The result: a security analyst goes from *alert fired* to *decision made* in under 30 seconds.
+The usual defences are fixed rules ("flag transfers above X") and periodic audits. Neither knows what normal looks like for a specific person. An admin who grants themselves extra privileges at 3 AM, or an analyst who exports 50 times their usual data volume, does not break a rule. They only break their own pattern, and nobody is watching for that.
 
-## 📑 Table of Contents
+Banks and fintechs are where this hurts most, because a single privileged action can move money or expose thousands of customer records. That is the setting we built the demo around.
 
-- [🚨 The Problem](#-the-problem)
-- [🛡️ The Solution](#%EF%B8%8F-the-solution)
-- [🎯 Why It Fits Open Innovation](#-why-it-fits-open-innovation)
-- [📸 Product Tour](#-product-tour)
-- [🏗️ Architecture](#%EF%B8%8F-architecture)
-- [🧠 The ML Engine](#-the-ml-engine)
-- [🔬 Benchmark Validation](#-benchmark-validation-cmu-cert-r42)
-- [🧰 Tech Stack](#-tech-stack)
-- [🚀 Quick Start](#-quick-start)
-- [🎬 60-Second Demo Guide](#-60-second-demo-guide)
-- [🔌 API Reference](#-api-reference)
-- [📁 Project Structure](#-project-structure)
-- [⚠️ Limitations & 🗺️ Roadmap](#%EF%B8%8F-limitations)
+## What SentinelIQ does
 
----
+SentinelIQ keeps a behavioural baseline for every monitored user and scores each new action against it as it happens.
 
-## 🚨 The Problem
+- Each event is turned into 8 behavioural features, measured against that user's own recent activity.
+- Three models score the event: an Isolation Forest, an LSTM autoencoder and an XGBoost classifier. Their scores are blended into one risk score from 0 to 100.
+- A score of 65 or more creates an alert. 80 or more is treated as critical and can trigger an outbound webhook.
+- Every alert carries a SHAP breakdown of which features pushed the score up, and a short plain-English summary of what happened.
+- A second alert for the same user within 24 hours opens a case, with all related events laid out on one timeline.
+- If the same attack pattern shows up across three or more users within 30 minutes, the dashboard flags it as coordinated activity.
+- Analysts can resolve, dismiss, add notes, restrict or escalate a user, and export the evidence as JSON.
+- Analysts label alerts as true or false positives. Once there are 10 labels, XGBoost can be retrained on them from the dashboard.
+- External systems can push their own events through `POST /api/ingest`.
 
-**The most dangerous attacker already has a valid login.** Insiders (employees, admins, contractors, or anyone whose credentials have been stolen) walk straight past firewalls, antivirus and perimeter defences, because every action they take looks authorised.
+Nothing is blocked automatically. The system is investigation-only: it surfaces and explains, and a person decides.
 
-<div align="center">
+The demo monitors a simulated bank workforce of 50 employees (tellers, analysts, managers, admins, treasury officers). The pipeline does not depend on banking, though. It works on behaviour, so the same approach applies to any organisation with privileged users.
 
-| 💸 **$19.5M** | ⏱️ **67 days** | 🔒 **0** |
-|:---:|:---:|:---:|
-| Average annual insider risk cost per organisation | Average time to contain an insider incident | Firewalls that can stop someone already inside |
+## Screenshots
 
-<sub>Source: Ponemon Institute, *2026 Cost of Insider Risks Global Report*</sub>
-
-</div>
-
-Most organisations still rely on **static rules** ("flag transfers over ₹10 lakh") and **periodic audits**. Neither knows what normal looks like for *each individual user*. So an admin escalating their own privileges at 3 AM, or an analyst quietly exporting 50x their usual data volume, goes unnoticed until the damage is done.
-
-Banks and fintechs feel this the hardest: a single privileged action can move money or leak thousands of customer records.
-
----
-
-## 🛡️ The Solution
-
-SentinelIQ is an **AI-driven cybersecurity platform** that builds a dynamic behavioural baseline for every monitored user and raises an explained alert the moment behaviour deviates. It works in real time, not after a quarterly audit.
-
-| | Capability | What it does |
-|:---:|---|---|
-| 🧬 | **Per-user behavioural baselines** | Every user is scored against their *own* history, not a generic role profile |
-| 🤖 | **3-model ML ensemble** | Isolation Forest + LSTM Autoencoder + XGBoost score every event in parallel |
-| 🔍 | **SHAP explainability** | Every alert shows exactly which behaviours drove the score, and by how much |
-| 🗣️ | **Plain-English narratives** | An LLM turns the real numbers into a short summary for non-technical investigators |
-| 🔗 | **Kill-chain case detection** | 2+ alerts from the same user within 24h are stitched into one attack case with a timeline |
-| 👥 | **Peer comparison** | Each suspect is compared against same-role peers on download, access, off-hours and velocity |
-| 🔁 | **Active learning loop** | Analyst True/False Positive labels retrain XGBoost, so the system gets sharper with use |
-| 🚦 | **Coordinated attack banners** | The same attack pattern across 3+ users in 30 minutes is flagged as coordinated activity |
-| 📡 | **SIEM integration** | Ingest real logs via `POST /api/ingest`; critical alerts (risk ≥ 80) fire an outbound webhook |
-| 📦 | **Evidence export** | One-click JSON evidence package per alert for audit and compliance handoff |
-
-> 🏦 **Flagship use case:** the live demo monitors a simulated bank workforce (tellers, analysts, managers, admins, treasury officers), where insider abuse is most costly. The detection pipeline itself is domain-agnostic: it scores *behaviour*, not job titles.
-
----
-
-## 🎯 Why It Fits Open Innovation
-
-| Track objective | How SentinelIQ delivers |
+| Overview | Alert investigation |
 |---|---|
-| 💡 **Innovation & problem-solving** | Replaces static rules with per-user behavioural baselines and a 3-model ensemble. Unsupervised models catch attacks nobody has written a rule for yet. |
-| ⚙️ **Functional, scalable prototype** | Fully deployed and live. Events stream, get scored, alerted, explained and grouped into cases continuously. The event-driven design scales by swapping SQLite for PostgreSQL and adding a message queue, not by rewriting. |
-| 🌍 **Genuine challenge, practical value** | Insider threats are one of the costliest, hardest-to-detect attack classes in cybersecurity. SentinelIQ plugs into existing logs through `/api/ingest`. |
-| 🏆 **Creativity, technical excellence, user impact** | SHAP evidence and plain-English narratives make ML decisions trustworthy for analysts. Validated against the CMU CERT r4.2 insider-threat benchmark, and it caught a real CERT insider live. |
+| ![Overview dashboard](docs/images/dashboard.png) | ![Alert detail](docs/images/alert-detail.png) |
+| Live event feed, headline numbers, recent alerts and the attack simulator. | Per-model scores, SHAP attribution, peer comparison, summary and analyst actions. |
 
----
+| Cases | Model intelligence |
+|---|---|
+| ![Cases](docs/images/cases.png) | ![Model intelligence](docs/images/intelligence.png) |
+| Related alerts grouped into a case with an investigation timeline. | Model configuration, precision / recall / F1, alert volume and retraining. |
 
-## 📸 Product Tour
+![User monitoring](docs/images/users.png)
 
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <img src="docs/images/dashboard.png" alt="Overview dashboard" />
-      <p align="center"><b>📊 Overview</b><br/><sub>Live intelligence feed, headline stats, recent alerts and a one-click attack simulator</sub></p>
-    </td>
-    <td width="50%" valign="top">
-      <img src="docs/images/alert-detail.png" alt="Alert investigation panel" />
-      <p align="center"><b>🔍 Alert Investigation</b><br/><sub>Per-model scores, SHAP attribution, peer comparison, AI narrative and analyst actions</sub></p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <img src="docs/images/cases.png" alt="Kill chain cases" />
-      <p align="center"><b>🔗 Kill-Chain Cases</b><br/><sub>Related alerts stitched into one case with a typed investigation timeline</sub></p>
-    </td>
-    <td width="50%" valign="top">
-      <img src="docs/images/intelligence.png" alt="Model intelligence" />
-      <p align="center"><b>🧠 Model Intelligence</b><br/><sub>Model cards, precision / recall / F1, alert volume and a live retraining pipeline</sub></p>
-    </td>
-  </tr>
-  <tr>
-    <td colspan="2">
-      <img src="docs/images/users.png" alt="User monitoring" />
-      <p align="center"><b>👥 User Monitoring</b><br/><sub>Every monitored employee ranked by live risk, with watchlist, restrict and escalate actions</sub></p>
-    </td>
-  </tr>
-</table>
+All monitored users ranked by current risk, with watchlist, restrict and escalate.
 
----
+## Architecture
 
-## 🏗️ Architecture
+### Detection pipeline
 
-### 1. Real-Time Detection Pipeline
-
-Every event (live, simulated or ingested from a SIEM) takes the same path through the engine.
+Every event takes the same path, whether it comes from the live stream, the simulator or an external system.
 
 ```mermaid
 flowchart TD
-    A[User Activity Event] --> B[SentinelIQ Ingest]
+    A[User Activity Event] --> B[Ingest]
     B --> C[Feature Engineering<br/>8 rolling-window signals]
     C --> D[Isolation Forest<br/>point anomaly]
     C --> E[LSTM Autoencoder<br/>sequence drift]
@@ -164,35 +111,35 @@ flowchart TD
     H -->|65 to 79| J[HIGH ALERT]
     H -->|80 and above| K[CRITICAL ALERT]
     K -->|Webhook| L[External SIEM / SOC]
-    J --> M[SHAP Attribution<br/>+ AI Narrative]
+    J --> M[SHAP Attribution<br/>+ Summary]
     K --> M
     M --> N{Prior Alert<br/>Within 24h?}
     N -->|No| O[ALERT QUEUE]
-    N -->|Yes| P[KILL-CHAIN CASE]
+    N -->|Yes| P[CASE]
 ```
 
-### 2. System Architecture
+### System
 
 ```mermaid
 flowchart TD
-    U[SOC Analyst Browser] --> V[Next.js 14 Dashboard<br/>Vercel]
+    U[Analyst Browser] --> V[Next.js 14 Dashboard<br/>Vercel]
     V -->|REST polling every 3s| API[FastAPI REST API<br/>HuggingFace Spaces]
     SIEM[SIEM / Log Sources] -->|POST /api/ingest| API
     CERT[CERT r4.2 Replay] -->|POST /api/ingest| API
     API --> PIPE[Event Pipeline]
     LOOP[Live Event Loop<br/>1 event every 3s] --> PIPE
-    API --> LLM[AI Narrative<br/>Grok, optional]
+    API --> LLM[Alert Summary<br/>Grok, optional]
     PIPE --> ML[ML Ensemble<br/>IF + LSTM + XGBoost]
     ML --> SHAP[SHAP TreeExplainer]
     PIPE --> DB[(SQLite WAL<br/>events, alerts, cases)]
     PIPE -->|Risk 80+| HOOK[Alerting Webhook]
 ```
 
-### 3. Analyst Decision & Active Learning Loop
+### Analyst feedback loop
 
 ```mermaid
 flowchart TD
-    A[Alert Opened] --> B[Evidence Review<br/>SHAP, peers, timeline, narrative]
+    A[Alert Opened] --> B[Evidence Review<br/>SHAP, peers, timeline, summary]
     B --> C{Analyst Verdict}
     C -->|TRUE POSITIVE| D[Label TP]
     C -->|FALSE POSITIVE| E[Label FP]
@@ -207,7 +154,7 @@ flowchart TD
     L --> M[Updated Model<br/>Scores Future Events]
 ```
 
-### 4. Deployment
+### Deployment
 
 ```mermaid
 flowchart TD
@@ -218,233 +165,206 @@ flowchart TD
     PING[Uptime Pinger<br/>every ~3 min] -->|keeps container warm| HF
 ```
 
----
+## Models and features
 
-## 🧠 The ML Engine
+We use three models because each one notices a different kind of problem.
 
-### Three models, three reasons to be suspicious
+| Model | Type | Looks for | Weight | Settings |
+|---|---|---|---|---|
+| Isolation Forest | Unsupervised | A single event far outside the normal cluster | 0.4 | 100 trees, contamination 0.1 |
+| LSTM Autoencoder | Unsupervised, sequential | A run of events that no longer matches the user's usual rhythm | 0.4 | sequence length 10, hidden size 16 |
+| XGBoost | Supervised | Events that resemble labelled attack patterns | 0.2 | 60 trees, depth 3, probability capped at 0.88 |
 
-| Model | Type | What it catches | Weight | Config |
-|---|---|---|:---:|---|
-| 🌲 **Isolation Forest** | Unsupervised | *Point anomalies*: a single event that sits far outside the normal cluster | **40%** | 100 trees, contamination 0.1 |
-| 🔄 **LSTM Autoencoder** | Unsupervised, temporal | *Behavioural drift*: sequences of events that no longer look like the user's normal rhythm | **40%** | seq_len 10, hidden 16 |
-| 🎯 **XGBoost** | Supervised | *Known attack signatures*: events that match labelled attack patterns | **20%** | 60 trees, depth 3, proba capped at 0.88 |
+The two unsupervised models carry most of the weight because they do not need labelled attacks, so they can flag behaviour nobody has seen before. XGBoost is weighted lower and is the one that improves with analyst labels.
 
-The ensemble blends the three 0-1 scores into a single **0-100 risk score**. Alerts fire at **65**, and **80+** is critical. When models disagree, that disagreement is itself shown to the analyst.
+**Features** (computed per event, per user, over a rolling window of that user's recent events):
 
-### 8 behavioural signals per event
+| Feature | What it measures |
+|---|---|
+| `login_hour_deviation` | Distance of this login from the user's normal working hours |
+| `transaction_velocity_ratio` | Transactions compared with the user's own average |
+| `access_entropy` | How spread out the user's department access is (Shannon entropy) |
+| `download_volume_zscore` | How unusual the download size is for this user |
+| `location_mismatch` | Whether the location is outside the user's usual set |
+| `privilege_use_ratio` | How often privileged actions are being used |
+| `device_change_frequency` | How often the user switches devices |
+| `off_hours_ratio` | Share of recent activity outside business hours |
 
-| # | Feature | Measures |
-|:---:|---|---|
-| 1 | `login_hour_deviation` | How far this login time is from the user's normal hours |
-| 2 | `transaction_velocity_ratio` | Transactions vs. the user's own average |
-| 3 | `access_entropy` | Shannon entropy of departments accessed (spread of access) |
-| 4 | `download_volume_zscore` | How unusual this download volume is for the user |
-| 5 | `location_mismatch` | Access from a location outside the user's normal set |
-| 6 | `privilege_use_ratio` | How often privileged actions are being used |
-| 7 | `device_change_frequency` | How often the user is switching devices |
-| 8 | `off_hours_ratio` | Share of recent activity outside business hours |
+**Attack patterns** in the synthetic data, injected at roughly 7% of events:
 
-### 6 insider attack patterns
-
-| Pattern | Real-world behaviour | Dashboard simulator scenario |
+| Pattern | Behaviour | In the simulator |
 |---|---|---|
-| 🌙 `off_hours_login` | Logging in at 3 AM when the user normally works 9 to 5 | Off-Hours Treasury Access |
-| 📤 `bulk_download` | Exporting a huge volume of records (data exfiltration) | Bulk Data Exfiltration |
-| 🧭 `cross_department_access` | Querying systems outside the user's department | - |
-| 🔑 `privilege_escalation` | Granting themselves elevated rights | Privilege Escalation |
-| ⚡ `velocity_spike` | 8-15x the user's usual transaction count | - |
-| ✏️ `account_modification` | Tampering with account records | Account Record Tampering |
+| `off_hours_login` | Logging in at 3 AM when the user normally works 9 to 5 | Off-Hours Treasury Access |
+| `bulk_download` | Exporting an unusually large volume of records | Bulk Data Exfiltration |
+| `cross_department_access` | Querying systems outside the user's department | not exposed |
+| `privilege_escalation` | Granting themselves elevated rights | Privilege Escalation |
+| `velocity_spike` | 8 to 15 times the usual transaction count | not exposed |
+| `account_modification` | Changing account records | Account Record Tampering |
 
----
-
-## 🔬 Benchmark Validation (CMU CERT r4.2)
-
-No real-world insider-threat dataset from a financial institution is public, so we validated our synthetic behaviour against **CMU CERT r4.2**, the standard insider-threat benchmark used across academic UEBA research (220k+ logon events analysed).
-
-- ✅ **Validated:** both SentinelIQ and CERT are strongly business-hours-dominant with rare off-hours activity, which confirms the off-hours signal is well-founded.
-- 🧪 **Honest finding:** CERT has a small (~4.5%) background of benign night activity, while our default synthetic baseline is ~0% (idealised). An **optional CERT calibration** samples login hours from CERT's real distribution to close this gap (off by default).
-- 🎯 **Caught a real insider:** `scripts/cert/cert_to_ingest.py` replays documented CERT malicious insider **CAH0936** (off-hours logon → USB connect → data upload) through `POST /api/ingest`. SentinelIQ flags it at **risk 84**.
-
-Tooling lives in [`scripts/cert/`](scripts/cert/). The CERT data itself is not committed (multi-GB); see that folder's README to reproduce.
-
-### Model performance (synthetic test set)
+**Results on the synthetic test set:**
 
 | Model | Precision | Recall | F1 |
-|---|:---:|:---:|:---:|
+|---|---|---|---|
 | Isolation Forest | 0.81 | 0.76 | 0.78 |
 | LSTM Autoencoder | 0.84 | 0.79 | 0.81 |
 | XGBoost | 0.88 | 0.83 | 0.85 |
-| **Ensemble (0.4 / 0.4 / 0.2)** | **0.91** | **0.86** | **0.88** |
+| Ensemble | 0.91 | 0.86 | 0.88 |
 
-<sub>Measured on synthetic data. Production use requires retraining on real labelled activity logs.</sub>
+These numbers come from synthetic data, so treat them as a sanity check and not a production benchmark.
 
-### 100% synthetic data
+## Validation against CMU CERT
 
-No real organisation's data was used at any stage. `backend/data/synthetic_generator.py` simulates **50 employees across 5 roles** (teller, analyst, manager, admin, treasury_officer), each with realistic login hours, Gaussian transaction and download volumes, typical departments and locations. Attack patterns are injected at a ~7% rate.
+All data in this project is synthetic. No real organisation's data was used. Since there is no public insider-threat dataset from a real financial institution, we checked our generator against CMU CERT r4.2, the dataset most insider-threat research uses.
 
----
+What we found, using about 220k CERT logon events:
 
-## 🧰 Tech Stack
+- Both datasets are dominated by business-hours activity with very little at night, which supports using off-hours activity as a signal.
+- CERT has about 4.5% harmless night activity. Our default generator has close to none, which is cleaner than reality. We added an optional calibration mode that samples login hours from the CERT distribution. It is off by default.
+- `scripts/cert/cert_to_ingest.py` replays a documented CERT insider (user CAH0936: off-hours logon, USB device, data upload) through `/api/ingest`. SentinelIQ scores it at 84.
 
-| Layer | Technology |
+The scripts are in [`scripts/cert/`](scripts/cert/). The CERT data itself is several GB and is not in the repo. That folder's README explains how to get it.
+
+## Tech stack
+
+| | |
 |---|---|
-| 🎨 **Frontend** | Next.js 14, TypeScript, Tailwind CSS, Framer Motion, Recharts |
-| ⚙️ **Backend** | FastAPI, Uvicorn, SQLAlchemy (async), aiosqlite, Pydantic |
-| 🧠 **Machine learning** | scikit-learn (Isolation Forest), PyTorch (LSTM Autoencoder), XGBoost, SHAP |
-| 🗣️ **Narratives** | Grok (`grok-3-mini`) via OpenAI-compatible SDK, optional |
-| 🗄️ **Database** | SQLite in WAL mode |
-| ☁️ **Hosting** | Vercel (frontend), HuggingFace Spaces Docker (backend) |
-| 🔬 **Validation** | CMU CERT r4.2 insider-threat benchmark |
+| Frontend | Next.js 14, TypeScript, Tailwind CSS, Framer Motion, Recharts |
+| Backend | FastAPI, Uvicorn, async SQLAlchemy, Pydantic |
+| ML | scikit-learn, PyTorch, XGBoost, SHAP |
+| Alert summaries | Grok (`grok-3-mini`), optional |
+| Database | SQLite in WAL mode |
+| Hosting | Vercel (frontend), HuggingFace Spaces with Docker (backend) |
 
----
+## Running locally
 
-## 🚀 Quick Start
+You need Python 3.10, Node.js 18 or newer, and Git LFS.
 
-**Prerequisites:** Python 3.10, Node.js 18+, Git LFS
-
-**1. Clone**
 ```bash
 git lfs install
 git clone https://github.com/TeamSigmoidIdea20/sentineliq.git
 cd sentineliq
 ```
 
-**2. Backend**
+Backend:
+
 ```bash
 cd backend
 python -m venv venv
 venv\Scripts\activate            # macOS/Linux: source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env              # optional: add GROK_API_KEY for AI narratives
+cp .env.example .env
 uvicorn main:app --reload --port 8000
 ```
-The first run generates 2,000 synthetic training events, trains all three models and seeds demo data. The backend is ready at `http://localhost:8000`.
 
-**3. Frontend** (new terminal)
+On first start the backend generates 2,000 training events, trains the three models and seeds some demo data. This takes a little while. To get alert summaries locally, add a `GROK_API_KEY` to `backend/.env`.
+
+Frontend, in a second terminal:
+
 ```bash
 cd frontend
 npm install
-cp .env.local.example .env.local  # NEXT_PUBLIC_API_URL=http://localhost:8000
+cp .env.local.example .env.local
 npm run dev
 ```
-Open **http://localhost:3000** 🎉
 
-> ⏳ The hosted backend runs on the HuggingFace free tier and sleeps after ~15 min idle. Open [`/health`](https://rak2315-sentineliq-backend.hf.space/health) and wait for `{"status":"ok"}` before demoing (cold start ~30-60s).
+Then open http://localhost:3000.
 
----
+## Trying the demo
 
-## 🎬 60-Second Demo Guide
+The hosted backend is on the free HuggingFace tier and goes to sleep when idle. If the dashboard looks empty, open the [health endpoint](https://rak2315-sentineliq-backend.hf.space/health), wait for `{"status":"ok"}` (up to a minute), and reload.
 
-1. 🌐 Open the [landing page](https://sentineliq-gold.vercel.app/), then **View Live Demo**. The live feed is already streaming.
-2. 💉 Click **Simulate → Bulk Data Exfiltration**. A new high-risk alert lands within seconds.
-3. 🔍 Open the alert: per-model scores, SHAP attribution, peer comparison and the plain-English narrative.
-4. 🔗 Go to **Cases** to see alerts stitched into a kill-chain timeline.
-5. 🏷️ Label a few alerts True/False Positive, then **Run Training Pipeline** on the **Intelligence** page to watch active learning retrain XGBoost.
+1. Open the [dashboard](https://sentineliq-gold.vercel.app/dashboard). The live feed should already be moving.
+2. Use **Simulate** and pick Bulk Data Exfiltration. An alert appears within a few seconds.
+3. Open the alert to see the model scores, SHAP breakdown, peer comparison and summary.
+4. Go to **Cases** to see alerts for the same user grouped on a timeline.
+5. Label some alerts as true or false positive, then run the training pipeline from the **Intelligence** page.
 
----
-
-## 🔌 API Reference
+## API
 
 <details>
-<summary><b>Click to expand all endpoints</b></summary>
+<summary>Endpoints</summary>
 
 | Method | Endpoint | Purpose |
 |---|---|---|
-| `GET` | `/health` · `/ping` | Health check, models loaded, DB connected |
-| `GET` | `/api/stats` | Users, alerts (24h), high-risk count, FP rate, coordinated patterns |
-| `GET` | `/api/feed` | Last 20 live events |
-| `GET` | `/api/alerts` | Filterable alert list (`risk_level`, `status`, `time_range`, `min_score`, paging) |
-| `GET` | `/api/alerts/{id}` | Full alert with model scores, SHAP values and AI narrative |
-| `GET` | `/api/alerts/{id}/timeline` | Investigation timeline for one alert |
-| `GET` | `/api/alerts/{id}/peer-comparison` | User vs. same-role peers on 4 metrics |
-| `GET` | `/api/alerts/{id}/export` | JSON evidence package download |
-| `POST` | `/api/alerts/{id}/resolve` · `/dismiss` | Close an alert |
-| `POST` | `/api/alerts/{id}/label` | TP/FP label for active learning |
-| `POST` | `/api/alerts/{id}/note` | Free-text analyst note |
-| `GET` | `/api/users` · `/api/users/{id}` | User list, 30-day risk history and recent alerts |
-| `GET` | `/api/users/{id}/events` | Event timeline for one user |
-| `POST` | `/api/users/{id}/restrict` · `/escalate` | Restrict or escalate a user |
-| `GET` | `/api/cases` · `/api/cases/{id}/timeline` | Kill-chain cases and their stitched timelines |
-| `POST` | `/api/cases/{id}/resolve` · `/dismiss` | Close a case |
-| `GET` | `/api/intelligence` | P/R/F1, model agreement, alert volume, FP trend, department risk |
-| `GET` | `/api/model-info` | Model configuration and training metadata |
-| `GET` | `/api/audit-log` | Analyst action audit trail |
-| `GET` `POST` | `/api/settings/webhook` | Read or set the critical-alert webhook URL |
-| `POST` | `/api/ingest` | Ingest an external event (SIEM, CERT replay) |
-| `POST` | `/api/simulate` | Inject an attack scenario |
-| `POST` | `/api/retrain` | Retrain XGBoost on analyst labels (needs 10+) |
+| GET | `/health`, `/ping` | Health check |
+| GET | `/api/stats` | Headline numbers and coordinated patterns |
+| GET | `/api/feed` | Last 20 live events |
+| GET | `/api/alerts` | Alert list with filters and paging |
+| GET | `/api/alerts/{id}` | One alert with model scores, SHAP values and summary |
+| GET | `/api/alerts/{id}/timeline` | Timeline for one alert |
+| GET | `/api/alerts/{id}/peer-comparison` | User compared with same-role peers |
+| GET | `/api/alerts/{id}/export` | Evidence package as JSON |
+| POST | `/api/alerts/{id}/resolve`, `/dismiss` | Close an alert |
+| POST | `/api/alerts/{id}/label` | True / false positive label |
+| POST | `/api/alerts/{id}/note` | Analyst note |
+| GET | `/api/users`, `/api/users/{id}` | Users, risk history and recent alerts |
+| GET | `/api/users/{id}/events` | Event history for one user |
+| POST | `/api/users/{id}/restrict`, `/escalate` | Restrict or escalate a user |
+| GET | `/api/cases`, `/api/cases/{id}/timeline` | Cases and their timelines |
+| POST | `/api/cases/{id}/resolve`, `/dismiss` | Close a case |
+| GET | `/api/intelligence` | Model metrics and trends |
+| GET | `/api/model-info` | Model configuration |
+| GET | `/api/audit-log` | Analyst action log |
+| GET, POST | `/api/settings/webhook` | Read or set the alert webhook |
+| POST | `/api/ingest` | Push an external event |
+| POST | `/api/simulate` | Inject an attack scenario |
+| POST | `/api/retrain` | Retrain XGBoost on analyst labels |
 
-Interactive docs are available at `/docs` (Swagger UI) on any running backend.
+Swagger docs are served at `/docs` on a running backend.
 
 </details>
 
----
-
-## 📁 Project Structure
-
-<details>
-<summary><b>Click to expand</b></summary>
+## Project structure
 
 ```
 sentineliq/
 ├── backend/
-│   ├── main.py                     - FastAPI app, all endpoints, live event loop
-│   ├── database.py                 - SQLAlchemy async models (SQLite WAL)
-│   ├── schemas.py                  - Pydantic request/response models
-│   ├── llm_narrative.py            - plain-English alert narratives
-│   ├── Dockerfile                  - HuggingFace Spaces container (port 7860)
+│   ├── main.py                     FastAPI app, endpoints, live event loop
+│   ├── database.py                 SQLAlchemy models
+│   ├── schemas.py                  Pydantic models
+│   ├── llm_narrative.py            alert summaries
+│   ├── Dockerfile                  HuggingFace Spaces container
 │   ├── data/
-│   │   ├── synthetic_generator.py  - 50-user event stream, 6 attack patterns
-│   │   ├── feature_engineering.py  - 8 rolling-window behavioural features
-│   │   └── cert_profile.json       - real CERT login-hour distribution
+│   │   ├── synthetic_generator.py  50-user event stream, 6 attack patterns
+│   │   ├── feature_engineering.py  the 8 behavioural features
+│   │   └── cert_profile.json       login-hour distribution from CERT
 │   └── models/
-│       ├── isolation_forest.py     - point anomaly detector
-│       ├── lstm_autoencoder.py     - temporal drift detector
-│       ├── xgboost_model.py        - supervised scorer + SHAP TreeExplainer
-│       └── ensemble.py             - weighted blend (0.4 / 0.4 / 0.2)
+│       ├── isolation_forest.py
+│       ├── lstm_autoencoder.py
+│       ├── xgboost_model.py        includes the SHAP explainer
+│       └── ensemble.py             weighted blend
 ├── frontend/
-│   ├── app/
-│   │   ├── page.tsx                - landing page
-│   │   └── dashboard/              - overview, alerts, cases, intelligence, users
-│   ├── components/                 - AlertPanel, SHAPChart, CommandPalette, LiveFeed, ...
-│   └── lib/
-│       ├── api.ts                  - typed API client
-│       └── tokens.ts               - design tokens
-├── scripts/cert/                   - CMU CERT r4.2 validation + insider replay
-└── docs/                           - walkthroughs and README images
+│   ├── app/                        landing page and dashboard pages
+│   ├── components/
+│   └── lib/                        API client and design tokens
+├── scripts/cert/                   CERT validation and replay scripts
+└── docs/                           walkthroughs and images
 ```
 
-</details>
+## Limitations
 
----
+- The models are trained on synthetic data. A real deployment would need real, labelled activity logs.
+- SQLite is fine for a prototype but would not hold up under production write volume.
+- On the free HuggingFace tier the database is wiped whenever the container restarts.
+- The dashboard polls every 3 seconds. It does not use WebSockets.
+- SHAP explanations cover XGBoost only. The other two models give a score without a per-feature breakdown.
+- The dashboard has no login.
+- The LSTM is trained once at startup and is not retrained as behaviour changes.
 
-## ⚠️ Limitations
+## What's next
 
-- 🧪 Trained on synthetic data only. Production deployment needs real labelled activity logs.
-- 🗄️ SQLite is right-sized for a POC; production would use PostgreSQL for write throughput.
-- 💤 The free HuggingFace tier has ephemeral storage (data resets on restart) and sleeps when idle.
-- 🔄 The live feed uses 3-second HTTP polling rather than WebSockets.
-- 🔍 SHAP covers XGBoost only; Isolation Forest and LSTM give scores without a per-feature breakdown.
-- 🔐 The dashboard has no authentication yet.
+- Map each alert to a MITRE ATT&CK technique
+- A per-user activity heatmap (hour by weekday)
+- WebSocket streaming
+- Analyst login with roles
+- PostgreSQL and a message queue for larger deployments
 
-## 🗺️ Roadmap
+## The idea in short
 
-- [ ] 🗺️ MITRE ATT&CK technique mapping on every alert
-- [ ] 🔥 24h × 7d activity heatmap per user
-- [ ] ⏱️ Live decision timer on open alerts
-- [ ] ⚡ WebSocket streaming instead of polling
-- [ ] 🔐 Role-based analyst authentication
-- [ ] 🐘 PostgreSQL + message queue for enterprise scale
+Rules and audits can only catch what someone thought to write a rule for, and they treat every employee the same. Insider attacks do not look like rule violations. They look like a trusted person behaving slightly unlike themselves.
 
----
+So we stopped asking "did this break a rule?" and started asking "is this normal for this person?". SentinelIQ learns each user's own pattern, scores every action against it with three different models, and when something is off it tells the analyst exactly why, in terms they can check. The analyst makes the call, and their decision feeds back into the model.
 
-<div align="center">
+## Contact
 
-**Built with ❤️ by Team SIGMOID for CodeArambh 2.0 · Open Innovation Track**
-
-📧 [rehtrooper@gmail.com](mailto:rehtrooper@gmail.com) &nbsp;·&nbsp; 🌐 [Live Demo](https://sentineliq-gold.vercel.app/) &nbsp;·&nbsp; 🎬 [Demo Video](https://youtu.be/ebN6C0Ewx7U)
-
-<sub>⭐ If SentinelIQ caught your attention, give the repo a star!</sub>
-
-</div>
+rehtrooper@gmail.com
