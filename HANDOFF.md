@@ -42,7 +42,7 @@ gives you all of it.
 | `docs/Pexp.md` | Plain-English walkthrough of the whole project + tough Q&A (presentation prep). |
 | `docs/explanation_working.md` | Detailed file-by-file code explanation. |
 | `docs/*.pdf` | Earlier submission PDF (archive, not maintained). |
-| `README.md` | Public GitHub README, framed for CodeArambh 2.0 (Open Innovation, cybersecurity). |
+| `README.md` | Public GitHub README. |
 | `backend/` | FastAPI + ML (deployed to HuggingFace Spaces via subtree push). |
 | `backend/main.py` | App, all endpoints, live event loop, seeding, simulate, retrain. |
 | `backend/database.py` / `schemas.py` | SQLAlchemy async models + Pydantic schemas. |
@@ -130,8 +130,7 @@ HF rejects binary files, hence the subtree push of `backend/` only.
 
 ---
 
-## 5. What's left (CodeArambh 2.0, Open Innovation track)
+## 5. What's left
 
-- PPT on the official CodeArambh template - not created (due 10 October 2026).
 - Known low-priority bugs: `handoff/claude-memory/known_bugs.md`.
 - Future features: activity heatmap, decision timer, MITRE ATT&CK chips (see `CLAUDE.md`).

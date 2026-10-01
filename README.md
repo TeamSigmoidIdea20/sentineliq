@@ -27,7 +27,7 @@
   <img src="docs/images/landing.png" alt="SentinelIQ landing page" width="100%" />
 </p>
 
-Built by Team SIGMOID for CodeArambh 2.0 (Open Innovation track, cybersecurity).
+Built by Team SIGMOID.
 
 ## Contents
 
@@ -361,11 +361,20 @@ sentineliq/
 
 ## The idea in short
 
-Most security tools are built to keep attackers out, but insiders are already in. An employee, an admin, or anyone using stolen credentials can cause damage while every action looks authorised. Fixed rules and periodic audits miss this because they do not know what normal looks like for each person.
+Most security tools are built to keep attackers out, but insiders are already in. An employee, an admin, or anyone using stolen credentials can cause damage while every action looks authorised. Fixed rules and periodic audits miss this because they treat everyone the same and do not know what normal looks like for each person. Insider incidents cost organisations $19.5M a year on average and take 67 days to contain (Ponemon Institute, 2026).
 
-Every alert comes with a SHAP breakdown of what drove the score and a plain-English summary. Repeated alerts for one user are grouped into a case with a timeline. Analysts label alerts as true or false positives, and those labels retrain the model.
+SentinelIQ is a real-time insider threat detection platform. It learns a behavioural baseline for every user: when they log in, how many transactions they make, how much data they download, which departments they access, and which devices and locations they use. Each new action is turned into 8 behavioural features and scored by three models working together: an Isolation Forest for sudden anomalies, an LSTM Autoencoder for gradual drift across a sequence of actions, and XGBoost for known attack patterns. The blended risk score runs from 0 to 100 and raises an alert at 65 or above.
 
-The working prototype is live, with a FastAPI backend and a Next.js dashboard, and was validated against the CMU CERT insider-threat benchmark.
+What makes it different:
+
+- **Per-user baselines.** Each person is compared with their own history, not a company-wide threshold.
+- **Three models, three angles.** Two of them are unsupervised, so they can flag behaviour that no rule or label describes yet.
+- **Explained alerts.** Every alert shows which signals drove the score (SHAP), how the user compares with peers in the same role, and a plain-English summary.
+- **Cases instead of noise.** Repeated alerts for one user are grouped into a single case with a timeline of what led up to it.
+- **It learns from analysts.** True and false positive labels retrain the model from the dashboard.
+- **Human in the loop.** Nothing is blocked automatically. The analyst decides.
+
+The working prototype is live, with a FastAPI backend and a Next.js dashboard. The data is synthetic, and we validated it against the CMU CERT insider-threat benchmark, where SentinelIQ flagged a documented insider from that dataset at a risk score of 84. It also accepts events from external systems through an ingest API, so it can sit alongside an existing SIEM.
 
 ## Contact
 

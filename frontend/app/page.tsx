@@ -549,7 +549,7 @@ export default function LandingPage() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo.png" alt="" aria-hidden="true" style={{ height: 20, width: 'auto', display: 'block' }} />
             <span style={{ fontSize: 13, fontWeight: 700, color: C.primary }}>SentinelIQ</span>
-            <span style={{ fontSize: 12, color: C.muted, marginLeft: 8 }}>Team SIGMOID · CodeArambh 2.0 · Open Innovation</span>
+            <span style={{ fontSize: 12, color: C.muted, marginLeft: 8 }}>Built by Team SIGMOID</span>
           </div>
           <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
             <a href="https://github.com/TeamSigmoidIdea20/sentineliq" target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: C.muted, textDecoration: 'none' }}>GitHub</a>

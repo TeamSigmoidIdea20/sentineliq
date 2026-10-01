@@ -6,7 +6,7 @@ product
 
 ## Users
 
-Security operations (SOC) analysts and insider-risk teams, with banks and fintechs as the flagship use case. They monitor 50+ privileged employees in real time from a dedicated security workstation, often under time pressure when an alert fires. Their primary job on any given screen is: see the anomaly, understand why it fired, decide to resolve or escalate. Secondary audience: CodeArambh 2.0 (Open Innovation track, cybersecurity) judges with 90 seconds to evaluate - they need to grasp the system's power immediately, without explanation.
+Security operations (SOC) analysts and insider-risk teams, with banks and fintechs as the flagship use case. They monitor 50+ privileged employees in real time from a dedicated security workstation, often under time pressure when an alert fires. Their primary job on any given screen is: see the anomaly, understand why it fired, decide to resolve or escalate. Secondary audience: evaluators and first-time viewers with 90 seconds to form an opinion - they need to grasp the system's power immediately, without explanation.
 
 ## Product Purpose
 

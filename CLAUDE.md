@@ -2,18 +2,17 @@
 
 ## What This Is
 AI-driven cybersecurity platform for real-time insider threat detection.
-Built for **CodeArambh 2.0** (HIET Ghaziabad, 24-hour national hackathon), **Open Innovation** track,
-domain: **Cybersecurity**. Banks/fintech are the flagship use case (the demo workforce is a bank).
+Domain: **Cybersecurity**. Banks/fintech are the flagship use case (the demo workforce is a bank).
 Working prototype deployed on Vercel + HuggingFace Spaces.
 
-## Hackathon: CodeArambh 2.0
-- Registration + PPT submission deadline: 10 October 2026 (Devfolio)
-- Track: Open Innovation (domains: Cybersecurity, FinTech, Smart Campus, IoT, Social Impact, Emerging Tech)
-- Track objectives (frame all copy around these): innovation and problem-solving; a functional,
-  scalable prototype; a genuine challenge with practical value; creativity, technical excellence, user impact
+## Framing Rules
+- The project is a general cybersecurity product. Never name any event, competition, sponsor
+  or organiser anywhere in the repo (frontend, backend, README, docs)
+- Frame copy around: innovation, a working and scalable prototype, a real problem with practical
+  value, technical depth, and user impact
 - Demo video: https://youtu.be/ebN6C0Ewx7U
-- Never mention the previous hackathon or its sponsor in any file
 - Use normal hyphen dashes (-) only, never em dashes or en dashes
+- No emojis or hype copy in the README or docs
 
 ## Live Deployment
 - Frontend: https://sentineliq-gold.vercel.app/
@@ -235,7 +234,6 @@ sentineliq/
 - SHAP shows only 1 non-zero feature bar when XGBoost was retrained on too few samples (< 50).
   The fallback runs but feature vectors themselves are near-zero if user has no rolling-window history.
   Root fix: accumulate more events before retraining.
-- CodeArambh 2.0 PPT (official template) not created yet.
 
 ## HuggingFace Deployment Reality - Why Things Break
 
@@ -280,11 +278,11 @@ from the browser's perspective. Always use `datetime.utcnow()` everywhere in bac
 - The "live feed" only shows events from the current container session
 - SEED_VERSION = "v3" ensures the seed state is at least deterministic per boot
 
-### Better deployment alternatives (post-hackathon)
+### Better deployment alternatives (later)
 - **Railway** or **Render** - persistent disk volumes, no binary restrictions, proper always-on free tier
 - **Fly.io** - persistent volumes, faster cold start, SQLite survives reboots
 - **Supabase** - replace SQLite with Postgres for real persistence (would need SQLAlchemy URL change)
-For the hackathon POC, HF is acceptable as long as the demo is done with an active backend.
+For the POC, HF is acceptable as long as the demo is done with an active backend.
 
 ## Synthetic Data Pipeline - Known Issues and Design
 
@@ -370,11 +368,10 @@ HF rebuilds automatically when the `hf` remote receives a push.
 - App shell upgrade: topbar with live UTC clock + threat level chip + statusbar (28px)
 - Risk gauge SVG arc: replace score bar in user profile header
 
-## Submission Status (CodeArambh 2.0)
+## Project Status
 - Live demo: sentineliq-gold.vercel.app ✓
 - Demo video: https://youtu.be/ebN6C0Ewx7U ✓
-- GitHub README (framed for Open Innovation / cybersecurity): README.md ✓
-- PPT on the official CodeArambh template: TODO (due 10 October 2026)
+- GitHub README: README.md ✓
 
 ## Demo Checklist (before presenting)
 1. Wake the backend: visit https://rak2315-sentineliq-backend.hf.space/health

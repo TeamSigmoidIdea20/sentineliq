@@ -18,10 +18,9 @@ bank (where one insider action can move money), but the pipeline works for any o
 All the data is synthetic (we generate it ourselves), and we validated that our synthetic
 behaviour looks realistic by comparing it to a famous real research dataset (CMU CERT).
 
-**Hackathon context:** CodeArambh 2.0 (HIET Ghaziabad), **Open Innovation** track, domain
-**Cybersecurity**. The track judges four things - innovation and problem-solving, a
-functional and scalable prototype, a genuine challenge with practical value, and
-creativity / technical excellence / user impact. Section 17 has a ready answer for each.
+**What evaluators usually look for:** innovation and problem-solving, a functional and
+scalable prototype, a genuine challenge with practical value, and technical excellence with
+real user impact. Section 17 has a ready answer for each.
 
 ---
 
@@ -486,9 +485,8 @@ used everywhere via the `C` object so colours stay consistent).
 
 ## 17. Anticipated judge questions + confident answers
 
-**Q: Why is this Open Innovation, and how does it meet the track objectives?**
-A: It's a cybersecurity product, one of the track's named domains, with FinTech as the
-flagship use case. *Innovation:* per-user behavioural baselines plus a 3-model ensemble
+**Q: What is new here, and why does it matter?**
+A: It's a cybersecurity product with FinTech as the flagship use case. *Innovation:* per-user behavioural baselines plus a 3-model ensemble
 instead of static rules, so we catch attacks nobody wrote a rule for. *Functional and
 scalable prototype:* it's live right now (Vercel + HuggingFace), the event-driven pipeline
 runs continuously, and scaling is a storage/queue swap, not a rewrite. *Genuine challenge:*
