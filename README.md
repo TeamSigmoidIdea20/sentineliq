@@ -361,9 +361,11 @@ sentineliq/
 
 ## The idea in short
 
-Rules and audits can only catch what someone thought to write a rule for, and they treat every employee the same. Insider attacks do not look like rule violations. They look like a trusted person behaving slightly unlike themselves.
+Most security tools are built to keep attackers out, but insiders are already in. An employee, an admin, or anyone using stolen credentials can cause damage while every action looks authorised. Fixed rules and periodic audits miss this because they do not know what normal looks like for each person.
 
-So we stopped asking "did this break a rule?" and started asking "is this normal for this person?". SentinelIQ learns each user's own pattern, scores every action against it with three different models, and when something is off it tells the analyst exactly why, in terms they can check. The analyst makes the call, and their decision feeds back into the model.
+Every alert comes with a SHAP breakdown of what drove the score and a plain-English summary. Repeated alerts for one user are grouped into a case with a timeline. Analysts label alerts as true or false positives, and those labels retrain the model.
+
+The working prototype is live, with a FastAPI backend and a Next.js dashboard, and was validated against the CMU CERT insider-threat benchmark.
 
 ## Contact
 
