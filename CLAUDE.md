@@ -10,7 +10,6 @@ Working prototype deployed on Vercel + HuggingFace Spaces.
   or organiser anywhere in the repo (frontend, backend, README, docs)
 - Frame copy around: innovation, a working and scalable prototype, a real problem with practical
   value, technical depth, and user impact
-- Demo video: https://youtu.be/ebN6C0Ewx7U
 - Use normal hyphen dashes (-) only, never em dashes or en dashes
 - No emojis or hype copy in the README or docs
 
@@ -370,7 +369,6 @@ HF rebuilds automatically when the `hf` remote receives a push.
 
 ## Project Status
 - Live demo: sentineliq-gold.vercel.app ✓
-- Demo video: https://youtu.be/ebN6C0Ewx7U ✓
 - GitHub README: README.md ✓
 
 ## Demo Checklist (before presenting)

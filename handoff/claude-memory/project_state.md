@@ -11,7 +11,6 @@ SentinelIQ is a working, deployed insider threat detection POC, framed as a gene
 - Frontend: https://sentineliq-gold.vercel.app/
 - Backend: https://rak2315-sentineliq-backend.hf.space
 - GitHub: https://github.com/TeamSigmoidIdea20/sentineliq.git (remote `origin`; remote `hf` = https://huggingface.co/spaces/rak2315/sentineliq-backend)
-- Demo video: https://youtu.be/ebN6C0Ewx7U
 
 **What's fully built:** 5 dashboard pages, 3-model ML ensemble (IF + LSTM + XGBoost), SHAP explanations, active learning retrain loop, simulate dropdown, kill-chain cases, model intelligence page with training log, user monitoring with restrict/escalate, peer comparison, evidence export, coordinated activity banners, dual-timestamp backend, LLM narrative via Grok (grok-3-mini, GROK_API_KEY HF secret), deterministic seed_demo_state().
 

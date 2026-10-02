@@ -19,7 +19,6 @@
 
 <p align="center">
   <a href="https://sentineliq-gold.vercel.app/">Live demo</a> ·
-  <a href="https://youtu.be/ebN6C0Ewx7U">Demo video</a> ·
   <a href="https://rak2315-sentineliq-backend.hf.space/health">Backend API</a>
 </p>
 
